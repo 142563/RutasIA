@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RutasIA | Monitoreo y Optimización</title>
+    <title>LogistiRoute | Optimizacion de Rutas</title>
     <link rel="stylesheet" href="{% static 'logistics/style.css' %}">
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" />
 </head>
@@ -13,15 +13,21 @@
     <div class="layout">
         <header class="hero">
             <div class="hero-top">
-                <div>
-                    <p class="chip">Sistema Web de Distribución</p>
-                    <h1>RutasIA</h1>
-                    <p class="subtitle">Monitoreo, optimización de rutas y control operativo de viajes en Guatemala.</p>
+                <div class="hero-brand">
+                    <img class="brand-logo" src="{% static 'logistics/brand/logistiroute-logo.png' %}" alt="LogistiRoute">
+                    <div class="hero-copy">
+                        <p class="chip">Sistema Web de Distribucion</p>
+                        <h1>LogistiRoute</h1>
+                        <p class="subtitle">Optimizacion inteligente de rutas y control operativo de viajes en Guatemala.</p>
+                    </div>
                 </div>
                 <div class="user-info" id="user-info">
                     <span id="user-badge" class="role-badge"></span>
                     <span id="user-name"></span>
-                    <a href="/accounts/logout/" class="btn-logout">Cerrar sesión</a>
+                    <form method="post" action="/accounts/logout/" class="logout-form">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-logout">Cerrar sesión</button>
+                    </form>
                 </div>
             </div>
         </header>
@@ -362,6 +368,49 @@
                                 <option value="">Ninguno</option>
                             </select>
                         </label>
+                    </div>
+                    <div class="route-summary is-empty" id="map-route-summary">
+                        <div class="route-summary-head">
+                            <h4>Detalle de ruta</h4>
+                            <span id="map-summary-hint">Selecciona un viaje para ver la ruta óptima destacada.</span>
+                        </div>
+                        <div class="route-summary-grid">
+                            <div class="route-summary-item">
+                                <span>Viaje</span>
+                                <strong id="map-summary-code">-</strong>
+                            </div>
+                            <div class="route-summary-item">
+                                <span>Origen</span>
+                                <strong id="map-summary-origin">-</strong>
+                            </div>
+                            <div class="route-summary-item">
+                                <span>Destino</span>
+                                <strong id="map-summary-destination">-</strong>
+                            </div>
+                            <div class="route-summary-item">
+                                <span>Distancia</span>
+                                <strong id="map-summary-distance">-</strong>
+                            </div>
+                            <div class="route-summary-item">
+                                <span>Costo</span>
+                                <strong id="map-summary-cost">-</strong>
+                            </div>
+                            <div class="route-summary-item">
+                                <span>Combustible</span>
+                                <strong id="map-summary-fuel">-</strong>
+                            </div>
+                            <div class="route-summary-item">
+                                <span>Estado</span>
+                                <strong id="map-summary-status">-</strong>
+                            </div>
+                        </div>
+                        <div class="route-legend">
+                            <span class="legend-item"><i class="legend-dot legend-network"></i>Red completa</span>
+                            <span class="legend-item"><i class="legend-dot legend-route"></i>Ruta seleccionada</span>
+                            <span class="legend-item"><i class="legend-dot legend-start"></i>Inicio</span>
+                            <span class="legend-item"><i class="legend-dot legend-middle"></i>Intermedio</span>
+                            <span class="legend-item"><i class="legend-dot legend-end"></i>Fin</span>
+                        </div>
                     </div>
                     <div id="route-map"></div>
                 </article>

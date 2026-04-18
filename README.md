@@ -1,4 +1,4 @@
-# RutasIA (Python + Django)
+# LogistiRoute (Python + Django)
 
 Sistema web para monitoreo y optimización de rutas de distribución en Guatemala.
 

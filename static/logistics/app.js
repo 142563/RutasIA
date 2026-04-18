@@ -27,6 +27,10 @@ let map = null;
 let mapReady = false;
 let mapHasAutoFit = false;
 let activePopup = null;
+let selectedMapTripId = null;
+let highlightAnimationFrame = null;
+
+const HIGHLIGHT_ANIMATION_MS = 520;
 
 const MAP_IDS = {
     connectionsSource: "connections-source",
@@ -37,6 +41,7 @@ const MAP_IDS = {
     departmentLabelsLayer: "departments-labels-layer",
     highlightSource: "highlight-source",
     highlightLineGlowLayer: "highlight-line-glow-layer",
+    highlightLineCasingLayer: "highlight-line-casing-layer",
     highlightLineLayer: "highlight-line-layer",
     highlightPointLayer: "highlight-point-layer"
 };
@@ -418,10 +423,19 @@ function renderEventTripSelect() {
 
 function renderMapTripSelect() {
     const sel = document.getElementById("map-trip-select");
+    const previousSelection = selectedMapTripId || Number(sel.value || 0);
     sel.innerHTML = [
         `<option value="">Ninguno</option>`,
-        ...state.trips.map((t) => `<option value="${t.id}">${escapeHtml(t.code)} — ${escapeHtml(t.route_nodes.join(" → "))}</option>`)
+        ...state.trips.map((trip) => `<option value="${trip.id}">${escapeHtml(trip.code)} - ${escapeHtml(trip.route_nodes.join(" -> "))}</option>`)
     ].join("");
+
+    if (previousSelection && state.trips.some((trip) => trip.id === previousSelection)) {
+        sel.value = String(previousSelection);
+        selectedMapTripId = previousSelection;
+    } else {
+        sel.value = "";
+        selectedMapTripId = null;
+    }
 }
 
 function renderUsers() {
@@ -508,36 +522,64 @@ function renderMap() {
 
 function onMapTripSelect(event) {
     if (!mapReady) return;
-    const tripId = Number(event.target.value);
+    const tripId = Number(event.target.value || 0);
+    focusMapTripById(tripId, { animate: true, shouldFit: true });
+}
+
+function focusMapTripById(tripId, options = {}) {
+    const { animate = true, shouldFit = true } = options;
+
     if (!tripId) {
+        selectedMapTripId = null;
         clearHighlightedRoute();
+        updateMapRouteSummary(null);
         return;
     }
 
-    const trip = state.trips.find((t) => t.id === tripId);
-    if (!trip) return;
+    const trip = state.trips.find((candidate) => candidate.id === tripId);
+    if (!trip) {
+        selectedMapTripId = null;
+        clearHighlightedRoute();
+        updateMapRouteSummary(null);
+        return;
+    }
 
-    const coords = trip.route_nodes.map((name) => {
-        const dept = state.departments.find((d) => d.name === name);
-        return dept && dept.latitude ? [Number(dept.longitude), Number(dept.latitude)] : null;
-    }).filter(Boolean);
+    const coords = trip.route_nodes
+        .map((name) => {
+            const department = state.departments.find((candidate) => candidate.name === name);
+            return department && department.latitude ? [Number(department.longitude), Number(department.latitude)] : null;
+        })
+        .filter(Boolean);
 
     if (coords.length < 2) {
+        selectedMapTripId = null;
         clearHighlightedRoute();
+        updateMapRouteSummary(null);
         return;
     }
 
-    const highlight = buildHighlightGeoJson(trip, coords);
+    selectedMapTripId = tripId;
     const source = map.getSource(MAP_IDS.highlightSource);
     if (source) {
-        source.setData(highlight);
+        source.setData(buildHighlightGeoJson(trip, coords));
+    }
+    updateMapRouteSummary(trip);
+
+    if (animate) {
+        animateHighlightedRoute();
     }
 
-    const bounds = coords.reduce(
-        (acc, coord) => acc.extend(coord),
-        new maplibregl.LngLatBounds(coords[0], coords[0])
-    );
-    map.fitBounds(bounds, { padding: 36, duration: 500, maxZoom: 10 });
+    if (shouldFit) {
+        const bounds = coords.reduce(
+            (accumulator, coordinate) => accumulator.extend(coordinate),
+            new maplibregl.LngLatBounds(coords[0], coords[0])
+        );
+        map.fitBounds(bounds, {
+            padding: { top: 70, right: 48, bottom: 84, left: 48 },
+            duration: 900,
+            maxZoom: 10
+        });
+    }
 }
 
 function ensureMapLayers() {
@@ -551,19 +593,19 @@ function ensureMapLayers() {
             type: "line",
             source: MAP_IDS.connectionsSource,
             paint: {
-                "line-color": "rgba(15, 23, 42, 0.24)",
+                "line-color": "rgba(2, 8, 23, 0.22)",
                 "line-width": [
                     "interpolate",
                     ["linear"],
                     ["zoom"],
                     5,
-                    1.8,
+                    1.6,
                     9,
-                    3.2,
+                    2.6,
                     12,
-                    5.2
+                    3.9
                 ],
-                "line-opacity": 0.5
+                "line-opacity": 0.32
             }
         });
         map.addLayer({
@@ -571,19 +613,19 @@ function ensureMapLayers() {
             type: "line",
             source: MAP_IDS.connectionsSource,
             paint: {
-                "line-color": "#14b8a6",
+                "line-color": "#67e8f9",
                 "line-width": [
                     "interpolate",
                     ["linear"],
                     ["zoom"],
                     5,
-                    1.1,
+                    0.8,
                     9,
-                    2.1,
+                    1.4,
                     12,
-                    3.3
+                    2
                 ],
-                "line-opacity": 0.72
+                "line-opacity": 0.38
             }
         });
     }
@@ -652,20 +694,41 @@ function ensureMapLayers() {
             source: MAP_IDS.highlightSource,
             filter: ["==", ["geometry-type"], "LineString"],
             paint: {
-                "line-color": "rgba(249, 115, 22, 0.35)",
+                "line-color": "rgba(15, 23, 42, 0.72)",
                 "line-width": [
                     "interpolate",
                     ["linear"],
                     ["zoom"],
                     5,
-                    8,
+                    7.5,
                     10,
-                    11,
+                    10.5,
                     12,
-                    13
+                    12.5
                 ],
-                "line-opacity": 0.5,
-                "line-blur": 0.85
+                "line-opacity": 0.62,
+                "line-blur": 1.2
+            }
+        });
+        map.addLayer({
+            id: MAP_IDS.highlightLineCasingLayer,
+            type: "line",
+            source: MAP_IDS.highlightSource,
+            filter: ["==", ["geometry-type"], "LineString"],
+            paint: {
+                "line-color": "#f8fafc",
+                "line-width": [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    5,
+                    4.8,
+                    10,
+                    7.2,
+                    12,
+                    8.8
+                ],
+                "line-opacity": 0.95
             }
         });
         map.addLayer({
@@ -674,7 +737,7 @@ function ensureMapLayers() {
             source: MAP_IDS.highlightSource,
             filter: ["==", ["geometry-type"], "LineString"],
             paint: {
-                "line-color": "#f97316",
+                "line-color": "#ff7f11",
                 "line-width": [
                     "interpolate",
                     ["linear"],
@@ -682,11 +745,11 @@ function ensureMapLayers() {
                     5,
                     3.2,
                     10,
-                    4.8,
+                    5.1,
                     12,
-                    6.2
+                    6.5
                 ],
-                "line-opacity": 0.9
+                "line-opacity": 0.98
             }
         });
         map.addLayer({
@@ -695,10 +758,35 @@ function ensureMapLayers() {
             source: MAP_IDS.highlightSource,
             filter: ["==", ["geometry-type"], "Point"],
             paint: {
-                "circle-radius": 8.5,
-                "circle-color": ["coalesce", ["get", "marker_color"], "#f97316"],
+                "circle-radius": [
+                    "match",
+                    ["get", "marker_type"],
+                    "start",
+                    10.5,
+                    "end",
+                    10.5,
+                    7.6
+                ],
+                "circle-color": [
+                    "match",
+                    ["get", "marker_type"],
+                    "start",
+                    "#22c55e",
+                    "end",
+                    "#ef4444",
+                    "#f59e0b"
+                ],
                 "circle-stroke-color": "#ffffff",
-                "circle-stroke-width": 2
+                "circle-stroke-width": [
+                    "match",
+                    ["get", "marker_type"],
+                    "start",
+                    2.6,
+                    "end",
+                    2.6,
+                    2.2
+                ],
+                "circle-opacity": 0.98
             }
         });
     }
@@ -741,13 +829,130 @@ function updateMapData() {
         departmentsSource.setData(buildDepartmentsGeoJson());
     }
 
+    if (selectedMapTripId && state.trips.some((trip) => trip.id === selectedMapTripId)) {
+        focusMapTripById(selectedMapTripId, { animate: false, shouldFit: false });
+        return;
+    }
+
+    selectedMapTripId = null;
+    const selector = document.getElementById("map-trip-select");
+    if (selector) selector.value = "";
     clearHighlightedRoute();
+    updateMapRouteSummary(null);
     fitMapToDepartments();
 }
 
 function clearHighlightedRoute() {
+    if (highlightAnimationFrame) {
+        cancelAnimationFrame(highlightAnimationFrame);
+        highlightAnimationFrame = null;
+    }
     const source = map && map.getSource(MAP_IDS.highlightSource);
     if (source) source.setData(emptyFeatureCollection());
+    resetHighlightLayerOpacity();
+}
+
+function resetHighlightLayerOpacity() {
+    if (!map) return;
+    if (map.getLayer(MAP_IDS.highlightLineGlowLayer)) {
+        map.setPaintProperty(MAP_IDS.highlightLineGlowLayer, "line-opacity", 0.62);
+    }
+    if (map.getLayer(MAP_IDS.highlightLineCasingLayer)) {
+        map.setPaintProperty(MAP_IDS.highlightLineCasingLayer, "line-opacity", 0.95);
+    }
+    if (map.getLayer(MAP_IDS.highlightLineLayer)) {
+        map.setPaintProperty(MAP_IDS.highlightLineLayer, "line-opacity", 0.98);
+    }
+    if (map.getLayer(MAP_IDS.highlightPointLayer)) {
+        map.setPaintProperty(MAP_IDS.highlightPointLayer, "circle-opacity", 0.98);
+    }
+}
+
+function animateHighlightedRoute() {
+    if (!map) return;
+    if (highlightAnimationFrame) {
+        cancelAnimationFrame(highlightAnimationFrame);
+    }
+
+    if (map.getLayer(MAP_IDS.highlightLineGlowLayer)) {
+        map.setPaintProperty(MAP_IDS.highlightLineGlowLayer, "line-opacity", 0.05);
+    }
+    if (map.getLayer(MAP_IDS.highlightLineCasingLayer)) {
+        map.setPaintProperty(MAP_IDS.highlightLineCasingLayer, "line-opacity", 0.08);
+    }
+    if (map.getLayer(MAP_IDS.highlightLineLayer)) {
+        map.setPaintProperty(MAP_IDS.highlightLineLayer, "line-opacity", 0.1);
+    }
+    if (map.getLayer(MAP_IDS.highlightPointLayer)) {
+        map.setPaintProperty(MAP_IDS.highlightPointLayer, "circle-opacity", 0.08);
+    }
+
+    const startedAt = performance.now();
+    const tick = (timestamp) => {
+        const progress = Math.min((timestamp - startedAt) / HIGHLIGHT_ANIMATION_MS, 1);
+        const eased = progress < 0.5 ? 2 * progress * progress : 1 - (Math.pow(-2 * progress + 2, 2) / 2);
+
+        if (map.getLayer(MAP_IDS.highlightLineGlowLayer)) {
+            map.setPaintProperty(MAP_IDS.highlightLineGlowLayer, "line-opacity", 0.62 * eased);
+        }
+        if (map.getLayer(MAP_IDS.highlightLineCasingLayer)) {
+            map.setPaintProperty(MAP_IDS.highlightLineCasingLayer, "line-opacity", 0.95 * eased);
+        }
+        if (map.getLayer(MAP_IDS.highlightLineLayer)) {
+            map.setPaintProperty(MAP_IDS.highlightLineLayer, "line-opacity", 0.98 * eased);
+        }
+        if (map.getLayer(MAP_IDS.highlightPointLayer)) {
+            map.setPaintProperty(MAP_IDS.highlightPointLayer, "circle-opacity", 0.98 * eased);
+        }
+
+        if (progress < 1) {
+            highlightAnimationFrame = requestAnimationFrame(tick);
+        } else {
+            highlightAnimationFrame = null;
+            resetHighlightLayerOpacity();
+        }
+    };
+
+    highlightAnimationFrame = requestAnimationFrame(tick);
+}
+
+function updateMapRouteSummary(trip) {
+    const summary = document.getElementById("map-route-summary");
+    const hint = document.getElementById("map-summary-hint");
+    if (!summary || !hint) return;
+
+    if (!trip) {
+        summary.classList.add("is-empty");
+        hint.textContent = "Selecciona un viaje para ver la ruta óptima destacada.";
+        setSummaryField("map-summary-code", "-");
+        setSummaryField("map-summary-origin", "-");
+        setSummaryField("map-summary-destination", "-");
+        setSummaryField("map-summary-distance", "-");
+        setSummaryField("map-summary-cost", "-");
+        setSummaryField("map-summary-fuel", "-");
+        setSummaryField("map-summary-status", "-");
+        return;
+    }
+
+    summary.classList.remove("is-empty");
+    hint.textContent = "Ruta resaltada con nodos de inicio, intermedios y fin.";
+    setSummaryField("map-summary-code", escapeHtml(trip.code));
+    setSummaryField("map-summary-origin", escapeHtml(trip.origin_name));
+    setSummaryField("map-summary-destination", escapeHtml(trip.destination_name));
+    setSummaryField("map-summary-distance", `${trip.total_distance_km.toFixed(2)} km`);
+    setSummaryField("map-summary-cost", `Q ${trip.estimated_cost.toFixed(2)}`);
+    setSummaryField("map-summary-fuel", `${trip.estimated_fuel_liters.toFixed(2)} l`);
+    setSummaryField("map-summary-status", statusChip(trip.status));
+}
+
+function setSummaryField(id, value) {
+    const node = document.getElementById(id);
+    if (!node) return;
+    if (typeof value === "string" && value.includes("<")) {
+        node.innerHTML = value;
+        return;
+    }
+    node.textContent = value;
 }
 
 function fitMapToDepartments() {
@@ -838,6 +1043,7 @@ function buildHighlightGeoJson(trip, coordinates) {
     ];
 
     coordinates.forEach((coordinate, index) => {
+        const markerType = index === 0 ? "start" : index === coordinates.length - 1 ? "end" : "mid";
         features.push({
             type: "Feature",
             geometry: {
@@ -845,7 +1051,7 @@ function buildHighlightGeoJson(trip, coordinates) {
                 coordinates: coordinate
             },
             properties: {
-                marker_color: index === 0 ? "#22c55e" : index === coordinates.length - 1 ? "#ef4444" : "#f97316",
+                marker_type: markerType,
                 label: trip.route_nodes[index] || ""
             }
         });

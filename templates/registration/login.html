@@ -1,9 +1,10 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RutasIA | Iniciar sesión</title>
+    <title>LogistiRoute | Iniciar sesion</title>
     <style>
         :root {
             --bg-0: #0f172a;
@@ -38,12 +39,19 @@
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(3, 9, 28, 0.35);
             padding: 2.2rem 2rem;
-            width: min(380px, 92vw);
+            width: min(420px, 92vw);
         }
 
         .brand {
             text-align: center;
             margin-bottom: 1.6rem;
+        }
+
+        .brand-logo {
+            width: min(320px, 90%);
+            height: auto;
+            display: block;
+            margin: 0 auto 0.7rem;
         }
 
         .chip {
@@ -124,14 +132,15 @@
 <body>
     <div class="login-box">
         <div class="brand">
-            <p class="chip">Sistema Web de Distribución</p>
-            <h1>RutasIA</h1>
+            <img class="brand-logo" src="{% static 'logistics/brand/logistiroute-logo.png' %}" alt="LogistiRoute">
+            <p class="chip">Sistema Web de Distribucion</p>
+            <h1>LogistiRoute</h1>
             <p class="subtitle">Ingresa tus credenciales para continuar</p>
         </div>
 
         {% if form.errors %}
         <div class="error-box">
-            Usuario o contraseña incorrectos. Intenta de nuevo.
+            Usuario o contrasena incorrectos. Intenta de nuevo.
         </div>
         {% endif %}
 
@@ -140,10 +149,10 @@
             <label>Usuario
                 <input type="text" name="username" autofocus autocomplete="username" required>
             </label>
-            <label>Contraseña
+            <label>Contrasena
                 <input type="password" name="password" autocomplete="current-password" required>
             </label>
-            <button type="submit" class="btn-submit">Iniciar sesión</button>
+            <button type="submit" class="btn-submit">Iniciar sesion</button>
         </form>
     </div>
 </body>
