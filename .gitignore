@@ -1,0 +1,27 @@
+# Python / Django
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local environments
+.venv/
+venv/
+env/
+.env
+
+# Django local DB and uploads
+db.sqlite3
+media/
+staticfiles/
+
+# IDE / OS
+.vscode/
+.idea/
+Thumbs.db
+
+# Temporary and extracted files
+tmp_*.txt
+
+# Previous scaffold not used in final stack
+RutasIA.Web/

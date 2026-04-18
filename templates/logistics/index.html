@@ -1,0 +1,427 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RutasIA | Monitoreo y Optimización</title>
+    <link rel="stylesheet" href="{% static 'logistics/style.css' %}">
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" />
+</head>
+<body>
+    <div class="backdrop"></div>
+    <div class="layout">
+        <header class="hero">
+            <div class="hero-top">
+                <div>
+                    <p class="chip">Sistema Web de Distribución</p>
+                    <h1>RutasIA</h1>
+                    <p class="subtitle">Monitoreo, optimización de rutas y control operativo de viajes en Guatemala.</p>
+                </div>
+                <div class="user-info" id="user-info">
+                    <span id="user-badge" class="role-badge"></span>
+                    <span id="user-name"></span>
+                    <a href="/accounts/logout/" class="btn-logout">Cerrar sesión</a>
+                </div>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab is-active" data-tab="dashboard">Dashboard</button>
+            <button class="tab" data-tab="vehicles">Vehículos</button>
+            <button class="tab" data-tab="drivers">Conductores</button>
+            <button class="tab" data-tab="orders">Pedidos</button>
+            <button class="tab" data-tab="planner">Planificador</button>
+            <button class="tab" data-tab="trips">Viajes</button>
+            <button class="tab" data-tab="map">Mapa</button>
+            <button class="tab tab-admin" data-tab="users" id="tab-users-btn" style="display:none">Usuarios</button>
+        </nav>
+
+        <main class="content">
+
+            <!-- DASHBOARD -->
+            <section id="tab-dashboard" class="panel is-active">
+                <div class="filter-bar">
+                    <label>Desde <input type="date" id="dash-date-from"></label>
+                    <label>Hasta <input type="date" id="dash-date-to"></label>
+                    <button class="btn-filter" id="dash-filter-btn">Filtrar</button>
+                    <button class="btn-filter btn-clear" id="dash-clear-btn">Limpiar</button>
+                </div>
+                <div class="cards-grid">
+                    <article class="metric-card">
+                        <h3>Total viajes</h3>
+                        <p id="metric-total-trips">0</p>
+                    </article>
+                    <article class="metric-card">
+                        <h3>Viajes activos</h3>
+                        <p id="metric-active-trips">0</p>
+                    </article>
+                    <article class="metric-card">
+                        <h3>Pedidos pendientes</h3>
+                        <p id="metric-pending-orders">0</p>
+                    </article>
+                    <article class="metric-card">
+                        <h3>Pedidos entregados</h3>
+                        <p id="metric-delivered-orders">0</p>
+                    </article>
+                    <article class="metric-card">
+                        <h3>Costo acumulado (Q)</h3>
+                        <p id="metric-total-cost">0.00</p>
+                    </article>
+                    <article class="metric-card">
+                        <h3>Distancia acumulada (km)</h3>
+                        <p id="metric-total-distance">0.00</p>
+                    </article>
+                </div>
+
+                <div class="charts-grid">
+                    <article class="chart-card">
+                        <h3>Distribución por estado de viaje</h3>
+                        <canvas id="status-chart" width="560" height="260"></canvas>
+                    </article>
+                    <article class="chart-card">
+                        <h3>Viajes en últimos 7 días</h3>
+                        <canvas id="timeline-chart" width="560" height="260"></canvas>
+                    </article>
+                </div>
+
+                <article class="table-card">
+                    <h3>Vehículos con mayor actividad</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Placa</th>
+                                <th>Total viajes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vehicle-activity-body"></tbody>
+                    </table>
+                </article>
+            </section>
+
+            <!-- VEHICLES -->
+            <section id="tab-vehicles" class="panel">
+                <div class="split">
+                    <article class="form-card" id="vehicle-form-card">
+                        <h3>Registrar vehículo</h3>
+                        <form id="vehicle-form">
+                            <label>Placa
+                                <input name="plate" required placeholder="C-123ABC">
+                            </label>
+                            <label>Modelo
+                                <input name="model" required placeholder="Isuzu NPR">
+                            </label>
+                            <label>Capacidad kg
+                                <input name="capacity_kg" type="number" step="0.01" min="1" required>
+                            </label>
+                            <label>Eficiencia km/l
+                                <input name="fuel_efficiency_km_l" type="number" step="0.01" min="0.1" required>
+                            </label>
+                            <label>Costo por km (Q)
+                                <input name="cost_per_km" type="number" step="0.01" min="0.1" required>
+                            </label>
+                            <label>Conductor asignado
+                                <select name="driver_id" id="vehicle-driver">
+                                    <option value="">Sin conductor</option>
+                                </select>
+                            </label>
+                            <label>Departamento actual
+                                <select name="current_department_id" id="vehicle-current-department"></select>
+                            </label>
+                            <label class="inline">
+                                <input type="checkbox" name="is_active" checked>
+                                Vehículo activo
+                            </label>
+                            <button type="submit">Guardar vehículo</button>
+                        </form>
+                    </article>
+
+                    <article class="table-card">
+                        <h3>Flota registrada</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Placa</th>
+                                    <th>Modelo</th>
+                                    <th>Capacidad</th>
+                                    <th>Eficiencia</th>
+                                    <th>Costo/km</th>
+                                    <th>Conductor</th>
+                                    <th>Ubicación</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vehicles-body"></tbody>
+                        </table>
+                    </article>
+                </div>
+            </section>
+
+            <!-- DRIVERS -->
+            <section id="tab-drivers" class="panel">
+                <div class="split">
+                    <article class="form-card" id="driver-form-card">
+                        <h3>Registrar conductor</h3>
+                        <form id="driver-form">
+                            <label>Nombre completo
+                                <input name="name" required placeholder="Juan Pérez">
+                            </label>
+                            <label>Teléfono
+                                <input name="phone" placeholder="5555-1234">
+                            </label>
+                            <label>No. de licencia
+                                <input name="license_number" required placeholder="L-12345678">
+                            </label>
+                            <label class="inline">
+                                <input type="checkbox" name="is_active" checked>
+                                Conductor activo
+                            </label>
+                            <button type="submit">Guardar conductor</button>
+                        </form>
+                    </article>
+
+                    <article class="table-card">
+                        <h3>Conductores registrados</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Teléfono</th>
+                                    <th>Licencia</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drivers-body"></tbody>
+                        </table>
+                    </article>
+                </div>
+            </section>
+
+            <!-- ORDERS -->
+            <section id="tab-orders" class="panel">
+                <div class="split">
+                    <article class="form-card" id="order-form-card">
+                        <h3>Crear pedido</h3>
+                        <form id="order-form">
+                            <label>Origen
+                                <select name="origin_id" id="order-origin" required></select>
+                            </label>
+                            <label>Destino
+                                <select name="destination_id" id="order-destination" required></select>
+                            </label>
+                            <label>Peso (kg)
+                                <input name="weight_kg" type="number" step="0.01" min="1" required>
+                            </label>
+                            <label>Cantidad de productos
+                                <input name="package_count" type="number" min="1" required>
+                            </label>
+                            <label>Prioridad
+                                <select name="priority">
+                                    <option value="low">Baja</option>
+                                    <option value="normal" selected>Normal</option>
+                                    <option value="high">Alta</option>
+                                </select>
+                            </label>
+                            <button type="submit">Guardar pedido</button>
+                        </form>
+                    </article>
+
+                    <article class="table-card">
+                        <h3>Pedidos</h3>
+                        <div class="filter-bar inline-filter">
+                            <label>Estado
+                                <select id="order-filter-status">
+                                    <option value="">Todos</option>
+                                    <option value="pending">Pendiente</option>
+                                    <option value="assigned">Asignado</option>
+                                    <option value="in_transit">En tránsito</option>
+                                    <option value="delivered">Entregado</option>
+                                    <option value="canceled">Cancelado</option>
+                                </select>
+                            </label>
+                            <label>Origen
+                                <select id="order-filter-origin">
+                                    <option value="">Todos</option>
+                                </select>
+                            </label>
+                            <label>Destino
+                                <select id="order-filter-dest">
+                                    <option value="">Todos</option>
+                                </select>
+                            </label>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Origen</th>
+                                    <th>Destino</th>
+                                    <th>Peso</th>
+                                    <th>Bultos</th>
+                                    <th>Prioridad</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-body"></tbody>
+                        </table>
+                    </article>
+                </div>
+            </section>
+
+            <!-- PLANNER -->
+            <section id="tab-planner" class="panel">
+                <article class="form-card wide">
+                    <h3>Planificar viaje óptimo (Dijkstra)</h3>
+                    <p class="hint">
+                        Selecciona pedidos pendientes con el mismo origen y destino para crear un viaje consolidado.
+                    </p>
+                    <form id="planner-form">
+                        <label>Vehículo
+                            <select id="planner-vehicle" name="vehicle_id" required></select>
+                        </label>
+                        <label>Conductor (opcional)
+                            <select id="planner-driver" name="driver_id">
+                                <option value="">Sin conductor asignado</option>
+                            </select>
+                        </label>
+                        <div class="orders-picker">
+                            <h4>Pedidos pendientes</h4>
+                            <div id="planner-orders-list" class="checklist"></div>
+                        </div>
+                        <button type="submit">Planificar y crear viaje</button>
+                    </form>
+                </article>
+
+                <article class="result-card" id="planner-result">
+                    <h3>Resultado de planificación</h3>
+                    <p>Aún no se ha generado ningún viaje en esta sesión.</p>
+                </article>
+            </section>
+
+            <!-- TRIPS -->
+            <section id="tab-trips" class="panel">
+                <article class="table-card">
+                    <h3>Viajes</h3>
+                    <div class="filter-bar inline-filter">
+                        <label>Estado
+                            <select id="trip-filter-status">
+                                <option value="">Todos</option>
+                                <option value="planned">Planificado</option>
+                                <option value="in_progress">En progreso</option>
+                                <option value="completed">Completado</option>
+                                <option value="canceled">Cancelado</option>
+                            </select>
+                        </label>
+                        <label>Vehículo
+                            <select id="trip-filter-vehicle">
+                                <option value="">Todos</option>
+                            </select>
+                        </label>
+                        <label>Desde <input type="date" id="trip-filter-from"></label>
+                        <label>Hasta <input type="date" id="trip-filter-to"></label>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Vehículo</th>
+                                <th>Conductor</th>
+                                <th>Ruta</th>
+                                <th>Distancia</th>
+                                <th>Combustible</th>
+                                <th>Costo</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trips-body"></tbody>
+                    </table>
+                </article>
+
+                <article class="form-card wide">
+                    <h3>Registrar evento de monitoreo</h3>
+                    <form id="event-form">
+                        <label>Viaje
+                            <select id="event-trip-id" name="trip_id" required></select>
+                        </label>
+                        <label>Evento
+                            <input name="note" required placeholder="Ejemplo: Unidad ingresó a Retalhuleu">
+                        </label>
+                        <button type="submit">Guardar evento</button>
+                    </form>
+                </article>
+            </section>
+
+            <!-- MAP -->
+            <section id="tab-map" class="panel">
+                <article class="map-card">
+                    <div class="map-controls">
+                        <h3>Mapa de red logística</h3>
+                        <label>Resaltar ruta de viaje
+                            <select id="map-trip-select">
+                                <option value="">Ninguno</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div id="route-map"></div>
+                </article>
+            </section>
+
+            <!-- USERS (Admin only) -->
+            <section id="tab-users" class="panel">
+                <div class="split">
+                    <article class="form-card">
+                        <h3>Crear usuario</h3>
+                        <form id="user-form">
+                            <label>Usuario
+                                <input name="username" required placeholder="operador01">
+                            </label>
+                            <label>Contraseña
+                                <input name="password" type="password" required>
+                            </label>
+                            <label>Nombre
+                                <input name="first_name" placeholder="Juan">
+                            </label>
+                            <label>Apellido
+                                <input name="last_name" placeholder="Pérez">
+                            </label>
+                            <label>Email
+                                <input name="email" type="email" placeholder="juan@empresa.com">
+                            </label>
+                            <label>Rol
+                                <select name="role">
+                                    <option value="operator">Operador</option>
+                                    <option value="supervisor">Supervisor</option>
+                                    <option value="admin">Administrador</option>
+                                </select>
+                            </label>
+                            <button type="submit">Crear usuario</button>
+                        </form>
+                    </article>
+
+                    <article class="table-card">
+                        <h3>Usuarios del sistema</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Nombre</th>
+                                    <th>Email</th>
+                                    <th>Rol</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-body"></tbody>
+                        </table>
+                    </article>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <div id="toast" class="toast"></div>
+    <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+    <script src="{% static 'logistics/app.js' %}" defer></script>
+</body>
+</html>

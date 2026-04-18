@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python manage.py clearsessions)",
+      "Bash(pip show *)",
+      "Bash(python manage.py seed_demo_data)",
+      "Bash(where python *)",
+      "Bash(.venv/Scripts/python.exe manage.py clearsessions)",
+      "Bash(.venv/Scripts/python.exe manage.py seed_demo_data)",
+      "Bash(\"c:/Users/julio/OneDrive/Desktop/Proyecto Rutas/RutasIA/.venv/Scripts/python.exe\" -c \"import django; print\\(django.__version__\\)\")",
+      "Bash(\"c:/Users/julio/anaconda3/python.exe\" -c \"import django; print\\(django.__version__\\)\")",
+      "Bash(\"c:/Users/julio/anaconda3/python.exe\" manage.py clearsessions)",
+      "Bash(\"c:/Users/julio/anaconda3/python.exe\" manage.py seed_demo_data)"
+    ]
+  }
+}

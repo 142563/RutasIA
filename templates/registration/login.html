@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RutasIA | Iniciar sesión</title>
+    <style>
+        :root {
+            --bg-0: #0f172a;
+            --bg-1: #16213e;
+            --bg-2: #0f3d3e;
+            --accent: #f97316;
+            --accent-2: #0ea5a4;
+            --card: rgba(255, 255, 255, 0.92);
+            --ink: #13213a;
+            --ink-soft: #37506b;
+            --line: rgba(10, 38, 64, 0.14);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            color: var(--ink);
+            background: radial-gradient(circle at 10% 20%, var(--bg-2), transparent 42%),
+                radial-gradient(circle at 85% 5%, #3b82f6, transparent 35%),
+                linear-gradient(135deg, var(--bg-0), var(--bg-1));
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-box {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(3, 9, 28, 0.35);
+            padding: 2.2rem 2rem;
+            width: min(380px, 92vw);
+        }
+
+        .brand {
+            text-align: center;
+            margin-bottom: 1.6rem;
+        }
+
+        .chip {
+            display: inline-block;
+            padding: 0.28rem 0.72rem;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            background: rgba(14, 165, 164, 0.16);
+            color: #0f766e;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        h1 {
+            margin: 0.3rem 0 0.2rem;
+            font-size: 2.2rem;
+            letter-spacing: 0.03em;
+        }
+
+        .subtitle {
+            margin: 0;
+            color: var(--ink-soft);
+            font-size: 0.9rem;
+        }
+
+        form { display: grid; gap: 0.7rem; }
+
+        label {
+            display: grid;
+            gap: 0.25rem;
+            font-size: 0.86rem;
+            color: #1f3c58;
+            font-weight: 700;
+        }
+
+        input {
+            font: inherit;
+            border: 1px solid rgba(12, 65, 89, 0.25);
+            border-radius: 10px;
+            padding: 0.55rem 0.7rem;
+            background: #fff;
+            width: 100%;
+        }
+
+        input:focus {
+            outline: 2px solid rgba(14, 165, 164, 0.35);
+            border-color: rgba(14, 165, 164, 0.75);
+        }
+
+        .btn-submit {
+            margin-top: 0.4rem;
+            border: 0;
+            border-radius: 10px;
+            padding: 0.65rem;
+            font: inherit;
+            font-weight: 700;
+            font-size: 1rem;
+            background: linear-gradient(135deg, var(--accent-2), #06b6d4);
+            color: #002633;
+            cursor: pointer;
+            transition: opacity 160ms;
+        }
+
+        .btn-submit:hover { opacity: 0.88; }
+
+        .error-box {
+            background: rgba(185, 28, 28, 0.1);
+            border: 1px solid rgba(185, 28, 28, 0.3);
+            border-radius: 10px;
+            padding: 0.6rem 0.8rem;
+            color: #b91c1c;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <div class="brand">
+            <p class="chip">Sistema Web de Distribución</p>
+            <h1>RutasIA</h1>
+            <p class="subtitle">Ingresa tus credenciales para continuar</p>
+        </div>
+
+        {% if form.errors %}
+        <div class="error-box">
+            Usuario o contraseña incorrectos. Intenta de nuevo.
+        </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <label>Usuario
+                <input type="text" name="username" autofocus autocomplete="username" required>
+            </label>
+            <label>Contraseña
+                <input type="password" name="password" autocomplete="current-password" required>
+            </label>
+            <button type="submit" class="btn-submit">Iniciar sesión</button>
+        </form>
+    </div>
+</body>
+</html>
