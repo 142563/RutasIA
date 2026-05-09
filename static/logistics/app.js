@@ -8,7 +8,8 @@ const API = {
     vehicles: "/api/vehicles/",
     orders: "/api/orders/",
     trips: "/api/trips/",
-    planTrip: "/api/trips/plan/"
+    planTrip: "/api/trips/plan/",
+    fuelPrice: "/api/fuel-price/"
 };
 
 const state = {
@@ -81,6 +82,61 @@ function bindForms() {
     document.getElementById("trips-body").addEventListener("click", onTripsActionClick);
     document.getElementById("user-form").addEventListener("submit", onUserSubmit);
     document.getElementById("map-trip-select").addEventListener("change", onMapTripSelect);
+    document.getElementById("fuel-form").addEventListener("submit", onFuelPriceSubmit);
+    document.getElementById("btn-edit-fuel").addEventListener("click", () => {
+        document.getElementById("fuel-form").style.display = "";
+        document.getElementById("btn-edit-fuel").style.display = "none";
+    });
+    document.getElementById("btn-cancel-fuel").addEventListener("click", () => {
+        document.getElementById("fuel-form").style.display = "none";
+        document.getElementById("btn-edit-fuel").style.display = "";
+    });
+}
+
+
+// ── PRECIO DE GASOLINA ────────────────────────────────────────────────────────
+
+async function reloadFuelPrice() {
+    try {
+        const res = await getJson(API.fuelPrice);
+        renderFuelPrice(res.fuel_price);
+    } catch (_) {}
+}
+
+function renderFuelPrice(fp) {
+    if (!fp) return;
+    document.getElementById("fuel-regular").textContent = `Q ${fp.regular_gtq_l.toFixed(2)}/L`;
+    document.getElementById("fuel-super").textContent = `Q ${fp.super_gtq_l.toFixed(2)}/L`;
+    document.getElementById("fuel-diesel").textContent = `Q ${fp.diesel_gtq_l.toFixed(2)}/L`;
+    const d = new Date(fp.updated_at);
+    document.getElementById("fuel-updated-at").textContent =
+        `${fp.source} · actualizado ${d.toLocaleDateString("es-GT")} ${d.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}`;
+    const isAdmin = state.currentUser && state.currentUser.role === "admin";
+    document.getElementById("btn-edit-fuel").style.display = isAdmin ? "" : "none";
+    const form = document.getElementById("fuel-form");
+    form.regular_gtq_l.value = fp.regular_gtq_l.toFixed(2);
+    form.super_gtq_l.value = fp.super_gtq_l.toFixed(2);
+    form.diesel_gtq_l.value = fp.diesel_gtq_l.toFixed(2);
+    form.source.value = fp.source;
+}
+
+async function onFuelPriceSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    try {
+        const res = await postJson(API.fuelPrice, {
+            regular_gtq_l: Number(form.regular_gtq_l.value),
+            super_gtq_l: Number(form.super_gtq_l.value),
+            diesel_gtq_l: Number(form.diesel_gtq_l.value),
+            source: form.source.value || "Manual"
+        });
+        renderFuelPrice(res.fuel_price);
+        form.style.display = "none";
+        document.getElementById("btn-edit-fuel").style.display = "";
+        showToast("Precio de combustible actualizado.");
+    } catch (error) {
+        showToast(error.message, true);
+    }
 }
 
 function bindFilters() {
@@ -117,7 +173,7 @@ async function reloadAll() {
         state.orders = orderRes.orders;
         state.trips = tripRes.trips;
 
-        await reloadDashboard();
+        await Promise.all([reloadDashboard(), reloadFuelPrice()]);
 
         if (state.currentUser && state.currentUser.role === "admin") {
             try {
@@ -470,39 +526,7 @@ function renderMap() {
     if (!map) {
         map = new maplibregl.Map({
             container: "route-map",
-            style: {
-                version: 8,
-                sources: {
-                    satellite: {
-                        type: "raster",
-                        tiles: [
-                            "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                        ],
-                        tileSize: 256,
-                        attribution: "Tiles &copy; Esri"
-                    },
-                    satellite_labels: {
-                        type: "raster",
-                        tiles: [
-                            "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-                        ],
-                        tileSize: 256,
-                        attribution: "Labels &copy; Esri"
-                    }
-                },
-                layers: [
-                    {
-                        id: "satellite-base",
-                        type: "raster",
-                        source: "satellite"
-                    },
-                    {
-                        id: "satellite-labels",
-                        type: "raster",
-                        source: "satellite_labels"
-                    }
-                ]
-            },
+            style: "https://tiles.openfreemap.org/styles/liberty",
             center: [-90.3, 15.45],
             zoom: 7
         });
@@ -526,7 +550,50 @@ function onMapTripSelect(event) {
     focusMapTripById(tripId, { animate: true, shouldFit: true });
 }
 
-function focusMapTripById(tripId, options = {}) {
+async function fetchRoadGeometry(waypointCoords) {
+    if (window.ORS_API_KEY) {
+        try {
+            return await _fetchViaORS(waypointCoords);
+        } catch (err) {
+            console.warn("ORS no disponible, usando OSRM:", err.message);
+        }
+    }
+    return _fetchViaOSRM(waypointCoords);
+}
+
+async function _fetchViaORS(waypointCoords) {
+    const resp = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + window.ORS_API_KEY
+        },
+        body: JSON.stringify({
+            coordinates: waypointCoords,
+            preference: "fastest",
+            geometry_simplify: false
+        })
+    });
+    if (!resp.ok) {
+        const msg = await resp.text().catch(() => resp.status);
+        throw new Error(`ORS ${resp.status}: ${msg}`);
+    }
+    const data = await resp.json();
+    if (!data.features?.[0]) throw new Error("ORS sin geometría");
+    return data.features[0].geometry.coordinates;
+}
+
+async function _fetchViaOSRM(waypointCoords) {
+    const coordStr = waypointCoords.map(([lon, lat]) => `${lon},${lat}`).join(";");
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`OSRM ${resp.status}`);
+    const data = await resp.json();
+    if (data.code !== "Ok" || !data.routes?.[0]) throw new Error("Sin ruta OSRM");
+    return data.routes[0].geometry.coordinates;
+}
+
+async function focusMapTripById(tripId, options = {}) {
     const { animate = true, shouldFit = true } = options;
 
     if (!tripId) {
@@ -544,14 +611,14 @@ function focusMapTripById(tripId, options = {}) {
         return;
     }
 
-    const coords = trip.route_nodes
+    const waypointCoords = trip.route_nodes
         .map((name) => {
             const department = state.departments.find((candidate) => candidate.name === name);
             return department && department.latitude ? [Number(department.longitude), Number(department.latitude)] : null;
         })
         .filter(Boolean);
 
-    if (coords.length < 2) {
+    if (waypointCoords.length < 2) {
         selectedMapTripId = null;
         clearHighlightedRoute();
         updateMapRouteSummary(null);
@@ -559,26 +626,35 @@ function focusMapTripById(tripId, options = {}) {
     }
 
     selectedMapTripId = tripId;
-    const source = map.getSource(MAP_IDS.highlightSource);
-    if (source) {
-        source.setData(buildHighlightGeoJson(trip, coords));
-    }
     updateMapRouteSummary(trip);
 
-    if (animate) {
-        animateHighlightedRoute();
-    }
+    // Show waypoint dots and straight placeholder while road data loads
+    const source = map.getSource(MAP_IDS.highlightSource);
+    if (source) source.setData(buildHighlightGeoJson(trip, waypointCoords, waypointCoords));
+
+    if (animate) animateHighlightedRoute();
 
     if (shouldFit) {
-        const bounds = coords.reduce(
-            (accumulator, coordinate) => accumulator.extend(coordinate),
-            new maplibregl.LngLatBounds(coords[0], coords[0])
+        const bounds = waypointCoords.reduce(
+            (acc, coord) => acc.extend(coord),
+            new maplibregl.LngLatBounds(waypointCoords[0], waypointCoords[0])
         );
         map.fitBounds(bounds, {
             padding: { top: 70, right: 48, bottom: 84, left: 48 },
             duration: 900,
             maxZoom: 10
         });
+    }
+
+    // Replace with actual road geometry from OSRM
+    try {
+        const roadCoords = await fetchRoadGeometry(waypointCoords);
+        const liveSource = map.getSource(MAP_IDS.highlightSource);
+        if (liveSource && selectedMapTripId === tripId) {
+            liveSource.setData(buildHighlightGeoJson(trip, waypointCoords, roadCoords));
+        }
+    } catch (err) {
+        console.warn("Geometría de carretera no disponible, usando ruta directa:", err.message);
     }
 }
 
@@ -1028,13 +1104,13 @@ function buildDepartmentsGeoJson() {
     };
 }
 
-function buildHighlightGeoJson(trip, coordinates) {
+function buildHighlightGeoJson(trip, waypointCoords, lineCoords) {
     const features = [
         {
             type: "Feature",
             geometry: {
                 type: "LineString",
-                coordinates
+                coordinates: lineCoords || waypointCoords
             },
             properties: {
                 trip_id: trip.id
@@ -1042,8 +1118,8 @@ function buildHighlightGeoJson(trip, coordinates) {
         }
     ];
 
-    coordinates.forEach((coordinate, index) => {
-        const markerType = index === 0 ? "start" : index === coordinates.length - 1 ? "end" : "mid";
+    waypointCoords.forEach((coordinate, index) => {
+        const markerType = index === 0 ? "start" : index === waypointCoords.length - 1 ? "end" : "mid";
         features.push({
             type: "Feature",
             geometry: {
@@ -1224,15 +1300,19 @@ async function onUserSubmit(event) {
 
 function showPlannerResult(trip) {
     const box = document.getElementById("planner-result");
+    const fuelCostLine = trip.estimated_fuel_cost_gtq != null
+        ? `<p><strong>Costo de combustible:</strong> Q ${trip.estimated_fuel_cost_gtq.toFixed(2)} <small>(Q ${trip.fuel_price_gtq_l?.toFixed(2)}/L al momento)</small></p>`
+        : "";
     box.innerHTML = `
         <h3>Resultado de planificación</h3>
         <p><strong>Código:</strong> ${escapeHtml(trip.code)}</p>
         <p><strong>Vehículo:</strong> ${escapeHtml(trip.vehicle_plate)}</p>
         <p><strong>Conductor:</strong> ${escapeHtml(trip.driver_name || "No asignado")}</p>
-        <p><strong>Ruta:</strong> ${escapeHtml(trip.route_nodes.join(" → "))}</p>
+        <p><strong>Ruta óptima:</strong> ${escapeHtml(trip.route_nodes.join(" → "))}</p>
         <p><strong>Distancia:</strong> ${trip.total_distance_km.toFixed(2)} km</p>
         <p><strong>Combustible estimado:</strong> ${trip.estimated_fuel_liters.toFixed(2)} litros</p>
-        <p><strong>Costo estimado:</strong> Q ${trip.estimated_cost.toFixed(2)}</p>
+        ${fuelCostLine}
+        <p><strong>Costo operativo estimado:</strong> Q ${trip.estimated_cost.toFixed(2)}</p>
         <p><strong>Pedidos asociados:</strong> ${trip.orders.length}</p>
     `;
 }

@@ -164,6 +164,89 @@ h1 {
     padding: 0.9rem 1rem;
 }
 
+/* ── Precio de gasolina ── */
+.fuel-price-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(10, 22, 44, 0.12);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.fuel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.fuel-header h3 {
+    margin: 0 0 0.2rem;
+    font-size: 0.95rem;
+    color: #1f3c58;
+    font-weight: 700;
+}
+
+.fuel-header small {
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+}
+
+.fuel-prices {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.fuel-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.fuel-item span {
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.fuel-item strong {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--accent);
+}
+
+.fuel-edit-form {
+    margin-top: 0.85rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.6rem;
+    border-top: 1px solid var(--line);
+    padding-top: 0.85rem;
+}
+
+.fuel-form-btns {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+.btn-small {
+    padding: 0.3rem 0.75rem;
+    font-size: 0.8rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 .metric-card h3 {
     margin: 0 0 0.35rem;
     font-size: 0.88rem;

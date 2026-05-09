@@ -1,6 +1,5 @@
 from django.urls import path
-
-from . import views
+from logistics.presentation import views
 
 urlpatterns = [
     path("", views.index, name="index"),
@@ -16,4 +15,5 @@ urlpatterns = [
     path("api/trips/plan/", views.api_plan_trip, name="api-plan-trip"),
     path("api/trips/<int:trip_id>/action/", views.api_trip_action, name="api-trip-action"),
     path("api/trips/<int:trip_id>/events/", views.api_trip_event, name="api-trip-event"),
+    path("api/fuel-price/", views.api_fuel_price, name="api-fuel-price"),
 ]

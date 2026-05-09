@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 import string
+from decimal import Decimal
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
@@ -17,6 +18,25 @@ class TimestampedModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class FuelPrice(TimestampedModel):
+    """Singleton — precio de combustible en GTQ/litro. Usar FuelPrice.current()."""
+    regular_gtq_l = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("8.50"))
+    super_gtq_l = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("9.20"))
+    diesel_gtq_l = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("7.80"))
+    source = models.CharField(max_length=120, default="MEM Guatemala")
+
+    class Meta:
+        verbose_name = "Precio de combustible"
+
+    def __str__(self) -> str:
+        return f"Regular Q{self.regular_gtq_l}/L — {self.updated_at:%d/%m/%Y %H:%M}"
+
+    @classmethod
+    def current(cls) -> "FuelPrice":
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
 
 
 class UserProfile(models.Model):
@@ -183,6 +203,8 @@ class Trip(TimestampedModel):
     route_nodes = models.JSONField(default=list)
     total_distance_km = models.DecimalField(max_digits=9, decimal_places=2)
     estimated_fuel_liters = models.DecimalField(max_digits=9, decimal_places=2)
+    fuel_price_gtq_l = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    estimated_fuel_cost_gtq = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     estimated_cost = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PLANNED)
     started_at = models.DateTimeField(null=True, blank=True)

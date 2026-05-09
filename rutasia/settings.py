@@ -96,6 +96,8 @@ ALLOWED_HOSTS = _env_list(
 )
 CSRF_TRUSTED_ORIGINS = _env_list("CSRF_TRUSTED_ORIGINS", default="")
 
+ORS_API_KEY = os.getenv("ORS_API_KEY", "")
+
 
 # Application definition
 

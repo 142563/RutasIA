@@ -53,6 +53,32 @@
                     <button class="btn-filter" id="dash-filter-btn">Filtrar</button>
                     <button class="btn-filter btn-clear" id="dash-clear-btn">Limpiar</button>
                 </div>
+                <!-- Precio de gasolina en tiempo real -->
+                <article class="fuel-price-card" id="fuel-price-card">
+                    <div class="fuel-header">
+                        <div>
+                            <h3>⛽ Precio de combustible</h3>
+                            <small id="fuel-updated-at">Cargando...</small>
+                        </div>
+                        <button class="btn-small" id="btn-edit-fuel" style="display:none">Actualizar precio</button>
+                    </div>
+                    <div class="fuel-prices">
+                        <div class="fuel-item"><span>Regular</span><strong id="fuel-regular">—</strong></div>
+                        <div class="fuel-item"><span>Super</span><strong id="fuel-super">—</strong></div>
+                        <div class="fuel-item"><span>Diesel</span><strong id="fuel-diesel">—</strong></div>
+                    </div>
+                    <form id="fuel-form" style="display:none" class="fuel-edit-form">
+                        <label>Regular (Q/L) <input type="number" name="regular_gtq_l" step="0.01" min="0" required></label>
+                        <label>Super (Q/L) <input type="number" name="super_gtq_l" step="0.01" min="0" required></label>
+                        <label>Diesel (Q/L) <input type="number" name="diesel_gtq_l" step="0.01" min="0" required></label>
+                        <label>Fuente <input type="text" name="source" maxlength="120" placeholder="MEM Guatemala"></label>
+                        <div class="fuel-form-btns">
+                            <button type="submit">Guardar</button>
+                            <button type="button" id="btn-cancel-fuel">Cancelar</button>
+                        </div>
+                    </form>
+                </article>
+
                 <div class="cards-grid">
                     <article class="metric-card">
                         <h3>Total viajes</h3>
@@ -470,6 +496,9 @@
     </div>
 
     <div id="toast" class="toast"></div>
+    <script>
+        window.ORS_API_KEY = "{{ ors_api_key|escapejs }}";
+    </script>
     <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
     <script src="{% static 'logistics/app.js' %}" defer></script>
 </body>
