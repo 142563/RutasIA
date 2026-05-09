@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LogistiRoute | Optimizacion de Rutas</title>
+    <title>JaironRoute | Optimizacion de Rutas</title>
     <link rel="stylesheet" href="{% static 'logistics/style.css' %}">
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" />
 </head>
@@ -14,10 +14,10 @@
         <header class="hero">
             <div class="hero-top">
                 <div class="hero-brand">
-                    <img class="brand-logo" src="{% static 'logistics/brand/logistiroute-logo.png' %}" alt="LogistiRoute">
+                    <img class="brand-logo" src="{% static 'logistics/brand/jaironroute-logo.svg' %}" alt="JaironRoute">
                     <div class="hero-copy">
                         <p class="chip">Sistema Web de Distribucion</p>
-                        <h1>LogistiRoute</h1>
+                        <h1>JaironRoute</h1>
                         <p class="subtitle">Optimizacion inteligente de rutas y control operativo de viajes en Guatemala.</p>
                     </div>
                 </div>
@@ -68,9 +68,9 @@
                         <div class="fuel-item"><span>Diesel</span><strong id="fuel-diesel">—</strong></div>
                     </div>
                     <form id="fuel-form" style="display:none" class="fuel-edit-form">
-                        <label>Regular (Q/L) <input type="number" name="regular_gtq_l" step="0.01" min="0" required></label>
-                        <label>Super (Q/L) <input type="number" name="super_gtq_l" step="0.01" min="0" required></label>
-                        <label>Diesel (Q/L) <input type="number" name="diesel_gtq_l" step="0.01" min="0" required></label>
+                        <label>Regular (Q/gal) <input type="number" name="regular_gtq_gal" step="0.01" min="0" required></label>
+                        <label>Super (Q/gal) <input type="number" name="super_gtq_gal" step="0.01" min="0" required></label>
+                        <label>Diesel (Q/gal) <input type="number" name="diesel_gtq_gal" step="0.01" min="0" required></label>
                         <label>Fuente <input type="text" name="source" maxlength="120" placeholder="MEM Guatemala"></label>
                         <div class="fuel-form-btns">
                             <button type="submit">Guardar</button>

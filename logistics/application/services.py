@@ -11,6 +11,8 @@ from logistics.models import Department, Driver, FuelPrice, Order, Trip, TripEve
 from logistics.domain.exceptions import PlanningError
 from logistics.domain.services import AStarOptimizer, RouteOptimizer, to_decimal, ZERO
 
+LITERS_PER_GALLON = Decimal("3.78541")
+
 
 class TripPlanner:
     @staticmethod
@@ -61,11 +63,12 @@ class TripPlanner:
         node_ids, distance = optimizer.shortest_path(origin.id, destination.id)
 
         fuel_liters = to_decimal(distance / Decimal(vehicle.fuel_efficiency_km_l))
+        fuel_gallons = to_decimal(fuel_liters / LITERS_PER_GALLON)
         estimated_cost = to_decimal(distance * Decimal(vehicle.cost_per_km))
 
         fp = FuelPrice.current()
-        fuel_price_gtq_l = to_decimal(fp.regular_gtq_l)
-        estimated_fuel_cost_gtq = to_decimal(fuel_liters * fuel_price_gtq_l)
+        fuel_price_gtq_gal = to_decimal(fp.regular_gtq_gal)
+        estimated_fuel_cost_gtq = to_decimal(fuel_gallons * fuel_price_gtq_gal)
 
         node_name_lookup = Department.objects.in_bulk(node_ids)
         route_nodes = [node_name_lookup[node_id].name for node_id in node_ids]
@@ -77,8 +80,8 @@ class TripPlanner:
             destination=destination,
             route_nodes=route_nodes,
             total_distance_km=distance,
-            estimated_fuel_liters=fuel_liters,
-            fuel_price_gtq_l=fuel_price_gtq_l,
+            estimated_fuel_gallons=fuel_gallons,
+            fuel_price_gtq_gal=fuel_price_gtq_gal,
             estimated_fuel_cost_gtq=estimated_fuel_cost_gtq,
             estimated_cost=estimated_cost,
             status=Trip.Status.PLANNED,

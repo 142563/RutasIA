@@ -105,18 +105,18 @@ async function reloadFuelPrice() {
 
 function renderFuelPrice(fp) {
     if (!fp) return;
-    document.getElementById("fuel-regular").textContent = `Q ${fp.regular_gtq_l.toFixed(2)}/L`;
-    document.getElementById("fuel-super").textContent = `Q ${fp.super_gtq_l.toFixed(2)}/L`;
-    document.getElementById("fuel-diesel").textContent = `Q ${fp.diesel_gtq_l.toFixed(2)}/L`;
+    document.getElementById("fuel-regular").textContent = `Q ${fp.regular_gtq_gal.toFixed(2)}/gal`;
+    document.getElementById("fuel-super").textContent = `Q ${fp.super_gtq_gal.toFixed(2)}/gal`;
+    document.getElementById("fuel-diesel").textContent = `Q ${fp.diesel_gtq_gal.toFixed(2)}/gal`;
     const d = new Date(fp.updated_at);
     document.getElementById("fuel-updated-at").textContent =
         `${fp.source} · actualizado ${d.toLocaleDateString("es-GT")} ${d.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}`;
     const isAdmin = state.currentUser && state.currentUser.role === "admin";
     document.getElementById("btn-edit-fuel").style.display = isAdmin ? "" : "none";
     const form = document.getElementById("fuel-form");
-    form.regular_gtq_l.value = fp.regular_gtq_l.toFixed(2);
-    form.super_gtq_l.value = fp.super_gtq_l.toFixed(2);
-    form.diesel_gtq_l.value = fp.diesel_gtq_l.toFixed(2);
+    form.regular_gtq_gal.value = fp.regular_gtq_gal.toFixed(2);
+    form.super_gtq_gal.value = fp.super_gtq_gal.toFixed(2);
+    form.diesel_gtq_gal.value = fp.diesel_gtq_gal.toFixed(2);
     form.source.value = fp.source;
 }
 
@@ -125,9 +125,9 @@ async function onFuelPriceSubmit(event) {
     const form = event.currentTarget;
     try {
         const res = await postJson(API.fuelPrice, {
-            regular_gtq_l: Number(form.regular_gtq_l.value),
-            super_gtq_l: Number(form.super_gtq_l.value),
-            diesel_gtq_l: Number(form.diesel_gtq_l.value),
+            regular_gtq_gal: Number(form.regular_gtq_gal.value),
+            super_gtq_gal: Number(form.super_gtq_gal.value),
+            diesel_gtq_gal: Number(form.diesel_gtq_gal.value),
             source: form.source.value || "Manual"
         });
         renderFuelPrice(res.fuel_price);
@@ -460,7 +460,7 @@ function renderTripsFiltered() {
                 <td>${escapeHtml(trip.driver_name || "-")}</td>
                 <td>${escapeHtml(trip.route_nodes.join(" → "))}</td>
                 <td>${trip.total_distance_km.toFixed(2)} km</td>
-                <td>${trip.estimated_fuel_liters.toFixed(2)} l</td>
+                <td>${trip.estimated_fuel_gallons.toFixed(2)} gal</td>
                 <td>Q ${trip.estimated_cost.toFixed(2)}</td>
                 <td>${statusChip(trip.status)}</td>
                 <td>${buildTripActions(trip)}</td>
@@ -1017,7 +1017,7 @@ function updateMapRouteSummary(trip) {
     setSummaryField("map-summary-destination", escapeHtml(trip.destination_name));
     setSummaryField("map-summary-distance", `${trip.total_distance_km.toFixed(2)} km`);
     setSummaryField("map-summary-cost", `Q ${trip.estimated_cost.toFixed(2)}`);
-    setSummaryField("map-summary-fuel", `${trip.estimated_fuel_liters.toFixed(2)} l`);
+    setSummaryField("map-summary-fuel", `${trip.estimated_fuel_gallons.toFixed(2)} gal`);
     setSummaryField("map-summary-status", statusChip(trip.status));
 }
 
@@ -1301,7 +1301,7 @@ async function onUserSubmit(event) {
 function showPlannerResult(trip) {
     const box = document.getElementById("planner-result");
     const fuelCostLine = trip.estimated_fuel_cost_gtq != null
-        ? `<p><strong>Costo de combustible:</strong> Q ${trip.estimated_fuel_cost_gtq.toFixed(2)} <small>(Q ${trip.fuel_price_gtq_l?.toFixed(2)}/L al momento)</small></p>`
+        ? `<p><strong>Costo de combustible:</strong> Q ${trip.estimated_fuel_cost_gtq.toFixed(2)} <small>(Q ${trip.fuel_price_gtq_gal?.toFixed(2)}/gal al momento)</small></p>`
         : "";
     box.innerHTML = `
         <h3>Resultado de planificación</h3>
@@ -1310,7 +1310,7 @@ function showPlannerResult(trip) {
         <p><strong>Conductor:</strong> ${escapeHtml(trip.driver_name || "No asignado")}</p>
         <p><strong>Ruta óptima:</strong> ${escapeHtml(trip.route_nodes.join(" → "))}</p>
         <p><strong>Distancia:</strong> ${trip.total_distance_km.toFixed(2)} km</p>
-        <p><strong>Combustible estimado:</strong> ${trip.estimated_fuel_liters.toFixed(2)} litros</p>
+        <p><strong>Combustible estimado:</strong> ${trip.estimated_fuel_gallons.toFixed(2)} galones</p>
         ${fuelCostLine}
         <p><strong>Costo operativo estimado:</strong> Q ${trip.estimated_cost.toFixed(2)}</p>
         <p><strong>Pedidos asociados:</strong> ${trip.orders.length}</p>

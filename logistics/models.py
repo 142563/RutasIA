@@ -21,17 +21,17 @@ class TimestampedModel(models.Model):
 
 
 class FuelPrice(TimestampedModel):
-    """Singleton — precio de combustible en GTQ/litro. Usar FuelPrice.current()."""
-    regular_gtq_l = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("8.50"))
-    super_gtq_l = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("9.20"))
-    diesel_gtq_l = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("7.80"))
+    """Singleton — precio de combustible en GTQ/galón. Usar FuelPrice.current()."""
+    regular_gtq_gal = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("29.50"))
+    super_gtq_gal = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("32.00"))
+    diesel_gtq_gal = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal("24.00"))
     source = models.CharField(max_length=120, default="MEM Guatemala")
 
     class Meta:
         verbose_name = "Precio de combustible"
 
     def __str__(self) -> str:
-        return f"Regular Q{self.regular_gtq_l}/L — {self.updated_at:%d/%m/%Y %H:%M}"
+        return f"Regular Q{self.regular_gtq_gal}/gal — {self.updated_at:%d/%m/%Y %H:%M}"
 
     @classmethod
     def current(cls) -> "FuelPrice":
@@ -202,8 +202,8 @@ class Trip(TimestampedModel):
     orders = models.ManyToManyField(Order, through="TripOrder", related_name="trips")
     route_nodes = models.JSONField(default=list)
     total_distance_km = models.DecimalField(max_digits=9, decimal_places=2)
-    estimated_fuel_liters = models.DecimalField(max_digits=9, decimal_places=2)
-    fuel_price_gtq_l = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    estimated_fuel_gallons = models.DecimalField(max_digits=9, decimal_places=2)
+    fuel_price_gtq_gal = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     estimated_fuel_cost_gtq = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     estimated_cost = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PLANNED)

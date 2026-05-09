@@ -396,9 +396,9 @@ def api_fuel_price(request: HttpRequest):
     if request.method == "GET":
         return _ok({
             "fuel_price": {
-                "regular_gtq_l": _as_float(fp.regular_gtq_l),
-                "super_gtq_l": _as_float(fp.super_gtq_l),
-                "diesel_gtq_l": _as_float(fp.diesel_gtq_l),
+                "regular_gtq_gal": _as_float(fp.regular_gtq_gal),
+                "super_gtq_gal": _as_float(fp.super_gtq_gal),
+                "diesel_gtq_gal": _as_float(fp.diesel_gtq_gal),
                 "source": fp.source,
                 "updated_at": timezone.localtime(fp.updated_at).isoformat(),
             }
@@ -410,16 +410,16 @@ def api_fuel_price(request: HttpRequest):
 
     try:
         payload = _parse_json(request)
-        fp.regular_gtq_l = Decimal(str(payload["regular_gtq_l"]))
-        fp.super_gtq_l = Decimal(str(payload["super_gtq_l"]))
-        fp.diesel_gtq_l = Decimal(str(payload["diesel_gtq_l"]))
+        fp.regular_gtq_gal = Decimal(str(payload["regular_gtq_gal"]))
+        fp.super_gtq_gal = Decimal(str(payload["super_gtq_gal"]))
+        fp.diesel_gtq_gal = Decimal(str(payload["diesel_gtq_gal"]))
         fp.source = str(payload.get("source", "Manual"))
         fp.save()
         return _ok({
             "fuel_price": {
-                "regular_gtq_l": _as_float(fp.regular_gtq_l),
-                "super_gtq_l": _as_float(fp.super_gtq_l),
-                "diesel_gtq_l": _as_float(fp.diesel_gtq_l),
+                "regular_gtq_gal": _as_float(fp.regular_gtq_gal),
+                "super_gtq_gal": _as_float(fp.super_gtq_gal),
+                "diesel_gtq_gal": _as_float(fp.diesel_gtq_gal),
                 "source": fp.source,
                 "updated_at": timezone.localtime(fp.updated_at).isoformat(),
             }

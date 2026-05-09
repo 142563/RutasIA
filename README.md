@@ -1,4 +1,4 @@
-# LogistiRoute — Sistema de Optimización de Rutas
+# JaironRoute — Sistema de Optimización de Rutas
 
 Sistema web de gestión y optimización de rutas logísticas para Guatemala. Permite planificar viajes entre departamentos usando algoritmos de camino más corto, gestionar pedidos, conductores y vehículos, y visualizar rutas en un mapa interactivo.
 
@@ -6,12 +6,12 @@ Sistema web de gestión y optimización de rutas logísticas para Guatemala. Per
 
 ## Descripción del proyecto
 
-LogistiRoute resuelve el problema de encontrar la ruta más corta entre cualquier par de departamentos de Guatemala, considerando las conexiones viales reales y sus distancias en kilómetros. El sistema:
+JaironRoute resuelve el problema de encontrar la ruta más corta entre cualquier par de departamentos de Guatemala, considerando las conexiones viales reales y sus distancias en kilómetros. El sistema:
 
 - Calcula rutas óptimas usando el algoritmo de **Dijkstra** (grafo de distancias viales) o **A\*** (con heurística Haversine).
 - Visualiza la ruta sobre un mapa vectorial con **MapLibre GL JS** y traza el trazado real por carreteras via **OpenRouteService**.
 - Gestiona el ciclo de vida completo de un viaje: planificación → en progreso → completado / cancelado.
-- Calcula costos estimados de combustible (GTQ/litro) y costo por kilómetro del vehículo.
+- Calcula costos estimados de combustible (GTQ/galón) y costo por kilómetro del vehículo.
 - Controla acceso por roles: Administrador, Supervisor y Operador.
 
 ---
@@ -31,6 +31,193 @@ LogistiRoute resuelve el problema de encontrar la ruta más corta entre cualquie
 | Ruteo fallback | OSRM (Open Source Routing Machine) |
 | Algoritmos | Dijkstra (camino más corto), A* con heurística Haversine |
 | Deploy | Render.com (web service) |
+
+---
+
+## Cómo se consume cada tecnología
+
+### 🐍 Django 6.0 — Framework web
+
+Maneja el servidor HTTP, autenticación, base de datos y caché. Cada endpoint de la API es una función Django decorada:
+
+```python
+# logistics/urls.py
+path("api/trips/plan/", views.api_plan_trip, name="api-plan-trip")
+
+# logistics/presentation/views.py
+@login_required               # redirige si no hay sesión activa
+@require_http_methods(["POST"])
+def api_plan_trip(request: HttpRequest):
+    ...
+```
+
+---
+
+### 🐘 PostgreSQL en Neon — Base de datos
+
+Almacena departamentos, vehículos, viajes, precios de gasolina y toda la información operativa. Se accede exclusivamente a través del ORM de Django:
+
+```python
+# logistics/domain/services.py — consulta para construir el grafo de Dijkstra
+RouteConnection.objects.only("origin_id", "destination_id", "distance_km", "is_bidirectional")
+
+# logistics/application/services.py — guarda un viaje nuevo
+Trip.objects.create(vehicle=vehicle, route_nodes=route_nodes, ...)
+
+# .env — cadena de conexión
+DATABASE_URL=postgresql://neondb_owner:...@neon.tech/neondb?sslmode=require
+```
+
+---
+
+### ⚡ Django Cache Framework — Caché en memoria
+
+Guarda el grafo de Dijkstra 2 minutos para no consultar la base de datos en cada cálculo de ruta:
+
+```python
+# logistics/domain/services.py
+def _build_graph():
+    cached = cache.get("dijkstra_graph_v1")    # busca en memoria primero
+    if cached is not None:
+        return cached                           # responde sin tocar la BD
+    # ... construye grafo desde RouteConnection en BD ...
+    cache.set("dijkstra_graph_v1", result, 120)  # guarda 120 segundos
+    return result
+```
+
+---
+
+### 🗺️ MapLibre GL JS — Motor del mapa
+
+Renderiza el mapa interactivo en el navegador con capas vectoriales (puntos, líneas, etiquetas):
+
+```javascript
+// static/logistics/app.js
+map = new maplibregl.Map({
+    container: "route-map",
+    style: "https://tiles.openfreemap.org/styles/liberty",  // estilo vectorial
+    center: [-90.3, 15.45],   // Guatemala
+    zoom: 7
+});
+
+// Agrega los departamentos como puntos interactivos
+map.addLayer({ id: "departments-layer", type: "circle", source: "departments-source" });
+
+// Dibuja la ruta óptima resaltada en naranja
+map.addLayer({ id: "highlight-line-layer", type: "line", source: "highlight-source" });
+```
+
+---
+
+### 🌍 OpenFreeMap Liberty — Tiles vectoriales del mapa
+
+Provee los mapas vectoriales (calles, ríos, nombres, pueblos) sin costo ni API key. Reemplazó 30 líneas de configuración raster de Esri:
+
+```javascript
+// Una sola URL carga el estilo completo: colores, tipografías, capas
+style: "https://tiles.openfreemap.org/styles/liberty"
+```
+
+---
+
+### 🛣️ OpenRouteService (ORS) — Geometría de carreteras reales
+
+Dado un conjunto de puntos GPS (departamentos en la ruta), devuelve cientos de coordenadas que forman la carretera real. `preference: "fastest"` elige autopistas sobre caminos viejos:
+
+```javascript
+// static/logistics/app.js — función _fetchViaORS()
+fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+    method: "POST",
+    headers: {
+        "Authorization": "Bearer " + window.ORS_API_KEY   // JWT token
+    },
+    body: JSON.stringify({
+        coordinates: [[lon1, lat1], [lon2, lat2]],   // waypoints del viaje
+        preference: "fastest"    // elige autopista CA-9 sobre carretera vieja
+    })
+})
+// Respuesta: 300+ coordenadas siguiendo la carretera exacta en el mapa
+```
+
+Si ORS falla, el sistema cae automáticamente al fallback OSRM:
+
+```javascript
+async function fetchRoadGeometry(waypointCoords) {
+    if (window.ORS_API_KEY) {
+        try { return await _fetchViaORS(waypointCoords); }
+        catch (err) { console.warn("ORS no disponible, usando OSRM:", err.message); }
+    }
+    return _fetchViaOSRM(waypointCoords);   // fallback automático
+}
+```
+
+---
+
+### 📐 Dijkstra — Algoritmo de ruta óptima
+
+Decide qué departamentos atravesar (ej: Guatemala → Escuintla → Quetzaltenango) operando sobre las distancias reales de carretera almacenadas en `RouteConnection`:
+
+```python
+# logistics/domain/services.py — clase RouteOptimizer
+while queue:
+    g, node = heapq.heappop(queue)        # saca el nodo más cercano (min-heap)
+    for neighbor, weight in graph.get(node, []):
+        candidate = g + weight            # distancia acumulada candidata
+        if candidate < distances.get(neighbor, INF):
+            distances[neighbor] = candidate
+            heapq.heappush(queue, (candidate, neighbor))
+```
+
+---
+
+### 🔢 Haversine — Heurística geográfica para A*
+
+Calcula la distancia en línea recta entre dos coordenadas GPS. La usa internamente A* para descartar rutas que van en dirección equivocada:
+
+```python
+# logistics/domain/services.py
+def haversine_km(lat1, lon1, lat2, lon2):
+    R = 6371.0                            # radio de la Tierra en km
+    a = math.sin(dphi/2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda/2)**2
+    return 2 * R * math.asin(math.sqrt(a))   # distancia en km
+
+# Usada en A* como:  f(n) = g(n) + haversine_km(n, destino)
+```
+
+---
+
+### 🔄 Flujo completo de un viaje planificado
+
+```
+Usuario hace click "Planificar"
+        │
+        ▼
+app.js  →  POST /api/trips/plan/              (JavaScript en el navegador)
+        │
+        ▼
+presentation/views.py  →  api_plan_trip()     (Django recibe la petición HTTP)
+        │
+        ▼
+application/services.py  →  TripPlanner       (orquesta el caso de uso)
+        │
+        ▼
+domain/services.py  →  RouteOptimizer         (Dijkstra calcula la ruta)
+        │
+        ▼
+RouteConnection en PostgreSQL/Neon            (distancias reales desde BD)
+        │
+        ▼
+Trip guardado con precio de gasolina actual   (FuelPrice.current())
+        │
+        ▼
+app.js recibe la respuesta JSON
+        │
+        ▼
+_fetchViaORS()  →  OpenRouteService API       (geometría de carretera real)
+        │
+        ▼
+MapLibre GL dibuja la ruta sobre OpenFreeMap  (mapa vectorial en pantalla)
+```
 
 ---
 
@@ -86,7 +273,7 @@ El código dentro de `logistics/` está organizado en cuatro capas con responsab
 | `Driver` | Conductor con nombre, telefono y numero de licencia. |
 | `Order` | Pedido de envio con origen, destino, peso, prioridad y estado. |
 | `Trip` | Viaje planificado que agrupa pedidos, calcula ruta y registra costos. |
-| `FuelPrice` | Singleton con precios de combustible (regular, super, diesel) en GTQ/litro. |
+| `FuelPrice` | Singleton con precios de combustible (regular, super, diesel) en GTQ/galón. |
 | `TripEvent` | Bitacora de eventos asociados a un viaje (inicio, completado, notas). |
 | `UserProfile` | Extension de `User` con rol (admin / supervisor / operador). |
 

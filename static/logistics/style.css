@@ -55,7 +55,7 @@ body {
 }
 
 .hero-brand .brand-logo {
-    width: clamp(120px, 15vw, 180px);
+    width: clamp(220px, 24vw, 320px);
     height: auto;
     display: block;
     filter: drop-shadow(0 8px 20px rgba(15, 23, 42, 0.2));
@@ -769,7 +769,7 @@ button[type="submit"],
     }
 
     .hero-brand .brand-logo {
-        width: min(170px, 44vw);
+        width: min(280px, 70vw);
     }
 
     #route-map { height: 320px; }
