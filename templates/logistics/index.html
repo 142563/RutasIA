@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JaironRoute | Optimizacion de Rutas</title>
     <link rel="stylesheet" href="{% static 'logistics/style.css' %}">
-    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" />
 </head>
 <body>
     <div class="backdrop"></div>
@@ -539,7 +538,7 @@
     <script>
         window.ORS_API_KEY = "{{ ors_api_key|escapejs }}";
     </script>
-    <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key|escapejs }}"></script>
     <script src="{% static 'logistics/app.js' %}" defer></script>
 </body>
 </html>

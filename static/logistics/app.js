@@ -25,27 +25,13 @@ const state = {
 };
 
 let map = null;
-let mapReady = false;
 let mapHasAutoFit = false;
-let activePopup = null;
+let activeInfoWindow = null;
 let selectedMapTripId = null;
-let highlightAnimationFrame = null;
-
-const HIGHLIGHT_ANIMATION_MS = 520;
-
-const MAP_IDS = {
-    connectionsSource: "connections-source",
-    connectionsCasingLayer: "connections-casing-layer",
-    connectionsLayer: "connections-layer",
-    departmentsSource: "departments-source",
-    departmentsLayer: "departments-layer",
-    departmentLabelsLayer: "departments-labels-layer",
-    highlightSource: "highlight-source",
-    highlightLineGlowLayer: "highlight-line-glow-layer",
-    highlightLineCasingLayer: "highlight-line-casing-layer",
-    highlightLineLayer: "highlight-line-layer",
-    highlightPointLayer: "highlight-point-layer"
-};
+let gmapMarkers = [];
+let gmapConnections = [];
+let gmapRoutePolyline = null;
+let gmapRouteMarkers = [];
 
 document.addEventListener("DOMContentLoaded", async () => {
     bindTabs();
@@ -66,7 +52,7 @@ function bindTabs() {
             });
             if (target === "map") {
                 window.setTimeout(() => {
-                    if (map) map.resize();
+                    if (map) google.maps.event.trigger(map, "resize");
                 }, 80);
             }
         });
@@ -95,7 +81,7 @@ function bindForms() {
 }
 
 
-// ── PRECIO DE GASOLINA ────────────────────────────────────────────────────────
+// â”€â”€ PRECIO DE GASOLINA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function reloadFuelPrice() {
     try {
@@ -111,7 +97,7 @@ function renderFuelPrice(fp) {
     document.getElementById("fuel-diesel").textContent = `Q ${fp.diesel_gtq_gal.toFixed(2)}/gal`;
     const d = new Date(fp.updated_at);
     document.getElementById("fuel-updated-at").textContent =
-        `${fp.source} · actualizado ${d.toLocaleDateString("es-GT")} ${d.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}`;
+        `${fp.source} Â· actualizado ${d.toLocaleDateString("es-GT")} ${d.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}`;
     const isAdmin = state.currentUser && state.currentUser.role === "admin";
     document.getElementById("btn-edit-fuel").style.display = isAdmin ? "" : "none";
     const form = document.getElementById("fuel-form");
@@ -344,7 +330,7 @@ function renderVehicles() {
     const body = document.getElementById("vehicles-body");
     body.innerHTML = "";
     if (!state.vehicles.length) {
-        body.innerHTML = `<tr><td colspan="8">No hay vehículos registrados.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="8">No hay vehÃ­culos registrados.</td></tr>`;
         return;
     }
     state.vehicles.forEach((v) => {
@@ -422,7 +408,7 @@ function renderPlannerInputs() {
     const vehicleSelect = document.getElementById("planner-vehicle");
     const activeVehicles = state.vehicles.filter((v) => v.is_active);
     vehicleSelect.innerHTML = [
-        `<option value="">Seleccione un vehículo...</option>`,
+        `<option value="">Seleccione un vehÃ­culo...</option>`,
         ...activeVehicles.map((v) => `<option value="${v.id}">${escapeHtml(v.plate)} - ${escapeHtml(v.model)}</option>`)
     ].join("");
 
@@ -483,7 +469,7 @@ function renderTripsFiltered() {
                 <td>${escapeHtml(trip.code)}</td>
                 <td>${escapeHtml(trip.vehicle_plate)}</td>
                 <td>${escapeHtml(trip.driver_name || "-")}</td>
-                <td>${escapeHtml(trip.route_nodes.join(" → "))}</td>
+                <td>${escapeHtml(trip.route_nodes.join(" â†’ "))}</td>
                 <td>${trip.total_distance_km.toFixed(2)} km</td>
                 <td>${trip.estimated_fuel_gallons.toFixed(2)} gal</td>
                 <td>Q ${trip.estimated_cost.toFixed(2)}</td>
@@ -542,37 +528,29 @@ function renderUsers() {
     });
 }
 
-// ── MAP ──────────────────────────────────────────────────────────────────────
+// â”€â”€ MAP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderMap() {
     const depts = state.departments.filter((d) => d.latitude && d.longitude);
     if (!depts.length) return;
 
     if (!map) {
-        map = new maplibregl.Map({
-            container: "route-map",
-            style: "https://tiles.openfreemap.org/styles/liberty",
-            center: [-90.3, 15.45],
-            zoom: 7
-        });
-
-        map.addControl(new maplibregl.NavigationControl(), "top-right");
-        map.on("load", () => {
-            mapReady = true;
-            ensureMapLayers();
-            updateMapData();
-            bindMapEvents();
+        map = new google.maps.Map(document.getElementById("route-map"), {
+            center: { lat: 15.45, lng: -90.3 },
+            zoom: 7,
+            mapTypeId: "hybrid",
+            streetViewControl: false,
+            rotateControl: false
         });
     }
 
     renderMapTripSelect();
-    if (mapReady) updateMapData();
+    updateMapData();
 }
 
 function onMapTripSelect(event) {
-    if (!mapReady) return;
     const tripId = Number(event.target.value || 0);
-    focusMapTripById(tripId, { animate: true, shouldFit: true });
+    focusMapTripById(tripId, { shouldFit: true });
 }
 
 async function fetchRoadGeometry(waypointCoords) {
@@ -604,7 +582,7 @@ async function _fetchViaORS(waypointCoords) {
         throw new Error(`ORS ${resp.status}: ${msg}`);
     }
     const data = await resp.json();
-    if (!data.features?.[0]) throw new Error("ORS sin geometría");
+    if (!data.features?.[0]) throw new Error("ORS sin geometrÃ­a");
     return data.features[0].geometry.coordinates;
 }
 
@@ -619,7 +597,7 @@ async function _fetchViaOSRM(waypointCoords) {
 }
 
 async function focusMapTripById(tripId, options = {}) {
-    const { animate = true, shouldFit = true } = options;
+    const { shouldFit = true } = options;
 
     if (!tripId) {
         selectedMapTripId = null;
@@ -628,7 +606,7 @@ async function focusMapTripById(tripId, options = {}) {
         return;
     }
 
-    const trip = state.trips.find((candidate) => candidate.id === tripId);
+    const trip = state.trips.find((t) => t.id === tripId);
     if (!trip) {
         selectedMapTripId = null;
         clearHighlightedRoute();
@@ -638,8 +616,8 @@ async function focusMapTripById(tripId, options = {}) {
 
     const waypointCoords = trip.route_nodes
         .map((name) => {
-            const department = state.departments.find((candidate) => candidate.name === name);
-            return department && department.latitude ? [Number(department.longitude), Number(department.latitude)] : null;
+            const dept = state.departments.find((d) => d.name === name);
+            return dept && dept.latitude ? [Number(dept.longitude), Number(dept.latitude)] : null;
         })
         .filter(Boolean);
 
@@ -653,285 +631,108 @@ async function focusMapTripById(tripId, options = {}) {
     selectedMapTripId = tripId;
     updateMapRouteSummary(trip);
 
-    // Show waypoint dots and straight placeholder while road data loads
-    const source = map.getSource(MAP_IDS.highlightSource);
-    if (source) source.setData(buildHighlightGeoJson(trip, waypointCoords, waypointCoords));
-
-    if (animate) animateHighlightedRoute();
-
-    if (shouldFit) {
-        const bounds = waypointCoords.reduce(
-            (acc, coord) => acc.extend(coord),
-            new maplibregl.LngLatBounds(waypointCoords[0], waypointCoords[0])
-        );
-        map.fitBounds(bounds, {
-            padding: { top: 70, right: 48, bottom: 84, left: 48 },
-            duration: 900,
-            maxZoom: 10
+    const drawRoute = (coords) => {
+        clearHighlightedRoute();
+        gmapRoutePolyline = new google.maps.Polyline({
+            path: coords.map(([lng, lat]) => ({ lat, lng })),
+            strokeColor: "#ff7f11",
+            strokeOpacity: 0.96,
+            strokeWeight: 5,
+            zIndex: 10,
+            map
         });
-    }
+        waypointCoords.forEach(([lng, lat], index) => {
+            const isFirst = index === 0;
+            const isLast = index === waypointCoords.length - 1;
+            const color = isFirst ? "#22c55e" : isLast ? "#ef4444" : "#f59e0b";
+            const marker = new google.maps.Marker({
+                position: { lat, lng },
+                map,
+                title: trip.route_nodes[index] || "",
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: isFirst || isLast ? 10 : 7,
+                    fillColor: color,
+                    fillOpacity: 1,
+                    strokeColor: "#ffffff",
+                    strokeWeight: 2.5
+                },
+                zIndex: 20
+            });
+            gmapRouteMarkers.push(marker);
+        });
+        if (shouldFit) {
+            const bounds = new google.maps.LatLngBounds();
+            coords.forEach(([lng, lat]) => bounds.extend({ lat, lng }));
+            map.fitBounds(bounds, 48);
+        }
+    };
 
-    // Replace with actual road geometry from OSRM
+    drawRoute(waypointCoords);
+
     try {
         const roadCoords = await fetchRoadGeometry(waypointCoords);
-        const liveSource = map.getSource(MAP_IDS.highlightSource);
-        if (liveSource && selectedMapTripId === tripId) {
-            liveSource.setData(buildHighlightGeoJson(trip, waypointCoords, roadCoords));
-        }
+        if (selectedMapTripId === tripId) drawRoute(roadCoords);
     } catch (err) {
-        console.warn("Geometría de carretera no disponible, usando ruta directa:", err.message);
+        console.warn("GeometrÃ­a de carretera no disponible:", err.message);
     }
-}
-
-function ensureMapLayers() {
-    if (!map.getSource(MAP_IDS.connectionsSource)) {
-        map.addSource(MAP_IDS.connectionsSource, {
-            type: "geojson",
-            data: emptyFeatureCollection()
-        });
-        map.addLayer({
-            id: MAP_IDS.connectionsCasingLayer,
-            type: "line",
-            source: MAP_IDS.connectionsSource,
-            paint: {
-                "line-color": "rgba(2, 8, 23, 0.22)",
-                "line-width": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    5,
-                    1.6,
-                    9,
-                    2.6,
-                    12,
-                    3.9
-                ],
-                "line-opacity": 0.32
-            }
-        });
-        map.addLayer({
-            id: MAP_IDS.connectionsLayer,
-            type: "line",
-            source: MAP_IDS.connectionsSource,
-            paint: {
-                "line-color": "#67e8f9",
-                "line-width": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    5,
-                    0.8,
-                    9,
-                    1.4,
-                    12,
-                    2
-                ],
-                "line-opacity": 0.38
-            }
-        });
-    }
-
-    if (!map.getSource(MAP_IDS.departmentsSource)) {
-        map.addSource(MAP_IDS.departmentsSource, {
-            type: "geojson",
-            data: emptyFeatureCollection()
-        });
-        map.addLayer({
-            id: MAP_IDS.departmentsLayer,
-            type: "circle",
-            source: MAP_IDS.departmentsSource,
-            paint: {
-                "circle-radius": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    5,
-                    5.5,
-                    9,
-                    7.3,
-                    12,
-                    9
-                ],
-                "circle-color": "#fb923c",
-                "circle-stroke-color": "#ffffff",
-                "circle-stroke-width": 2.2
-            }
-        });
-        map.addLayer({
-            id: MAP_IDS.departmentLabelsLayer,
-            type: "symbol",
-            source: MAP_IDS.departmentsSource,
-            layout: {
-                "text-field": ["get", "code"],
-                "text-size": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    5,
-                    10,
-                    9,
-                    11.5,
-                    12,
-                    13
-                ],
-                "text-offset": [0, 1.4]
-            },
-            paint: {
-                "text-color": "#0f1f35",
-                "text-halo-color": "#ffffff",
-                "text-halo-width": 1.35
-            }
-        });
-    }
-
-    if (!map.getSource(MAP_IDS.highlightSource)) {
-        map.addSource(MAP_IDS.highlightSource, {
-            type: "geojson",
-            data: emptyFeatureCollection()
-        });
-        map.addLayer({
-            id: MAP_IDS.highlightLineGlowLayer,
-            type: "line",
-            source: MAP_IDS.highlightSource,
-            filter: ["==", ["geometry-type"], "LineString"],
-            paint: {
-                "line-color": "rgba(15, 23, 42, 0.72)",
-                "line-width": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    5,
-                    7.5,
-                    10,
-                    10.5,
-                    12,
-                    12.5
-                ],
-                "line-opacity": 0.62,
-                "line-blur": 1.2
-            }
-        });
-        map.addLayer({
-            id: MAP_IDS.highlightLineCasingLayer,
-            type: "line",
-            source: MAP_IDS.highlightSource,
-            filter: ["==", ["geometry-type"], "LineString"],
-            paint: {
-                "line-color": "#f8fafc",
-                "line-width": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    5,
-                    4.8,
-                    10,
-                    7.2,
-                    12,
-                    8.8
-                ],
-                "line-opacity": 0.95
-            }
-        });
-        map.addLayer({
-            id: MAP_IDS.highlightLineLayer,
-            type: "line",
-            source: MAP_IDS.highlightSource,
-            filter: ["==", ["geometry-type"], "LineString"],
-            paint: {
-                "line-color": "#ff7f11",
-                "line-width": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    5,
-                    3.2,
-                    10,
-                    5.1,
-                    12,
-                    6.5
-                ],
-                "line-opacity": 0.98
-            }
-        });
-        map.addLayer({
-            id: MAP_IDS.highlightPointLayer,
-            type: "circle",
-            source: MAP_IDS.highlightSource,
-            filter: ["==", ["geometry-type"], "Point"],
-            paint: {
-                "circle-radius": [
-                    "match",
-                    ["get", "marker_type"],
-                    "start",
-                    10.5,
-                    "end",
-                    10.5,
-                    7.6
-                ],
-                "circle-color": [
-                    "match",
-                    ["get", "marker_type"],
-                    "start",
-                    "#22c55e",
-                    "end",
-                    "#ef4444",
-                    "#f59e0b"
-                ],
-                "circle-stroke-color": "#ffffff",
-                "circle-stroke-width": [
-                    "match",
-                    ["get", "marker_type"],
-                    "start",
-                    2.6,
-                    "end",
-                    2.6,
-                    2.2
-                ],
-                "circle-opacity": 0.98
-            }
-        });
-    }
-}
-
-function bindMapEvents() {
-    map.on("click", MAP_IDS.departmentsLayer, (event) => {
-        const feature = event.features && event.features[0];
-        if (!feature) return;
-
-        const coords = feature.geometry.coordinates;
-        const { name, code } = feature.properties || {};
-        if (activePopup) activePopup.remove();
-        activePopup = new maplibregl.Popup({ closeButton: false, closeOnClick: true, offset: 10 })
-            .setLngLat(coords)
-            .setHTML(`<strong>${escapeHtml(name || "")}</strong><br>${escapeHtml(code || "")}`)
-            .addTo(map);
-    });
-
-    [MAP_IDS.departmentsLayer, MAP_IDS.highlightPointLayer].forEach((layerId) => {
-        map.on("mouseenter", layerId, () => {
-            map.getCanvas().style.cursor = "pointer";
-        });
-        map.on("mouseleave", layerId, () => {
-            map.getCanvas().style.cursor = "";
-        });
-    });
 }
 
 function updateMapData() {
-    ensureMapLayers();
+    gmapMarkers.forEach((m) => m.setMap(null));
+    gmapMarkers = [];
+    gmapConnections.forEach((p) => p.setMap(null));
+    gmapConnections = [];
 
-    const connectionsSource = map.getSource(MAP_IDS.connectionsSource);
-    if (connectionsSource) {
-        connectionsSource.setData(buildConnectionsGeoJson());
-    }
+    state.connections.forEach((connection) => {
+        const origin = state.departments.find((d) => d.id === connection.origin_id);
+        const destination = state.departments.find((d) => d.id === connection.destination_id);
+        if (!origin || !destination || !origin.latitude || !destination.latitude) return;
+        const poly = new google.maps.Polyline({
+            path: [
+                { lat: Number(origin.latitude), lng: Number(origin.longitude) },
+                { lat: Number(destination.latitude), lng: Number(destination.longitude) }
+            ],
+            strokeColor: "#67e8f9",
+            strokeOpacity: 0.45,
+            strokeWeight: 2,
+            map
+        });
+        gmapConnections.push(poly);
+    });
 
-    const departmentsSource = map.getSource(MAP_IDS.departmentsSource);
-    if (departmentsSource) {
-        departmentsSource.setData(buildDepartmentsGeoJson());
-    }
+    state.departments.filter((d) => d.latitude && d.longitude).forEach((dept) => {
+        const marker = new google.maps.Marker({
+            position: { lat: Number(dept.latitude), lng: Number(dept.longitude) },
+            map,
+            title: dept.name,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: "#fb923c",
+                fillOpacity: 1,
+                strokeColor: "#ffffff",
+                strokeWeight: 2.2
+            },
+            label: {
+                text: dept.code,
+                color: "#ffffff",
+                fontSize: "10px",
+                fontWeight: "bold"
+            }
+        });
+        marker.addListener("click", () => {
+            if (activeInfoWindow) activeInfoWindow.close();
+            activeInfoWindow = new google.maps.InfoWindow({
+                content: `<div style="font-family:sans-serif;padding:2px"><strong>${escapeHtml(dept.name)}</strong><br><small>${escapeHtml(dept.code)}</small></div>`
+            });
+            activeInfoWindow.open(map, marker);
+        });
+        gmapMarkers.push(marker);
+    });
 
-    if (selectedMapTripId && state.trips.some((trip) => trip.id === selectedMapTripId)) {
-        focusMapTripById(selectedMapTripId, { animate: false, shouldFit: false });
+    if (selectedMapTripId && state.trips.some((t) => t.id === selectedMapTripId)) {
+        focusMapTripById(selectedMapTripId, { shouldFit: false });
         return;
     }
 
@@ -944,87 +745,31 @@ function updateMapData() {
 }
 
 function clearHighlightedRoute() {
-    if (highlightAnimationFrame) {
-        cancelAnimationFrame(highlightAnimationFrame);
-        highlightAnimationFrame = null;
+    if (gmapRoutePolyline) {
+        gmapRoutePolyline.setMap(null);
+        gmapRoutePolyline = null;
     }
-    const source = map && map.getSource(MAP_IDS.highlightSource);
-    if (source) source.setData(emptyFeatureCollection());
-    resetHighlightLayerOpacity();
+    gmapRouteMarkers.forEach((m) => m.setMap(null));
+    gmapRouteMarkers = [];
 }
 
-function resetHighlightLayerOpacity() {
-    if (!map) return;
-    if (map.getLayer(MAP_IDS.highlightLineGlowLayer)) {
-        map.setPaintProperty(MAP_IDS.highlightLineGlowLayer, "line-opacity", 0.62);
-    }
-    if (map.getLayer(MAP_IDS.highlightLineCasingLayer)) {
-        map.setPaintProperty(MAP_IDS.highlightLineCasingLayer, "line-opacity", 0.95);
-    }
-    if (map.getLayer(MAP_IDS.highlightLineLayer)) {
-        map.setPaintProperty(MAP_IDS.highlightLineLayer, "line-opacity", 0.98);
-    }
-    if (map.getLayer(MAP_IDS.highlightPointLayer)) {
-        map.setPaintProperty(MAP_IDS.highlightPointLayer, "circle-opacity", 0.98);
-    }
-}
-
-function animateHighlightedRoute() {
-    if (!map) return;
-    if (highlightAnimationFrame) {
-        cancelAnimationFrame(highlightAnimationFrame);
-    }
-
-    if (map.getLayer(MAP_IDS.highlightLineGlowLayer)) {
-        map.setPaintProperty(MAP_IDS.highlightLineGlowLayer, "line-opacity", 0.05);
-    }
-    if (map.getLayer(MAP_IDS.highlightLineCasingLayer)) {
-        map.setPaintProperty(MAP_IDS.highlightLineCasingLayer, "line-opacity", 0.08);
-    }
-    if (map.getLayer(MAP_IDS.highlightLineLayer)) {
-        map.setPaintProperty(MAP_IDS.highlightLineLayer, "line-opacity", 0.1);
-    }
-    if (map.getLayer(MAP_IDS.highlightPointLayer)) {
-        map.setPaintProperty(MAP_IDS.highlightPointLayer, "circle-opacity", 0.08);
-    }
-
-    const startedAt = performance.now();
-    const tick = (timestamp) => {
-        const progress = Math.min((timestamp - startedAt) / HIGHLIGHT_ANIMATION_MS, 1);
-        const eased = progress < 0.5 ? 2 * progress * progress : 1 - (Math.pow(-2 * progress + 2, 2) / 2);
-
-        if (map.getLayer(MAP_IDS.highlightLineGlowLayer)) {
-            map.setPaintProperty(MAP_IDS.highlightLineGlowLayer, "line-opacity", 0.62 * eased);
-        }
-        if (map.getLayer(MAP_IDS.highlightLineCasingLayer)) {
-            map.setPaintProperty(MAP_IDS.highlightLineCasingLayer, "line-opacity", 0.95 * eased);
-        }
-        if (map.getLayer(MAP_IDS.highlightLineLayer)) {
-            map.setPaintProperty(MAP_IDS.highlightLineLayer, "line-opacity", 0.98 * eased);
-        }
-        if (map.getLayer(MAP_IDS.highlightPointLayer)) {
-            map.setPaintProperty(MAP_IDS.highlightPointLayer, "circle-opacity", 0.98 * eased);
-        }
-
-        if (progress < 1) {
-            highlightAnimationFrame = requestAnimationFrame(tick);
-        } else {
-            highlightAnimationFrame = null;
-            resetHighlightLayerOpacity();
-        }
-    };
-
-    highlightAnimationFrame = requestAnimationFrame(tick);
+function fitMapToDepartments() {
+    if (mapHasAutoFit) return;
+    const depts = state.departments.filter((d) => d.latitude && d.longitude);
+    if (depts.length < 2) return;
+    const bounds = new google.maps.LatLngBounds();
+    depts.forEach((d) => bounds.extend({ lat: Number(d.latitude), lng: Number(d.longitude) }));
+    map.fitBounds(bounds);
+    mapHasAutoFit = true;
 }
 
 function updateMapRouteSummary(trip) {
     const summary = document.getElementById("map-route-summary");
     const hint = document.getElementById("map-summary-hint");
     if (!summary || !hint) return;
-
     if (!trip) {
         summary.classList.add("is-empty");
-        hint.textContent = "Selecciona un viaje para ver la ruta óptima destacada.";
+        hint.textContent = "Selecciona un viaje para ver la ruta Ã³ptima destacada.";
         setSummaryField("map-summary-code", "-");
         setSummaryField("map-summary-origin", "-");
         setSummaryField("map-summary-destination", "-");
@@ -1034,7 +779,6 @@ function updateMapRouteSummary(trip) {
         setSummaryField("map-summary-status", "-");
         return;
     }
-
     summary.classList.remove("is-empty");
     hint.textContent = "Ruta resaltada con nodos de inicio, intermedios y fin.";
     setSummaryField("map-summary-code", escapeHtml(trip.code));
@@ -1056,122 +800,7 @@ function setSummaryField(id, value) {
     node.textContent = value;
 }
 
-function fitMapToDepartments() {
-    if (mapHasAutoFit) return;
-
-    const coords = state.departments
-        .filter((department) => department.latitude && department.longitude)
-        .map((department) => [Number(department.longitude), Number(department.latitude)]);
-
-    if (coords.length < 2) return;
-
-    const bounds = coords.reduce(
-        (acc, coord) => acc.extend(coord),
-        new maplibregl.LngLatBounds(coords[0], coords[0])
-    );
-
-    map.fitBounds(bounds, {
-        padding: { top: 30, right: 30, bottom: 40, left: 30 },
-        maxZoom: 8.6,
-        duration: 450
-    });
-    mapHasAutoFit = true;
-}
-
-function buildConnectionsGeoJson() {
-    const features = state.connections.map((connection) => {
-        const origin = state.departments.find((department) => department.id === connection.origin_id);
-        const destination = state.departments.find((department) => department.id === connection.destination_id);
-        if (!origin || !destination || !origin.latitude || !destination.latitude) {
-            return null;
-        }
-
-        return {
-            type: "Feature",
-            geometry: {
-                type: "LineString",
-                coordinates: [
-                    [Number(origin.longitude), Number(origin.latitude)],
-                    [Number(destination.longitude), Number(destination.latitude)]
-                ]
-            },
-            properties: {
-                distance_km: connection.distance_km
-            }
-        };
-    }).filter(Boolean);
-
-    return {
-        type: "FeatureCollection",
-        features
-    };
-}
-
-function buildDepartmentsGeoJson() {
-    const features = state.departments
-        .filter((department) => department.latitude && department.longitude)
-        .map((department) => ({
-            type: "Feature",
-            geometry: {
-                type: "Point",
-                coordinates: [Number(department.longitude), Number(department.latitude)]
-            },
-            properties: {
-                id: department.id,
-                name: department.name,
-                code: department.code
-            }
-        }));
-
-    return {
-        type: "FeatureCollection",
-        features
-    };
-}
-
-function buildHighlightGeoJson(trip, waypointCoords, lineCoords) {
-    const features = [
-        {
-            type: "Feature",
-            geometry: {
-                type: "LineString",
-                coordinates: lineCoords || waypointCoords
-            },
-            properties: {
-                trip_id: trip.id
-            }
-        }
-    ];
-
-    waypointCoords.forEach((coordinate, index) => {
-        const markerType = index === 0 ? "start" : index === waypointCoords.length - 1 ? "end" : "mid";
-        features.push({
-            type: "Feature",
-            geometry: {
-                type: "Point",
-                coordinates: coordinate
-            },
-            properties: {
-                marker_type: markerType,
-                label: trip.route_nodes[index] || ""
-            }
-        });
-    });
-
-    return {
-        type: "FeatureCollection",
-        features
-    };
-}
-
-function emptyFeatureCollection() {
-    return {
-        type: "FeatureCollection",
-        features: []
-    };
-}
-
-// ── FORM HANDLERS ─────────────────────────────────────────────────────────────
+// â”€â”€ FORM HANDLERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function onVehicleSubmit(event) {
     event.preventDefault();
@@ -1189,7 +818,7 @@ async function onVehicleSubmit(event) {
     try {
         await postJson(API.vehicles, payload);
         form.reset();
-        showToast("Vehículo registrado.");
+        showToast("VehÃ­culo registrado.");
         await reloadAll();
     } catch (error) {
         showToast(error.message, true);
@@ -1247,7 +876,7 @@ async function onPlannerSubmit(event) {
     }
     const vehicleId = Number(form.vehicle_id.value);
     if (!vehicleId) {
-        showToast("Selecciona un vehículo.", true);
+        showToast("Selecciona un vehÃ­culo.", true);
         return;
     }
     const driverId = form.driver_id.value ? Number(form.driver_id.value) : null;
@@ -1272,7 +901,7 @@ async function onTripsActionClick(event) {
     const action = button.dataset.action;
     try {
         await postJson(`/api/trips/${tripId}/action/`, { action });
-        showToast(`Acción "${action}" ejecutada.`);
+        showToast(`AcciÃ³n "${action}" ejecutada.`);
         await reloadAll();
     } catch (error) {
         showToast(error.message, true);
@@ -1340,7 +969,7 @@ async function onUserSubmit(event) {
     }
 }
 
-// ── DISPLAY ───────────────────────────────────────────────────────────────────
+// â”€â”€ DISPLAY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function showPlannerResult(trip) {
     const box = document.getElementById("planner-result");
@@ -1348,11 +977,11 @@ function showPlannerResult(trip) {
         ? `<p><strong>Costo de combustible:</strong> Q ${trip.estimated_fuel_cost_gtq.toFixed(2)} <small>(Q ${trip.fuel_price_gtq_gal?.toFixed(2)}/gal al momento)</small></p>`
         : "";
     box.innerHTML = `
-        <h3>Resultado de planificación</h3>
-        <p><strong>Código:</strong> ${escapeHtml(trip.code)}</p>
-        <p><strong>Vehículo:</strong> ${escapeHtml(trip.vehicle_plate)}</p>
+        <h3>Resultado de planificaciÃ³n</h3>
+        <p><strong>CÃ³digo:</strong> ${escapeHtml(trip.code)}</p>
+        <p><strong>VehÃ­culo:</strong> ${escapeHtml(trip.vehicle_plate)}</p>
         <p><strong>Conductor:</strong> ${escapeHtml(trip.driver_name || "No asignado")}</p>
-        <p><strong>Ruta óptima:</strong> ${escapeHtml(trip.route_nodes.join(" → "))}</p>
+        <p><strong>Ruta Ã³ptima:</strong> ${escapeHtml(trip.route_nodes.join(" â†’ "))}</p>
         <p><strong>Distancia:</strong> ${trip.total_distance_km.toFixed(2)} km</p>
         <p><strong>Combustible estimado:</strong> ${trip.estimated_fuel_gallons.toFixed(2)} galones</p>
         ${fuelCostLine}
@@ -1363,7 +992,7 @@ function showPlannerResult(trip) {
 
 function buildTripActions(trip) {
     const role = state.currentUser ? state.currentUser.role : "operator";
-    if (role === "operator") return "—";
+    if (role === "operator") return "â€”";
     if (trip.status === "completed" || trip.status === "canceled") return "Sin acciones";
     if (trip.status === "planned") {
         return `
@@ -1378,7 +1007,7 @@ function buildTripActions(trip) {
     `;
 }
 
-// ── CHART ─────────────────────────────────────────────────────────────────────
+// â”€â”€ CHART â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function drawBarChart(canvasId, labels, values, color) {
     const canvas = document.getElementById(canvasId);
@@ -1430,7 +1059,7 @@ function drawBarChart(canvasId, labels, values, color) {
     });
 }
 
-// ── HTTP ──────────────────────────────────────────────────────────────────────
+// â”€â”€ HTTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function getJson(url) {
     const response = await fetch(url, { credentials: "same-origin" });
@@ -1458,11 +1087,11 @@ async function postJson(url, payload) {
     return data;
 }
 
-// ── HELPERS ───────────────────────────────────────────────────────────────────
+// â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function statusLabel(status) {
     const labels = {
-        pending: "Pendiente", assigned: "Asignado", in_transit: "En tránsito",
+        pending: "Pendiente", assigned: "Asignado", in_transit: "En trÃ¡nsito",
         delivered: "Entregado", canceled: "Cancelado",
         planned: "Planificado", in_progress: "En progreso", completed: "Completado"
     };

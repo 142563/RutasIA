@@ -38,6 +38,7 @@ from logistics.presentation.serializers import (
 def index(request: HttpRequest):
     return render(request, "logistics/index.html", {
         "ors_api_key": getattr(django_settings, "ORS_API_KEY", ""),
+        "google_maps_api_key": getattr(django_settings, "GOOGLE_MAPS_API_KEY", ""),
     })
 
 
