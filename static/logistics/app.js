@@ -538,10 +538,11 @@ function renderMap() {
         map = new google.maps.Map(document.getElementById("route-map"), {
             center: { lat: 15.45, lng: -90.3 },
             zoom: 7,
-            mapTypeId: "hybrid",
+            mapTypeId: "roadmap",
             streetViewControl: false,
             rotateControl: false
         });
+        new google.maps.TrafficLayer().setMap(map);
     }
 
     renderMapTripSelect();
