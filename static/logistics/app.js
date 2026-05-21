@@ -81,6 +81,7 @@ function bindForms() {
     document.getElementById("event-form").addEventListener("submit", onEventSubmit);
     document.getElementById("trips-body").addEventListener("click", onTripsActionClick);
     document.getElementById("user-form").addEventListener("submit", onUserSubmit);
+    document.getElementById("department-form").addEventListener("submit", onDepartmentSubmit);
     document.getElementById("map-trip-select").addEventListener("change", onMapTripSelect);
     document.getElementById("fuel-form").addEventListener("submit", onFuelPriceSubmit);
     document.getElementById("btn-edit-fuel").addEventListener("click", () => {
@@ -209,6 +210,7 @@ function renderAll() {
     renderUserInfo();
     renderDashboard();
     renderDepartmentsInSelects();
+    renderDepartments();
     renderDriverSelects();
     renderVehicles();
     renderDrivers();
@@ -234,9 +236,11 @@ function renderUserInfo() {
     const isSupervisor = user.role === "supervisor" || isAdmin;
 
     document.getElementById("tab-users-btn").style.display = isAdmin ? "" : "none";
+    document.getElementById("tab-departments-btn").style.display = isSupervisor ? "" : "none";
     document.getElementById("vehicle-form-card").style.display = isSupervisor ? "" : "none";
     document.getElementById("driver-form-card").style.display = isSupervisor ? "" : "none";
     document.getElementById("order-form-card").style.display = isSupervisor ? "" : "none";
+    document.getElementById("department-form-card").style.display = isSupervisor ? "" : "none";
 }
 
 function renderDashboard() {
@@ -300,6 +304,27 @@ function renderDepartmentsInSelects() {
     ].join("");
     document.getElementById("order-filter-origin").innerHTML = filterOpts;
     document.getElementById("order-filter-dest").innerHTML = filterOpts;
+}
+
+function renderDepartments() {
+    const body = document.getElementById("departments-body");
+    if (!body) return;
+    body.innerHTML = "";
+    if (!state.departments.length) {
+        body.innerHTML = `<tr><td colspan="4">No hay departamentos registrados.</td></tr>`;
+        return;
+    }
+    state.departments.forEach((d) => {
+        body.insertAdjacentHTML(
+            "beforeend",
+            `<tr>
+                <td>${escapeHtml(d.code)}</td>
+                <td>${escapeHtml(d.name)}</td>
+                <td>${d.latitude !== null && d.latitude !== undefined ? d.latitude : "-"}</td>
+                <td>${d.longitude !== null && d.longitude !== undefined ? d.longitude : "-"}</td>
+            </tr>`
+        );
+    });
 }
 
 function renderDriverSelects() {
@@ -1267,6 +1292,25 @@ async function onEventSubmit(event) {
         await postJson(`/api/trips/${tripId}/events/`, { note });
         form.reset();
         showToast("Evento registrado.");
+        await reloadAll();
+    } catch (error) {
+        showToast(error.message, true);
+    }
+}
+
+async function onDepartmentSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const payload = {
+        code: form.code.value.trim(),
+        name: form.name.value.trim(),
+        latitude: form.latitude.value !== "" ? Number(form.latitude.value) : null,
+        longitude: form.longitude.value !== "" ? Number(form.longitude.value) : null,
+    };
+    try {
+        await postJson(API.departments, payload);
+        form.reset();
+        showToast("Departamento registrado.");
         await reloadAll();
     } catch (error) {
         showToast(error.message, true);
