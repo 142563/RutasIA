@@ -128,10 +128,39 @@ def api_dashboard(request: HttpRequest):
 
 
 @login_required
-@require_GET
+@require_http_methods(["GET", "POST"])
 def api_departments(request: HttpRequest):
-    departments = Department.objects.all()
-    return _ok({"departments": [_serialize_department(d) for d in departments]})
+    if request.method == "GET":
+        departments = Department.objects.all()
+        return _ok({"departments": [_serialize_department(d) for d in departments]})
+
+    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.SUPERVISOR)
+    if perm_error:
+        return perm_error
+
+    try:
+        payload = _parse_json(request)
+        code = str(payload["code"]).strip().upper()
+        name = str(payload["name"]).strip()
+        latitude = payload.get("latitude")
+        longitude = payload.get("longitude")
+
+        if Department.objects.filter(code=code).exists():
+            return _error("Ya existe un departamento con ese código.")
+        if Department.objects.filter(name=name).exists():
+            return _error("Ya existe un departamento con ese nombre.")
+
+        department = Department.objects.create(
+            code=code,
+            name=name,
+            latitude=Decimal(str(latitude)) if latitude is not None else None,
+            longitude=Decimal(str(longitude)) if longitude is not None else None,
+        )
+        return _ok({"department": _serialize_department(department)}, status=201)
+    except KeyError as exc:
+        return _error(f"Falta el campo requerido: {exc.args[0]}")
+    except Exception as exc:
+        return _error(str(exc))
 
 
 @login_required

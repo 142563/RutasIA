@@ -40,6 +40,7 @@
             <button class="tab" data-tab="planner">Planificador</button>
             <button class="tab" data-tab="trips">Viajes</button>
             <button class="tab" data-tab="map">Mapa</button>
+            <button class="tab tab-admin" data-tab="departments" id="tab-departments-btn" style="display:none">Departamentos</button>
             <button class="tab tab-admin" data-tab="users" id="tab-users-btn" style="display:none">Usuarios</button>
         </nav>
 
@@ -440,6 +441,45 @@
                     </div>
                     <div id="route-map"></div>
                 </article>
+            </section>
+
+            <!-- DEPARTMENTS -->
+            <section id="tab-departments" class="panel">
+                <div class="split">
+                    <article class="form-card" id="department-form-card">
+                        <h3>Agregar departamento</h3>
+                        <form id="department-form">
+                            <label>Código
+                                <input name="code" required placeholder="GT01" maxlength="8">
+                            </label>
+                            <label>Nombre
+                                <input name="name" required placeholder="Guatemala">
+                            </label>
+                            <label>Latitud
+                                <input name="latitude" type="number" step="0.000001" placeholder="14.634915">
+                            </label>
+                            <label>Longitud
+                                <input name="longitude" type="number" step="0.000001" placeholder="-90.506882">
+                            </label>
+                            <button type="submit">Guardar departamento</button>
+                        </form>
+                    </article>
+
+                    <article class="table-card">
+                        <h3>Departamentos registrados</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Nombre</th>
+                                    <th>Latitud</th>
+                                    <th>Longitud</th>
+                                </tr>
+                            </thead>
+                            <tbody id="departments-body"></tbody>
+                        </table>
+                    </article>
+                </div>
             </section>
 
             <!-- USERS (Admin only) -->
