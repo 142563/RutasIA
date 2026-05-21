@@ -25,12 +25,12 @@ const state = {
 };
 
 let map = null;
+let directionsRenderer = null;
 let mapHasAutoFit = false;
 let activeInfoWindow = null;
 let selectedMapTripId = null;
 let gmapMarkers = [];
 let gmapConnections = [];
-let gmapRoutePolyline = null;
 let gmapRouteMarkers = [];
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -543,6 +543,15 @@ function renderMap() {
             rotateControl: false
         });
         new google.maps.TrafficLayer().setMap(map);
+        directionsRenderer = new google.maps.DirectionsRenderer({
+            suppressMarkers: true,
+            polylineOptions: {
+                strokeColor: "#1a73e8",
+                strokeOpacity: 0.9,
+                strokeWeight: 5
+            }
+        });
+        directionsRenderer.setMap(map);
     }
 
     renderMapTripSelect();
@@ -554,47 +563,31 @@ function onMapTripSelect(event) {
     focusMapTripById(tripId, { shouldFit: true });
 }
 
-async function fetchRoadGeometry(waypointCoords) {
-    if (window.ORS_API_KEY) {
-        try {
-            return await _fetchViaORS(waypointCoords);
-        } catch (err) {
-            console.warn("ORS no disponible, usando OSRM:", err.message);
-        }
-    }
-    return _fetchViaOSRM(waypointCoords);
-}
-
-async function _fetchViaORS(waypointCoords) {
-    const resp = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + window.ORS_API_KEY
-        },
-        body: JSON.stringify({
-            coordinates: waypointCoords,
-            preference: "fastest",
-            geometry_simplify: false
-        })
+function fetchRoadGeometryGoogleMaps(waypointCoords) {
+    return new Promise((resolve, reject) => {
+        const svc = new google.maps.DirectionsService();
+        const origin = { lat: waypointCoords[0][1], lng: waypointCoords[0][0] };
+        const destination = {
+            lat: waypointCoords[waypointCoords.length - 1][1],
+            lng: waypointCoords[waypointCoords.length - 1][0]
+        };
+        const waypoints = waypointCoords.slice(1, -1).map(([lng, lat]) => ({
+            location: { lat, lng },
+            stopover: true
+        }));
+        svc.route({
+            origin,
+            destination,
+            waypoints,
+            travelMode: google.maps.TravelMode.DRIVING
+        }, (result, status) => {
+            if (status !== "OK") {
+                reject(new Error(`Directions API: ${status}`));
+                return;
+            }
+            resolve(result);
+        });
     });
-    if (!resp.ok) {
-        const msg = await resp.text().catch(() => resp.status);
-        throw new Error(`ORS ${resp.status}: ${msg}`);
-    }
-    const data = await resp.json();
-    if (!data.features?.[0]) throw new Error("ORS sin geometrÃ­a");
-    return data.features[0].geometry.coordinates;
-}
-
-async function _fetchViaOSRM(waypointCoords) {
-    const coordStr = waypointCoords.map(([lon, lat]) => `${lon},${lat}`).join(";");
-    const url = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`OSRM ${resp.status}`);
-    const data = await resp.json();
-    if (data.code !== "Ok" || !data.routes?.[0]) throw new Error("Sin ruta OSRM");
-    return data.routes[0].geometry.coordinates;
 }
 
 async function focusMapTripById(tripId, options = {}) {
@@ -631,17 +624,9 @@ async function focusMapTripById(tripId, options = {}) {
 
     selectedMapTripId = tripId;
     updateMapRouteSummary(trip);
+    clearHighlightedRoute();
 
-    const drawRoute = (coords) => {
-        clearHighlightedRoute();
-        gmapRoutePolyline = new google.maps.Polyline({
-            path: coords.map(([lng, lat]) => ({ lat, lng })),
-            strokeColor: "#ff7f11",
-            strokeOpacity: 0.96,
-            strokeWeight: 5,
-            zIndex: 10,
-            map
-        });
+    const addWaypointMarkers = () => {
         waypointCoords.forEach(([lng, lat], index) => {
             const isFirst = index === 0;
             const isLast = index === waypointCoords.length - 1;
@@ -662,20 +647,24 @@ async function focusMapTripById(tripId, options = {}) {
             });
             gmapRouteMarkers.push(marker);
         });
-        if (shouldFit) {
-            const bounds = new google.maps.LatLngBounds();
-            coords.forEach(([lng, lat]) => bounds.extend({ lat, lng }));
-            map.fitBounds(bounds, 48);
-        }
     };
 
-    drawRoute(waypointCoords);
-
     try {
-        const roadCoords = await fetchRoadGeometry(waypointCoords);
-        if (selectedMapTripId === tripId) drawRoute(roadCoords);
+        const result = await fetchRoadGeometryGoogleMaps(waypointCoords);
+        if (selectedMapTripId !== tripId) return;
+        directionsRenderer.setDirections(result);
+        addWaypointMarkers();
+        if (shouldFit && result.routes[0]?.bounds) {
+            map.fitBounds(result.routes[0].bounds, 48);
+        }
     } catch (err) {
-        console.warn("GeometrÃ­a de carretera no disponible:", err.message);
+        console.warn("Directions API no disponible, usando línea directa:", err.message);
+        addWaypointMarkers();
+        if (shouldFit) {
+            const bounds = new google.maps.LatLngBounds();
+            waypointCoords.forEach(([lng, lat]) => bounds.extend({ lat, lng }));
+            map.fitBounds(bounds, 48);
+        }
     }
 }
 
@@ -746,10 +735,7 @@ function updateMapData() {
 }
 
 function clearHighlightedRoute() {
-    if (gmapRoutePolyline) {
-        gmapRoutePolyline.setMap(null);
-        gmapRoutePolyline = null;
-    }
+    if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
     gmapRouteMarkers.forEach((m) => m.setMap(null));
     gmapRouteMarkers = [];
 }
