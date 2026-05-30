@@ -129,7 +129,7 @@ function renderFuelPrice(fp) {
     document.getElementById("fuel-diesel").textContent = `Q ${fp.diesel_gtq_gal.toFixed(2)}/gal`;
     const d = new Date(fp.updated_at);
     document.getElementById("fuel-updated-at").textContent =
-        `${fp.source} Â· actualizado ${d.toLocaleDateString("es-GT")} ${d.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}`;
+        `${fp.source} · actualizado ${d.toLocaleDateString("es-GT")} ${d.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })}`;
     const isAdmin = state.currentUser && state.currentUser.role === "admin";
     document.getElementById("btn-edit-fuel").style.display = isAdmin ? "" : "none";
     const form = document.getElementById("fuel-form");
@@ -385,7 +385,7 @@ function renderVehicles() {
     const body = document.getElementById("vehicles-body");
     body.innerHTML = "";
     if (!state.vehicles.length) {
-        body.innerHTML = `<tr><td colspan="8">No hay vehÃ­culos registrados.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="8">No hay vehículos registrados.</td></tr>`;
         return;
     }
     state.vehicles.forEach((v) => {
@@ -463,7 +463,7 @@ function renderPlannerInputs() {
     const vehicleSelect = document.getElementById("planner-vehicle");
     const activeVehicles = state.vehicles.filter((v) => v.is_active);
     vehicleSelect.innerHTML = [
-        `<option value="">Seleccione un vehÃ­culo...</option>`,
+        `<option value="">Seleccione un vehículo...</option>`,
         ...activeVehicles.map((v) => `<option value="${v.id}">${escapeHtml(v.plate)} - ${escapeHtml(v.model)}</option>`)
     ].join("");
 
@@ -524,7 +524,7 @@ function renderTripsFiltered() {
                 <td>${escapeHtml(trip.code)}</td>
                 <td>${escapeHtml(trip.vehicle_plate)}</td>
                 <td>${escapeHtml(trip.driver_name || "-")}</td>
-                <td>${escapeHtml(trip.route_nodes.join(" â†’ "))}</td>
+                <td>${escapeHtml(trip.route_nodes.join(" → "))}</td>
                 <td>${trip.total_distance_km.toFixed(2)} km</td>
                 <td>${trip.estimated_fuel_gallons.toFixed(2)} gal</td>
                 <td>Q ${trip.estimated_cost.toFixed(2)}</td>
@@ -814,7 +814,7 @@ function updateMapRouteSummary(trip) {
     if (!summary || !hint) return;
     if (!trip) {
         summary.classList.add("is-empty");
-        hint.textContent = "Selecciona un viaje para ver la ruta Ã³ptima destacada.";
+        hint.textContent = "Selecciona un viaje para ver la ruta óptima destacada.";
         setSummaryField("map-summary-code", "-");
         setSummaryField("map-summary-origin", "-");
         setSummaryField("map-summary-destination", "-");
@@ -939,7 +939,7 @@ async function onVehicleSubmit(event) {
     try {
         await postJson(API.vehicles, payload);
         form.reset();
-        showToast("VehÃ­culo registrado.");
+        showToast("Vehículo registrado.");
         await reloadAll();
     } catch (error) {
         showToast(error.message, true);
@@ -997,7 +997,7 @@ async function onPlannerSubmit(event) {
     }
     const vehicleId = Number(form.vehicle_id.value);
     if (!vehicleId) {
-        showToast("Selecciona un vehÃ­culo.", true);
+        showToast("Selecciona un vehículo.", true);
         return;
     }
     const driverId = form.driver_id.value ? Number(form.driver_id.value) : null;
@@ -1022,7 +1022,7 @@ async function onTripsActionClick(event) {
     const action = button.dataset.action;
     try {
         await postJson(`/api/trips/${tripId}/action/`, { action });
-        showToast(`AcciÃ³n "${action}" ejecutada.`);
+        showToast(`Acción "${action}" ejecutada.`);
         await reloadAll();
     } catch (error) {
         showToast(error.message, true);
@@ -1098,11 +1098,11 @@ function showPlannerResult(trip) {
         ? `<p><strong>Costo de combustible:</strong> Q ${trip.estimated_fuel_cost_gtq.toFixed(2)} <small>(Q ${trip.fuel_price_gtq_gal?.toFixed(2)}/gal al momento)</small></p>`
         : "";
     box.innerHTML = `
-        <h3>Resultado de planificaciÃ³n</h3>
-        <p><strong>CÃ³digo:</strong> ${escapeHtml(trip.code)}</p>
-        <p><strong>VehÃ­culo:</strong> ${escapeHtml(trip.vehicle_plate)}</p>
+        <h3>Resultado de planificación</h3>
+        <p><strong>Código:</strong> ${escapeHtml(trip.code)}</p>
+        <p><strong>Vehículo:</strong> ${escapeHtml(trip.vehicle_plate)}</p>
         <p><strong>Conductor:</strong> ${escapeHtml(trip.driver_name || "No asignado")}</p>
-        <p><strong>Ruta Ã³ptima:</strong> ${escapeHtml(trip.route_nodes.join(" â†’ "))}</p>
+        <p><strong>Ruta óptima:</strong> ${escapeHtml(trip.route_nodes.join(" → "))}</p>
         <p><strong>Distancia:</strong> ${trip.total_distance_km.toFixed(2)} km</p>
         <p><strong>Combustible estimado:</strong> ${trip.estimated_fuel_gallons.toFixed(2)} galones</p>
         ${fuelCostLine}
@@ -1113,7 +1113,7 @@ function showPlannerResult(trip) {
 
 function buildTripActions(trip) {
     const role = state.currentUser ? state.currentUser.role : "operator";
-    if (role === "operator") return "â€”";
+    if (role === "operator") return "—";
     if (trip.status === "completed" || trip.status === "canceled") return "Sin acciones";
     if (trip.status === "planned") {
         return `
@@ -1212,7 +1212,7 @@ async function postJson(url, payload) {
 
 function statusLabel(status) {
     const labels = {
-        pending: "Pendiente", assigned: "Asignado", in_transit: "En trÃ¡nsito",
+        pending: "Pendiente", assigned: "Asignado", in_transit: "En tránsito",
         delivered: "Entregado", canceled: "Cancelado",
         planned: "Planificado", in_progress: "En progreso", completed: "Completado"
     };
