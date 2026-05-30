@@ -12,6 +12,31 @@ const API = {
     fuelPrice: "/api/fuel-price/"
 };
 
+const GUATEMALA_DEPARTMENTS = [
+    { code: "GT01", name: "Guatemala",        lat: 14.634915, lng: -90.506882 },
+    { code: "GT02", name: "El Progreso",      lat: 14.866600, lng: -90.070300 },
+    { code: "GT03", name: "Sacatepéquez",     lat: 14.560100, lng: -90.733700 },
+    { code: "GT04", name: "Chimaltenango",    lat: 14.659800, lng: -90.818600 },
+    { code: "GT05", name: "Escuintla",        lat: 14.304900, lng: -90.784300 },
+    { code: "GT06", name: "Santa Rosa",       lat: 14.279400, lng: -90.297700 },
+    { code: "GT07", name: "Sololá",           lat: 14.776700, lng: -91.182600 },
+    { code: "GT08", name: "Totonicapán",      lat: 14.909300, lng: -91.360600 },
+    { code: "GT09", name: "Quetzaltenango",   lat: 14.845900, lng: -91.518300 },
+    { code: "GT10", name: "Suchitepéquez",    lat: 14.532400, lng: -91.502400 },
+    { code: "GT11", name: "Retalhuleu",       lat: 14.536800, lng: -91.686400 },
+    { code: "GT12", name: "San Marcos",       lat: 14.963700, lng: -91.796000 },
+    { code: "GT13", name: "Huehuetenango",    lat: 15.319200, lng: -91.469400 },
+    { code: "GT14", name: "Quiché",           lat: 15.032600, lng: -91.149800 },
+    { code: "GT15", name: "Baja Verapaz",     lat: 15.101900, lng: -90.315400 },
+    { code: "GT16", name: "Alta Verapaz",     lat: 15.469700, lng: -90.368900 },
+    { code: "GT17", name: "Petén",            lat: 16.927000, lng: -89.894800 },
+    { code: "GT18", name: "Izabal",           lat: 15.729100, lng: -88.593300 },
+    { code: "GT19", name: "Zacapa",           lat: 14.972400, lng: -89.524700 },
+    { code: "GT20", name: "Chiquimula",       lat: 14.799700, lng: -89.546300 },
+    { code: "GT21", name: "Jalapa",           lat: 14.633800, lng: -89.983100 },
+    { code: "GT22", name: "Jutiapa",          lat: 14.291900, lng: -89.898000 },
+];
+
 const state = {
     currentUser: null,
     dashboard: null,
@@ -32,9 +57,13 @@ let selectedMapTripId = null;
 let gmapMarkers = [];
 let gmapConnections = [];
 let gmapRouteMarkers = [];
+let gpsSimTimer = null;
+let gpsSimMarker = null;
+let lastDirectionsResult = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
     bindTabs();
+    initDeptPresetSelect();
     bindForms();
     bindFilters();
     await reloadAll();
@@ -69,6 +98,9 @@ function bindForms() {
     document.getElementById("user-form").addEventListener("submit", onUserSubmit);
     document.getElementById("department-form").addEventListener("submit", onDepartmentSubmit);
     document.getElementById("map-trip-select").addEventListener("change", onMapTripSelect);
+    document.getElementById("dept-preset-select").addEventListener("change", onDeptPresetChange);
+    document.getElementById("btn-start-gps").addEventListener("click", startGpsSimulation);
+    document.getElementById("btn-stop-gps").addEventListener("click", stopGpsSimulation);
     document.getElementById("fuel-form").addEventListener("submit", onFuelPriceSubmit);
     document.getElementById("btn-edit-fuel").addEventListener("click", () => {
         document.getElementById("fuel-form").style.display = "";
@@ -124,6 +156,29 @@ async function onFuelPriceSubmit(event) {
     } catch (error) {
         showToast(error.message, true);
     }
+}
+
+function initDeptPresetSelect() {
+    const sel = document.getElementById("dept-preset-select");
+    GUATEMALA_DEPARTMENTS.forEach((d) => {
+        const opt = document.createElement("option");
+        opt.value = d.code;
+        opt.textContent = `${d.name} (${d.code})`;
+        sel.appendChild(opt);
+    });
+}
+
+function onDeptPresetChange(event) {
+    const code = event.target.value;
+    if (!code) return;
+    const preset = GUATEMALA_DEPARTMENTS.find((d) => d.code === code);
+    if (!preset) return;
+    const form = document.getElementById("department-form");
+    form.code.value = preset.code;
+    form.name.value = preset.name;
+    form.latitude.value = preset.lat;
+    form.longitude.value = preset.lng;
+    event.target.value = "";
 }
 
 function bindFilters() {
@@ -652,6 +707,7 @@ async function focusMapTripById(tripId, options = {}) {
     try {
         const result = await fetchRoadGeometryGoogleMaps(waypointCoords);
         if (selectedMapTripId !== tripId) return;
+        lastDirectionsResult = result;
         directionsRenderer.setDirections(result);
         addWaypointMarkers();
         if (shouldFit && result.routes[0]?.bounds) {
@@ -735,6 +791,8 @@ function updateMapData() {
 }
 
 function clearHighlightedRoute() {
+    lastDirectionsResult = null;
+    stopGpsSimulation();
     if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
     gmapRouteMarkers.forEach((m) => m.setMap(null));
     gmapRouteMarkers = [];
@@ -775,6 +833,82 @@ function updateMapRouteSummary(trip) {
     setSummaryField("map-summary-cost", `Q ${trip.estimated_cost.toFixed(2)}`);
     setSummaryField("map-summary-fuel", `${trip.estimated_fuel_gallons.toFixed(2)} gal`);
     setSummaryField("map-summary-status", statusChip(trip.status));
+}
+
+function calcBearing(p1, p2) {
+    const lat1 = p1.lat() * Math.PI / 180;
+    const lat2 = p2.lat() * Math.PI / 180;
+    const dLng = (p2.lng() - p1.lng()) * Math.PI / 180;
+    const y = Math.sin(dLng) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function startGpsSimulation() {
+    if (!selectedMapTripId) {
+        showToast("Selecciona un viaje en el mapa primero.", true);
+        return;
+    }
+    if (!lastDirectionsResult || !lastDirectionsResult.routes.length) {
+        showToast("Espera que cargue la ruta vial o selecciona un viaje distinto.", true);
+        return;
+    }
+    stopGpsSimulation();
+
+    const path = lastDirectionsResult.routes[0].overview_path;
+    if (path.length < 2) {
+        showToast("La ruta no tiene suficientes puntos para simular.", true);
+        return;
+    }
+
+    let step = 0;
+    const carSvg = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36"><text x="2" y="30" font-size="30">🚗</text></svg>');
+    const carIcon = {
+        url: `data:image/svg+xml;charset=UTF-8,${carSvg}`,
+        scaledSize: new google.maps.Size(36, 36),
+        anchor: new google.maps.Point(18, 18)
+    };
+
+    gpsSimMarker = new google.maps.Marker({
+        position: path[0],
+        map,
+        title: "Vehículo en ruta",
+        icon: carIcon,
+        zIndex: 30
+    });
+
+    document.getElementById("btn-start-gps").style.display = "none";
+    document.getElementById("btn-stop-gps").style.display = "";
+    const hint = document.getElementById("gps-sim-status");
+    if (hint) hint.textContent = `Simulando ${path.length} puntos...`;
+
+    gpsSimTimer = setInterval(() => {
+        step++;
+        if (step >= path.length) {
+            stopGpsSimulation();
+            showToast("Simulación GPS completada.");
+            return;
+        }
+        gpsSimMarker.setPosition(path[step]);
+        map.panTo(path[step]);
+    }, 150);
+}
+
+function stopGpsSimulation() {
+    if (gpsSimTimer) {
+        clearInterval(gpsSimTimer);
+        gpsSimTimer = null;
+    }
+    if (gpsSimMarker) {
+        gpsSimMarker.setMap(null);
+        gpsSimMarker = null;
+    }
+    const startBtn = document.getElementById("btn-start-gps");
+    const stopBtn = document.getElementById("btn-stop-gps");
+    const hint = document.getElementById("gps-sim-status");
+    if (startBtn) startBtn.style.display = "";
+    if (stopBtn) stopBtn.style.display = "none";
+    if (hint) hint.textContent = "";
 }
 
 function setSummaryField(id, value) {

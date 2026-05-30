@@ -628,6 +628,24 @@ button[type="submit"],
     max-width: 360px;
 }
 
+.gps-sim-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.gps-sim-hint {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-style: italic;
+}
+
+.btn-small.btn-danger {
+    background: #dc2626;
+}
+
 .route-summary {
     margin-bottom: 0.75rem;
     padding: 0.7rem 0.8rem;

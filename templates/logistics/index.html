@@ -438,6 +438,11 @@
                             <span class="legend-item"><i class="legend-dot legend-end"></i>Fin</span>
                         </div>
                     </div>
+                    <div class="gps-sim-controls">
+                        <button type="button" id="btn-start-gps" class="btn-small">▶ Simular GPS</button>
+                        <button type="button" id="btn-stop-gps" class="btn-small btn-danger" style="display:none">■ Detener simulación</button>
+                        <span id="gps-sim-status" class="gps-sim-hint"></span>
+                    </div>
                     <div id="route-map"></div>
                 </article>
             </section>
@@ -448,6 +453,11 @@
                     <article class="form-card" id="department-form-card">
                         <h3>Agregar departamento</h3>
                         <form id="department-form">
+                            <label>Autocompletar departamento de Guatemala
+                                <select id="dept-preset-select">
+                                    <option value="">— Seleccione para autocompletar —</option>
+                                </select>
+                            </label>
                             <label>Código
                                 <input name="code" required placeholder="GT01" maxlength="8">
                             </label>
