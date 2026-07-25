@@ -1,10 +1,11 @@
 import json
 from decimal import Decimal
 
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Department, Order, RouteConnection, Trip, Vehicle
+from .models import Department, Order, RouteConnection, Trip, UserProfile, Vehicle
 from .services import PlanningError, RouteOptimizer, TripPlanner
 
 
@@ -34,6 +35,12 @@ class RouteOptimizerTests(TestCase):
 
 class TripPlanningApiTests(TestCase):
     def setUp(self):
+        # /api/trips/plan/ exige sesion iniciada y rol admin o supervisor:
+        # sin esto la vista responde 302 hacia el login.
+        self.user = User.objects.create_user(username="tester", password="test-pass-123")
+        UserProfile.objects.create(user=self.user, role=UserProfile.Role.ADMIN)
+        self.client.force_login(self.user)
+
         self.gua = Department.objects.create(code="GUA", name="Guatemala")
         self.esc = Department.objects.create(code="ESC", name="Escuintla")
         self.que = Department.objects.create(code="QUE", name="Quetzaltenango")

@@ -9,7 +9,7 @@ Sistema web de gestión y optimización de rutas logísticas para Guatemala. Per
 JaironRoute resuelve el problema de encontrar la ruta más corta entre cualquier par de departamentos de Guatemala, considerando las conexiones viales reales y sus distancias en kilómetros. El sistema:
 
 - Calcula rutas óptimas usando el algoritmo de **Dijkstra** (grafo de distancias viales) o **A\*** (con heurística Haversine).
-- Visualiza la ruta sobre un mapa vectorial con **MapLibre GL JS** y traza el trazado real por carreteras via **OpenRouteService**.
+- Visualiza la ruta sobre **Google Maps** y traza el recorrido real por carreteras via **Google Directions API**.
 - Gestiona el ciclo de vida completo de un viaje: planificación → en progreso → completado / cancelado.
 - Calcula costos estimados de combustible (GTQ/galón) y costo por kilómetro del vehículo.
 - Controla acceso por roles: Administrador, Supervisor y Operador.
@@ -26,9 +26,9 @@ JaironRoute resuelve el problema de encontrar la ruta más corta entre cualquier
 | Base de datos | PostgreSQL (Neon serverless) |
 | ORM | Django ORM + Django Cache Framework |
 | Frontend | Vanilla JavaScript ES2022 |
-| Mapa | MapLibre GL JS, OpenFreeMap (estilo Liberty — vector tiles) |
-| Ruteo por carreteras | OpenRouteService API (preference=fastest) |
-| Ruteo fallback | OSRM (Open Source Routing Machine) |
+| Mapa | Google Maps JavaScript API (marcadores avanzados + capa de trafico) |
+| Ruteo por carreteras | Google Directions API (`DirectionsService`) |
+| Ruteo fallback | Linea recta entre waypoints si Directions falla |
 | Algoritmos | Dijkstra (camino más corto), A* con heurística Haversine |
 | Deploy | Render.com (web service) |
 
@@ -87,69 +87,66 @@ def _build_graph():
 
 ---
 
-### 🗺️ MapLibre GL JS — Motor del mapa
+### 🗺️ Google Maps JavaScript API — Motor del mapa
 
-Renderiza el mapa interactivo en el navegador con capas vectoriales (puntos, líneas, etiquetas):
+Renderiza el mapa, los marcadores de departamento y la capa de trafico en vivo.
+El loader es asincrono (`loading=async` + `callback`), asi que `app.js` espera la
+promesa `window.googleMapsReady` antes de tocar `google.maps`:
 
 ```javascript
+// templates/logistics/index.html — se define ANTES de cargar la API
+window.googleMapsReady = new Promise(function (resolve, reject) { ... });
+window.initGoogleMaps = function () { resolve(); };   // lo llama Google al cargar
+window.gm_authFailure = function () { reject(...); }; // API key rechazada
+
 // static/logistics/app.js
-map = new maplibregl.Map({
-    container: "route-map",
-    style: "https://tiles.openfreemap.org/styles/liberty",  // estilo vectorial
-    center: [-90.3, 15.45],   // Guatemala
-    zoom: 7
+map = new google.maps.Map(document.getElementById("route-map"), {
+    center: { lat: 15.45, lng: -90.3 },
+    zoom: 7,
+    mapId: window.GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID"   // requerido por AdvancedMarker
 });
+new google.maps.TrafficLayer().setMap(map);
+```
 
-// Agrega los departamentos como puntos interactivos
-map.addLayer({ id: "departments-layer", type: "circle", source: "departments-source" });
+Cada departamento es un `AdvancedMarkerElement` con contenido HTML propio. La
+opcion `gmpClickable: true` es obligatoria: sin ella el marcador nunca emite el
+evento `gmp-click` y el InfoWindow no abre.
 
-// Dibuja la ruta óptima resaltada en naranja
-map.addLayer({ id: "highlight-line-layer", type: "line", source: "highlight-source" });
+```javascript
+const marker = new google.maps.marker.AdvancedMarkerElement({
+    position: { lat, lng }, map, content: el, gmpClickable: true
+});
+marker.addListener("gmp-click", () => { /* abre InfoWindow */ });
 ```
 
 ---
 
-### 🌍 OpenFreeMap Liberty — Tiles vectoriales del mapa
+### 🛣️ Google Directions API — Geometria de carreteras reales
 
-Provee los mapas vectoriales (calles, ríos, nombres, pueblos) sin costo ni API key. Reemplazó 30 líneas de configuración raster de Esri:
+Dado el origen, el destino y los departamentos intermedios que eligio Dijkstra,
+devuelve la geometria de la carretera real para dibujarla sobre el mapa:
 
 ```javascript
-// Una sola URL carga el estilo completo: colores, tipografías, capas
-style: "https://tiles.openfreemap.org/styles/liberty"
+// static/logistics/app.js — fetchRoadGeometryGoogleMaps()
+new google.maps.DirectionsService().route({
+    origin, destination,
+    waypoints,                                  // departamentos intermedios
+    travelMode: google.maps.TravelMode.DRIVING
+}, (result, status) => { ... });
 ```
 
----
-
-### 🛣️ OpenRouteService (ORS) — Geometría de carreteras reales
-
-Dado un conjunto de puntos GPS (departamentos en la ruta), devuelve cientos de coordenadas que forman la carretera real. `preference: "fastest"` elige autopistas sobre caminos viejos:
+Si Directions falla (cuota, red, sin ruta terrestre), el mapa cae a marcadores y
+encuadre directo sobre los waypoints, sin romper la vista:
 
 ```javascript
-// static/logistics/app.js — función _fetchViaORS()
-fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
-    method: "POST",
-    headers: {
-        "Authorization": "Bearer " + window.ORS_API_KEY   // JWT token
-    },
-    body: JSON.stringify({
-        coordinates: [[lon1, lat1], [lon2, lat2]],   // waypoints del viaje
-        preference: "fastest"    // elige autopista CA-9 sobre carretera vieja
-    })
-})
-// Respuesta: 300+ coordenadas siguiendo la carretera exacta en el mapa
-```
-
-Si ORS falla, el sistema cae automáticamente al fallback OSRM:
-
-```javascript
-async function fetchRoadGeometry(waypointCoords) {
-    if (window.ORS_API_KEY) {
-        try { return await _fetchViaORS(waypointCoords); }
-        catch (err) { console.warn("ORS no disponible, usando OSRM:", err.message); }
-    }
-    return _fetchViaOSRM(waypointCoords);   // fallback automático
+} catch (err) {
+    console.warn("Directions API no disponible, usando linea directa:", err.message);
+    addWaypointMarkers();
 }
 ```
+
+El resultado tambien alimenta la simulacion GPS: `overview_path` da los ~300
+puntos por los que se mueve el marcador del vehiculo.
 
 ---
 
@@ -213,10 +210,10 @@ Trip guardado con precio de gasolina actual   (FuelPrice.current())
 app.js recibe la respuesta JSON
         │
         ▼
-_fetchViaORS()  →  OpenRouteService API       (geometría de carretera real)
+fetchRoadGeometryGoogleMaps()  →  Directions API  (geometria de carretera real)
         │
         ▼
-MapLibre GL dibuja la ruta sobre OpenFreeMap  (mapa vectorial en pantalla)
+DirectionsRenderer dibuja la ruta sobre Google Maps  (mapa en pantalla)
 ```
 
 ---
@@ -239,7 +236,7 @@ El código dentro de `logistics/` está organizado en cuatro capas con responsab
 +----------------------------------------------------------+
 |  Infrastructure       (logistics/models.py + cache)      |
 |  Django ORM, Django Cache Framework, APIs externas       |
-|  (OpenRouteService / OSRM)                               |
+|  (Google Maps JavaScript API / Directions API)           |
 +----------------------------------------------------------+
 ```
 
@@ -259,7 +256,7 @@ El código dentro de `logistics/` está organizado en cuatro capas con responsab
 **Infrastructure**
 - `logistics/models.py` — Modelos Django (no se mueven; las migraciones dependen de su ubicacion).
 - Cache de Django — El grafo de conexiones y las coordenadas de departamentos se cachean 120 segundos.
-- APIs externas — OpenRouteService y OSRM se consumen desde el frontend JavaScript, no desde el backend Python.
+- APIs externas — Google Maps y Directions se consumen desde el frontend JavaScript, no desde el backend Python.
 
 ---
 
@@ -307,9 +304,9 @@ Al ser `h(n)` admisible (linea recta <= distancia vial), A* garantiza optimalida
 
 El grafo de Guatemala tiene pocos nodos (~22 departamentos) y pocas aristas, por lo que la diferencia de rendimiento es irrelevante en produccion. Dijkstra se usa por defecto por su simplicidad; A* esta disponible como opcion avanzada.
 
-### Visualizacion en mapa — OpenRouteService
+### Visualizacion en mapa — Google Directions API
 
-El grafo interno solo contiene distancias en km. Para dibujar la ruta sobre el mapa con curvas de carretera reales, el frontend llama a la API de **OpenRouteService** (profile `driving-car`, preference `fastest`). Si ORS falla, el frontend usa **OSRM** como fallback.
+El grafo interno solo contiene distancias en km. Para dibujar la ruta sobre el mapa con curvas de carretera reales, el frontend llama a **Google Directions API** (`travelMode: DRIVING`, con los departamentos intermedios como waypoints). Si Directions falla, el mapa cae a marcadores y encuadre directo sobre los waypoints.
 
 ---
 
@@ -362,7 +359,22 @@ Crear un archivo `.env` en la raiz del proyecto:
 | `SECRET_KEY` | Clave secreta de Django | `django-insecure-...` |
 | `DEBUG` | Modo depuracion (`true` / `false`) | `false` |
 | `ALLOWED_HOSTS` | Hosts permitidos, separados por coma | `localhost,mi-app.onrender.com` |
-| `ORS_API_KEY` | API key de OpenRouteService | `5b3ce3597851...` |
+| `ORS_API_KEY` | API key de OpenRouteService (heredada, ya no se usa) | `5b3ce3597851...` |
+| `GOOGLE_MAPS_API_KEY` | **Obligatoria.** API key de Google Maps JavaScript API | `AIzaSy...` |
+| `GOOGLE_MAPS_MAP_ID` | Map ID para marcadores avanzados (por defecto `DEMO_MAP_ID`) | `8f2a1c...` |
+
+### Requisitos de la API key de Google Maps
+
+1. Habilitar **Maps JavaScript API** y **Directions API** en Google Cloud Console.
+2. Tener facturacion activa en el proyecto de Cloud.
+3. Si la key usa restriccion por referente HTTP, incluir todos los origenes:
+   `http://localhost:8000/*`, `http://127.0.0.1:8000/*` y `https://<tu-app>.onrender.com/*`.
+4. Definir `GOOGLE_MAPS_API_KEY` en Render (Environment -> Add Environment Variable).
+   Sin esta variable la pestana Mapa muestra un aviso y el resto del sistema
+   sigue funcionando con normalidad.
+
+La key **nunca** debe escribirse dentro de `templates/logistics/index.html`: el
+repositorio es publico y quedaria expuesta.
 
 ---
 

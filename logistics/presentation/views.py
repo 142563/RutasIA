@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.http import HttpRequest, HttpResponseNotAllowed
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -37,8 +37,8 @@ from logistics.presentation.serializers import (
 @require_GET
 def index(request: HttpRequest):
     return render(request, "logistics/index.html", {
-        "ors_api_key": getattr(django_settings, "ORS_API_KEY", ""),
         "google_maps_api_key": getattr(django_settings, "GOOGLE_MAPS_API_KEY", ""),
+        "google_maps_map_id": getattr(django_settings, "GOOGLE_MAPS_MAP_ID", "DEMO_MAP_ID"),
     })
 
 
@@ -458,5 +458,3 @@ def api_fuel_price(request: HttpRequest):
         return _error(f"Datos inválidos: {exc}")
 
 
-def method_not_allowed(_: HttpRequest):
-    return HttpResponseNotAllowed(["GET", "POST"])

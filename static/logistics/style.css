@@ -744,6 +744,17 @@ button[type="submit"],
     color: #64748b;
 }
 
+.map-error {
+    margin: 0 0 0.85rem;
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+    background: rgba(127, 29, 29, 0.08);
+    border: 1px solid rgba(127, 29, 29, 0.35);
+    color: #7f1d1d;
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
 #route-map {
     height: 540px;
     border-radius: 0 0 14px 14px;

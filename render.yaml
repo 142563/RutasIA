@@ -12,6 +12,10 @@ services:
         sync: false
       - key: ORS_API_KEY
         sync: false
+      # Sin esta variable el template renderiza el mapa sin API key y
+      # Google responde InvalidKeyMapError.
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
       - key: DEBUG
         value: "False"
 

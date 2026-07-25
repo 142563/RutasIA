@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>JaironRoute | Optimizacion de Rutas</title>
+    <title>Rutas A* | Optimización de Rutas</title>
     <link rel="stylesheet" href="{% static 'logistics/style.css' %}">
 </head>
 <body>
@@ -16,8 +16,8 @@
                     <img class="brand-logo" src="{% static 'logistics/brand/rutas_astar_logo_logistica_gt.svg' %}" alt="Rutas A*">
                     <div class="hero-copy">
                         <p class="chip">Sistema Web de Distribucion</p>
-                        <h1>JaironRoute</h1>
-                        <p class="subtitle">Optimizacion inteligente de rutas y control operativo de viajes en Guatemala.</p>
+                        <h1>Rutas A*</h1>
+                        <p class="subtitle">Optimización inteligente de rutas y control operativo de viajes en Guatemala.</p>
                     </div>
                 </div>
                 <div class="user-info" id="user-info">
@@ -443,6 +443,7 @@
                         <button type="button" id="btn-stop-gps" class="btn-small btn-danger" style="display:none">■ Detener simulación</button>
                         <span id="gps-sim-status" class="gps-sim-hint"></span>
                     </div>
+                    <div id="map-error" class="map-error" style="display:none"></div>
                     <div id="route-map"></div>
                 </article>
             </section>
@@ -546,9 +547,40 @@
 
     <div id="toast" class="toast"></div>
     <script>
-        window.ORS_API_KEY = "{{ ors_api_key|escapejs }}";
+        // La API de Google Maps se carga de forma asincrona (loading=async + callback).
+        // Estas variables tienen que existir ANTES de que el loader termine, por eso
+        // van en un script inline y no dentro de app.js (que se ejecuta con defer).
+        window.GOOGLE_MAPS_API_KEY = "{{ google_maps_api_key|escapejs }}";
+        window.GOOGLE_MAPS_MAP_ID = "{{ google_maps_map_id|escapejs }}";
+        window.googleMapsReady = new Promise(function (resolve, reject) {
+            window.__resolveGoogleMaps = resolve;
+            window.__rejectGoogleMaps = reject;
+        });
+        // Lo invoca el loader de Google cuando google.maps ya esta disponible.
+        window.initGoogleMaps = function () {
+            window.__resolveGoogleMaps();
+        };
+        // Lo invoca Google si la API key es invalida, esta restringida a otros
+        // dominios, o el proyecto no tiene facturacion activa.
+        window.gm_authFailure = function () {
+            window.__rejectGoogleMaps(new Error(
+                "Google rechazo la API key (revisa restricciones de dominio, " +
+                "facturacion y que Maps JavaScript API este habilitada)."
+            ));
+        };
+        if (!window.GOOGLE_MAPS_API_KEY) {
+            window.__rejectGoogleMaps(new Error(
+                "Falta la variable de entorno GOOGLE_MAPS_API_KEY."
+            ));
+        }
     </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBcoQAzpOO8-BDwaSvM0owPca0_NCdoK3k&libraries=places"></script>
+    {% if google_maps_api_key %}
+    {# OJO: aqui va urlencode, NO escapejs. escapejs escapa el guion de la  #}
+    {# API key como -, la key llega corrupta y Google responde        #}
+    {# InvalidKeyMapError. escapejs solo sirve dentro de strings de JS.     #}
+    <script async
+        src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key|urlencode }}&libraries=marker&loading=async&callback=initGoogleMaps"></script>
+    {% endif %}
     <script src="{% static 'logistics/app.js' %}" defer></script>
 </body>
 </html>

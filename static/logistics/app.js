@@ -60,14 +60,56 @@ let gmapRouteMarkers = [];
 let gpsSimTimer = null;
 let gpsSimMarker = null;
 let lastDirectionsResult = null;
+// Se resuelve cuando el loader de Google llama a window.initGoogleMaps, y se
+// rechaza si falta la API key o Google la rechaza (window.gm_authFailure).
+// Ambos se definen en un <script> inline de index.html, antes que este archivo.
+let googleMapsLoaded = false;
+let googleMapsError = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
     bindTabs();
     initDeptPresetSelect();
     bindForms();
     bindFilters();
+    watchGoogleMaps();
     await reloadAll();
 });
+
+// El mapa nunca debe tumbar al resto de la aplicacion: si Google falla se
+// muestra el aviso en la pestana Mapa y las demas pestanas siguen funcionando.
+function watchGoogleMaps() {
+    const pending = window.googleMapsReady || Promise.reject(
+        new Error("No se inicializo el loader de Google Maps.")
+    );
+    pending.then(
+        () => {
+            googleMapsLoaded = true;
+            showMapError(null);
+            try {
+                renderMap();
+            } catch (error) {
+                showMapError(error.message);
+            }
+        },
+        (error) => {
+            googleMapsError = error;
+            showMapError(error.message);
+        }
+    );
+}
+
+function showMapError(message) {
+    const box = document.getElementById("map-error");
+    if (!box) return;
+    if (!message) {
+        box.style.display = "none";
+        box.textContent = "";
+        return;
+    }
+    box.style.display = "";
+    box.textContent = `No se pudo cargar el mapa: ${message}`;
+    console.error("Google Maps:", message);
+}
 
 function bindTabs() {
     const tabs = Array.from(document.querySelectorAll(".tab"));
@@ -80,9 +122,7 @@ function bindTabs() {
                 panel.classList.toggle("is-active", panel.id === `tab-${target}`);
             });
             if (target === "map") {
-                window.setTimeout(() => {
-                    if (map) google.maps.event.trigger(map, "resize");
-                }, 80);
+                window.setTimeout(onMapPanelShown, 80);
             }
         });
     });
@@ -113,7 +153,7 @@ function bindForms() {
 }
 
 
-// â”€â”€ PRECIO DE GASOLINA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- PRECIO DE GASOLINA ------------------------------------------------------
 
 async function reloadFuelPrice() {
     try {
@@ -260,8 +300,14 @@ function renderAll() {
     renderTripsFiltered();
     renderEventTripSelect();
     renderTripFilterVehicles();
-    renderMap();
     renderUsers();
+    // Va al final y aislado: un fallo de Google Maps no debe dejar el resto
+    // de las pestanas a medio renderizar.
+    try {
+        renderMap();
+    } catch (error) {
+        showMapError(error.message);
+    }
 }
 
 function renderUserInfo() {
@@ -583,9 +629,15 @@ function renderUsers() {
     });
 }
 
-// â”€â”€ MAP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- MAP ---------------------------------------------------------------------
 
 function renderMap() {
+    // El selector de viajes es HTML puro: se llena aunque Google Maps falle.
+    renderMapTripSelect();
+
+    if (googleMapsError) return;
+    if (!googleMapsLoaded) return; // watchGoogleMaps() reintenta al cargar.
+
     const depts = state.departments.filter((d) => d.latitude && d.longitude);
     if (!depts.length) return;
 
@@ -594,6 +646,9 @@ function renderMap() {
             center: { lat: 15.45, lng: -90.3 },
             zoom: 7,
             mapTypeId: "roadmap",
+            // AdvancedMarkerElement exige un mapId. DEMO_MAP_ID sirve para
+            // desarrollo; en produccion conviene uno propio de Cloud Console.
+            mapId: window.GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID",
             streetViewControl: false,
             rotateControl: false
         });
@@ -609,12 +664,15 @@ function renderMap() {
         directionsRenderer.setMap(map);
     }
 
-    renderMapTripSelect();
     updateMapData();
 }
 
 function onMapTripSelect(event) {
     const tripId = Number(event.target.value || 0);
+    if (!map) {
+        showToast("El mapa aun no esta disponible.", true);
+        return;
+    }
     focusMapTripById(tripId, { shouldFit: true });
 }
 
@@ -637,7 +695,7 @@ function fetchRoadGeometryGoogleMaps(waypointCoords) {
             travelMode: google.maps.TravelMode.DRIVING
         }, (result, status) => {
             if (status !== "OK") {
-                reject(new Error(`Directions API: ${status}`));
+                reject(new Error("Directions API: " + status));
                 return;
             }
             resolve(result);
@@ -686,18 +744,17 @@ async function focusMapTripById(tripId, options = {}) {
             const isFirst = index === 0;
             const isLast = index === waypointCoords.length - 1;
             const color = isFirst ? "#22c55e" : isLast ? "#ef4444" : "#f59e0b";
-            const marker = new google.maps.Marker({
+            const pin = new google.maps.marker.PinElement({
+                background: color,
+                borderColor: "#ffffff",
+                glyphColor: "#ffffff",
+                scale: isFirst || isLast ? 1.3 : 1.0
+            });
+            const marker = new google.maps.marker.AdvancedMarkerElement({
                 position: { lat, lng },
                 map,
                 title: trip.route_nodes[index] || "",
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: isFirst || isLast ? 10 : 7,
-                    fillColor: color,
-                    fillOpacity: 1,
-                    strokeColor: "#ffffff",
-                    strokeWeight: 2.5
-                },
+                content: pin.element,
                 zIndex: 20
             });
             gmapRouteMarkers.push(marker);
@@ -710,11 +767,11 @@ async function focusMapTripById(tripId, options = {}) {
         lastDirectionsResult = result;
         directionsRenderer.setDirections(result);
         addWaypointMarkers();
-        if (shouldFit && result.routes[0]?.bounds) {
+        if (shouldFit && result.routes[0] && result.routes[0].bounds) {
             map.fitBounds(result.routes[0].bounds, 48);
         }
     } catch (err) {
-        console.warn("Directions API no disponible, usando línea directa:", err.message);
+        console.warn("Directions API no disponible, usando linea directa:", err.message);
         addWaypointMarkers();
         if (shouldFit) {
             const bounds = new google.maps.LatLngBounds();
@@ -725,7 +782,7 @@ async function focusMapTripById(tripId, options = {}) {
 }
 
 function updateMapData() {
-    gmapMarkers.forEach((m) => m.setMap(null));
+    gmapMarkers.forEach((m) => { m.map = null; });
     gmapMarkers = [];
     gmapConnections.forEach((p) => p.setMap(null));
     gmapConnections = [];
@@ -748,31 +805,24 @@ function updateMapData() {
     });
 
     state.departments.filter((d) => d.latitude && d.longitude).forEach((dept) => {
-        const marker = new google.maps.Marker({
+        const el = document.createElement("div");
+        el.style.cssText = "background:#fb923c;color:#fff;padding:2px 5px;border-radius:10px;font-size:9px;font-weight:700;border:2px solid #fff;white-space:nowrap;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,.3)";
+        el.textContent = dept.code;
+        const marker = new google.maps.marker.AdvancedMarkerElement({
             position: { lat: Number(dept.latitude), lng: Number(dept.longitude) },
             map,
             title: dept.name,
-            icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 8,
-                fillColor: "#fb923c",
-                fillOpacity: 1,
-                strokeColor: "#ffffff",
-                strokeWeight: 2.2
-            },
-            label: {
-                text: dept.code,
-                color: "#ffffff",
-                fontSize: "10px",
-                fontWeight: "bold"
-            }
+            content: el,
+            // Sin gmpClickable el marcador nunca emite "gmp-click".
+            gmpClickable: true,
+            zIndex: 10
         });
-        marker.addListener("click", () => {
+        marker.addListener("gmp-click", () => {
             if (activeInfoWindow) activeInfoWindow.close();
             activeInfoWindow = new google.maps.InfoWindow({
-                content: `<div style="font-family:sans-serif;padding:2px"><strong>${escapeHtml(dept.name)}</strong><br><small>${escapeHtml(dept.code)}</small></div>`
+                content: "<div style=\"font-family:sans-serif;padding:2px\"><strong>" + escapeHtml(dept.name) + "</strong><br><small>" + escapeHtml(dept.code) + "</small></div>"
             });
-            activeInfoWindow.open(map, marker);
+            activeInfoWindow.open({ map, anchor: marker });
         });
         gmapMarkers.push(marker);
     });
@@ -794,7 +844,7 @@ function clearHighlightedRoute() {
     lastDirectionsResult = null;
     stopGpsSimulation();
     if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
-    gmapRouteMarkers.forEach((m) => m.setMap(null));
+    gmapRouteMarkers.forEach((m) => { m.map = null; });
     gmapRouteMarkers = [];
 }
 
@@ -802,10 +852,28 @@ function fitMapToDepartments() {
     if (mapHasAutoFit) return;
     const depts = state.departments.filter((d) => d.latitude && d.longitude);
     if (depts.length < 2) return;
+    // El panel del mapa arranca oculto (display:none) y ahi el contenedor mide
+    // 0x0, asi que fitBounds no puede calcular el zoom. En ese caso se deja el
+    // encuadre pendiente y lo aplica onMapPanelShown() al abrir la pestana.
+    if (!isMapVisible()) return;
     const bounds = new google.maps.LatLngBounds();
     depts.forEach((d) => bounds.extend({ lat: Number(d.latitude), lng: Number(d.longitude) }));
     map.fitBounds(bounds);
     mapHasAutoFit = true;
+}
+
+function isMapVisible() {
+    const node = document.getElementById("route-map");
+    return !!node && node.offsetWidth > 0 && node.offsetHeight > 0;
+}
+
+// Se llama al abrir la pestana Mapa: recalcula tamano y, si el encuadre
+// inicial quedo pendiente por el contenedor oculto, lo aplica ahora.
+function onMapPanelShown() {
+    if (!map || !googleMapsLoaded) return;
+    google.maps.event.trigger(map, "resize");
+    if (selectedMapTripId) return;
+    fitMapToDepartments();
 }
 
 function updateMapRouteSummary(trip) {
@@ -835,15 +903,6 @@ function updateMapRouteSummary(trip) {
     setSummaryField("map-summary-status", statusChip(trip.status));
 }
 
-function calcBearing(p1, p2) {
-    const lat1 = p1.lat() * Math.PI / 180;
-    const lat2 = p2.lat() * Math.PI / 180;
-    const dLng = (p2.lng() - p1.lng()) * Math.PI / 180;
-    const y = Math.sin(dLng) * Math.cos(lat2);
-    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
 function startGpsSimulation() {
     if (!selectedMapTripId) {
         showToast("Selecciona un viaje en el mapa primero.", true);
@@ -862,34 +921,31 @@ function startGpsSimulation() {
     }
 
     let step = 0;
-    const carSvg = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36"><text x="2" y="30" font-size="30">🚗</text></svg>');
-    const carIcon = {
-        url: `data:image/svg+xml;charset=UTF-8,${carSvg}`,
-        scaledSize: new google.maps.Size(36, 36),
-        anchor: new google.maps.Point(18, 18)
-    };
+    const carEl = document.createElement("div");
+    carEl.style.cssText = "font-size:26px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))";
+    carEl.textContent = "🚗";
 
-    gpsSimMarker = new google.maps.Marker({
+    gpsSimMarker = new google.maps.marker.AdvancedMarkerElement({
         position: path[0],
         map,
-        title: "Vehículo en ruta",
-        icon: carIcon,
+        title: "Vehiculo en ruta",
+        content: carEl,
         zIndex: 30
     });
 
     document.getElementById("btn-start-gps").style.display = "none";
     document.getElementById("btn-stop-gps").style.display = "";
     const hint = document.getElementById("gps-sim-status");
-    if (hint) hint.textContent = `Simulando ${path.length} puntos...`;
+    if (hint) hint.textContent = "Simulando " + path.length + " puntos...";
 
     gpsSimTimer = setInterval(() => {
         step++;
         if (step >= path.length) {
             stopGpsSimulation();
-            showToast("Simulación GPS completada.");
+            showToast("Simulacion GPS completada.");
             return;
         }
-        gpsSimMarker.setPosition(path[step]);
+        gpsSimMarker.position = path[step];
         map.panTo(path[step]);
     }, 150);
 }
@@ -900,7 +956,7 @@ function stopGpsSimulation() {
         gpsSimTimer = null;
     }
     if (gpsSimMarker) {
-        gpsSimMarker.setMap(null);
+        gpsSimMarker.map = null;
         gpsSimMarker = null;
     }
     const startBtn = document.getElementById("btn-start-gps");
@@ -921,7 +977,7 @@ function setSummaryField(id, value) {
     node.textContent = value;
 }
 
-// â”€â”€ FORM HANDLERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- FORM HANDLERS -----------------------------------------------------------
 
 async function onVehicleSubmit(event) {
     event.preventDefault();
@@ -1090,7 +1146,7 @@ async function onUserSubmit(event) {
     }
 }
 
-// â”€â”€ DISPLAY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- DISPLAY -----------------------------------------------------------------
 
 function showPlannerResult(trip) {
     const box = document.getElementById("planner-result");
@@ -1128,7 +1184,7 @@ function buildTripActions(trip) {
     `;
 }
 
-// â”€â”€ CHART â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- CHART -------------------------------------------------------------------
 
 function drawBarChart(canvasId, labels, values, color) {
     const canvas = document.getElementById(canvasId);
@@ -1180,7 +1236,7 @@ function drawBarChart(canvasId, labels, values, color) {
     });
 }
 
-// â”€â”€ HTTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- HTTP --------------------------------------------------------------------
 
 async function getJson(url) {
     const response = await fetch(url, { credentials: "same-origin" });
@@ -1208,7 +1264,7 @@ async function postJson(url, payload) {
     return data;
 }
 
-// â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- HELPERS -----------------------------------------------------------------
 
 function statusLabel(status) {
     const labels = {

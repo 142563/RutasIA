@@ -130,6 +130,7 @@ def _serialize_trip(trip: Trip) -> dict:
 
 def _dashboard_payload(date_from=None, date_to=None) -> dict:
     from django.db.models import Count, Sum
+    from django.db.models.functions import TruncDate
     from django.utils import timezone as tz
     from datetime import timedelta
 
@@ -155,23 +156,28 @@ def _dashboard_payload(date_from=None, date_to=None) -> dict:
     )
 
     today = tz.localdate()
-    timeline = []
-    for delta in range(6, -1, -1):
-        day = today - timedelta(days=delta)
-        timeline.append(
-            {
-                "date": day.isoformat(),
-                "trips": trips.filter(created_at__date=day).count(),
-            }
-        )
+    week_ago = today - timedelta(days=6)
+    daily_counts = {
+        row["day"]: row["count"]
+        for row in trips.filter(created_at__date__gte=week_ago)
+        .annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(count=Count("id"))
+    }
+    timeline = [
+        {
+            "date": (today - timedelta(days=delta)).isoformat(),
+            "trips": daily_counts.get(today - timedelta(days=delta), 0),
+        }
+        for delta in range(6, -1, -1)
+    ]
 
-    from logistics.models import Order as _Order
     return {
         "summary": {
             "total_trips": aggregates["total_trips"] or 0,
             "active_trips": trips.filter(status__in=[Trip.Status.PLANNED, Trip.Status.IN_PROGRESS]).count(),
-            "pending_orders": _Order.objects.filter(status=_Order.Status.PENDING).count(),
-            "delivered_orders": _Order.objects.filter(status=_Order.Status.DELIVERED).count(),
+            "pending_orders": Order.objects.filter(status=Order.Status.PENDING).count(),
+            "delivered_orders": Order.objects.filter(status=Order.Status.DELIVERED).count(),
             "total_cost": _as_float(aggregates["total_cost"]),
             "total_distance_km": _as_float(aggregates["total_distance"]),
         },
