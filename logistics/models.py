@@ -184,6 +184,10 @@ class Trip(TimestampedModel):
         COMPLETED = "completed", "Completado"
         CANCELED = "canceled", "Cancelado"
 
+    class Algorithm(models.TextChoices):
+        DIJKSTRA = "dijkstra", "Dijkstra"
+        ASTAR = "astar", "A* (A-estrella)"
+
     code = models.CharField(max_length=24, unique=True, blank=True)
     vehicle = models.ForeignKey(Vehicle, on_delete=models.PROTECT, related_name="trips")
     driver = models.ForeignKey(
@@ -207,6 +211,12 @@ class Trip(TimestampedModel):
     estimated_fuel_cost_gtq = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     estimated_cost = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PLANNED)
+    algorithm = models.CharField(
+        max_length=16,
+        choices=Algorithm.choices,
+        default=Algorithm.DIJKSTRA,
+        help_text="Algoritmo de búsqueda de caminos con el que se calculó la ruta.",
+    )
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

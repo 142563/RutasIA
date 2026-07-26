@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from statistics import median
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -14,6 +15,7 @@ from django.conf import settings as django_settings
 
 from logistics.models import Department, Driver, FuelPrice, Order, RouteConnection, Trip, UserProfile, Vehicle
 from logistics.domain.exceptions import PlanningError
+from logistics.domain.services import OPTIMIZERS, GreedyOptimizer, warm_route_cache
 from logistics.application.services import TripLifecycleService, TripPlanner
 from logistics.presentation.serializers import (
     _as_float,
@@ -30,6 +32,8 @@ from logistics.presentation.serializers import (
     _serialize_vehicle,
     _serialize_department,
 )
+
+REPEATS = 7  # corridas por algoritmo en el Laboratorio; se reporta la mediana
 
 
 @ensure_csrf_cookie
@@ -367,6 +371,87 @@ def api_plan_trip(request: HttpRequest):
         return _error(f"Falta el campo requerido: {exc.args[0]}")
     except Exception as exc:
         return _error(str(exc))
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_compare_routes(request: HttpRequest):
+    """Corre los tres optimizadores sobre el mismo par origen/destino.
+
+    Sostiene el Objetivo Específico 1 del protocolo: comparar algoritmos por
+    distancia total, tiempo de procesamiento y porcentaje de reducción frente a
+    la planificación convencional.
+    """
+    try:
+        payload = _parse_json(request)
+        origin = Department.objects.get(pk=payload["origin_id"])
+        destination = Department.objects.get(pk=payload["destination_id"])
+    except KeyError as exc:
+        return _error(f"Falta el campo requerido: {exc.args[0]}")
+    except Department.DoesNotExist:
+        return _error("Origen o destino inválido.")
+
+    if origin.id == destination.id:
+        return _error("Origen y destino no pueden ser iguales.")
+
+    names = {d.id: d.name for d in Department.objects.only("id", "name")}
+
+    # El grafo y las coordenadas se cachean, pero la primera llamada paga la
+    # consulta a la base (~250 ms). Sin precalentar, el primer algoritmo de la
+    # lista cargaría ese costo y la comparación de tiempos no significaría nada.
+    warm_route_cache()
+
+    results = []
+    baseline_distance = None
+
+    for optimizer in OPTIMIZERS:
+        try:
+            # Varias corridas y se toma la mediana: a esta escala los tiempos son
+            # de microsegundos y una sola medición es puro ruido del planificador
+            # del sistema operativo.
+            runs = [optimizer.search(origin.id, destination.id) for _ in range(REPEATS)]
+        except PlanningError as exc:
+            return _error(str(exc))
+
+        search = runs[0]
+        elapsed_ms = median(run.elapsed_ms for run in runs)
+
+        distance = _as_float(search.distance)
+        if optimizer is GreedyOptimizer:
+            baseline_distance = distance
+
+        results.append({
+            "key": optimizer.key,
+            "label": optimizer.label,
+            "is_baseline": optimizer is GreedyOptimizer,
+            "route_ids": search.path,
+            "route_nodes": [names.get(node_id, "?") for node_id in search.path],
+            "distance_km": distance,
+            "explored": search.explored,
+            "frontier_peak": search.frontier_peak,
+            "elapsed_ms": round(elapsed_ms, 4),
+            "visited_order": search.visited_order,
+            "visited_names": [names.get(node_id, "?") for node_id in search.visited_order],
+        })
+
+    # Reducción frente a la línea base. Si la convencional ya encontró la ruta
+    # óptima el porcentaje es 0: sobre grafos poco densos es un resultado normal
+    # y honesto, no un error.
+    for item in results:
+        if baseline_distance:
+            item["reduction_pct"] = round(
+                (baseline_distance - item["distance_km"]) / baseline_distance * 100, 2
+            )
+        else:
+            item["reduction_pct"] = 0.0
+
+    return _ok({
+        "comparison": {
+            "origin": {"id": origin.id, "name": origin.name},
+            "destination": {"id": destination.id, "name": destination.name},
+            "results": results,
+        }
+    })
 
 
 @login_required

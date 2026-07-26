@@ -60,7 +60,8 @@ class TripPlanner:
         destination = order_list[0].destination
 
         optimizer = AStarOptimizer if algorithm == "astar" else RouteOptimizer
-        node_ids, distance = optimizer.shortest_path(origin.id, destination.id)
+        search = optimizer.search(origin.id, destination.id)
+        node_ids, distance = search.path, search.distance
 
         fuel_liters = to_decimal(distance / Decimal(vehicle.fuel_efficiency_km_l))
         fuel_gallons = to_decimal(fuel_liters / LITERS_PER_GALLON)
@@ -85,14 +86,18 @@ class TripPlanner:
             estimated_fuel_cost_gtq=estimated_fuel_cost_gtq,
             estimated_cost=estimated_cost,
             status=Trip.Status.PLANNED,
+            algorithm=optimizer.key,
         )
 
         TripOrder.objects.bulk_create([TripOrder(trip=trip, order=order) for order in order_list])
         Order.objects.filter(id__in=[o.id for o in order_list]).update(status=Order.Status.ASSIGNED)
-        algo_label = "A* (A-estrella)" if algorithm == "astar" else "Dijkstra"
         TripEvent.objects.create(
             trip=trip,
-            note=f"Viaje planificado con {len(order_list)} pedido(s) usando {algo_label}. Ruta: {' -> '.join(route_nodes)}.",
+            note=(
+                f"Viaje planificado con {len(order_list)} pedido(s) usando {optimizer.label} "
+                f"({search.explored} nodos explorados en {search.elapsed_ms:.2f} ms). "
+                f"Ruta: {' -> '.join(route_nodes)}."
+            ),
         )
         return trip
 

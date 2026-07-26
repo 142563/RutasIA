@@ -121,6 +121,8 @@ def _serialize_trip(trip: Trip) -> dict:
         "estimated_fuel_cost_gtq": _as_float(trip.estimated_fuel_cost_gtq) if trip.estimated_fuel_cost_gtq else None,
         "estimated_cost": _as_float(trip.estimated_cost),
         "status": trip.status,
+        "algorithm": trip.algorithm,
+        "algorithm_label": trip.get_algorithm_display(),
         "started_at": trip.started_at.isoformat() if trip.started_at else None,
         "completed_at": trip.completed_at.isoformat() if trip.completed_at else None,
         "orders": [_serialize_order(order) for order in trip.orders.all().order_by("-created_at")],

@@ -13,6 +13,7 @@ urlpatterns = [
     path("api/orders/", views.api_orders, name="api-orders"),
     path("api/trips/", views.api_trips, name="api-trips"),
     path("api/trips/plan/", views.api_plan_trip, name="api-plan-trip"),
+    path("api/routes/compare/", views.api_compare_routes, name="api-compare-routes"),
     path("api/trips/<int:trip_id>/action/", views.api_trip_action, name="api-trip-action"),
     path("api/trips/<int:trip_id>/events/", views.api_trip_event, name="api-trip-event"),
     path("api/fuel-price/", views.api_fuel_price, name="api-fuel-price"),
