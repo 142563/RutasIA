@@ -9,8 +9,11 @@ const API = {
     orders: "/api/orders/",
     trips: "/api/trips/",
     planTrip: "/api/trips/plan/",
+    compareRoutes: "/api/routes/compare/",
     fuelPrice: "/api/fuel-price/"
 };
+
+const ALGO_LABELS = { greedy: "Convencional", dijkstra: "Dijkstra", astar: "A*" };
 
 const GUATEMALA_DEPARTMENTS = [
     { code: "GT01", name: "Guatemala",        lat: 14.634915, lng: -90.506882 },
@@ -66,7 +69,16 @@ let lastDirectionsResult = null;
 let googleMapsLoaded = false;
 let googleMapsError = null;
 
+// Laboratorio de algoritmos
+let labMap = null;
+let labMarkers = [];
+let labConnections = [];
+let labComparison = null;
+let labReplayTimer = null;
+let labRoutePolylines = [];
+
 document.addEventListener("DOMContentLoaded", async () => {
+    bindTheme();
     bindTabs();
     initDeptPresetSelect();
     bindForms();
@@ -74,6 +86,75 @@ document.addEventListener("DOMContentLoaded", async () => {
     watchGoogleMaps();
     await reloadAll();
 });
+
+// --- TEMA ------------------------------------------------------------------
+
+function currentTheme() {
+    return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
+
+function bindTheme() {
+    const button = document.getElementById("theme-toggle");
+    if (!button) return;
+    paintThemeToggle(button);
+    button.addEventListener("click", () => {
+        const next = currentTheme() === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = next;
+        try { localStorage.setItem("theme", next); } catch (_) {}
+        paintThemeToggle(button);
+        onThemeChanged();
+    });
+}
+
+function paintThemeToggle(button) {
+    const dark = currentTheme() === "dark";
+    button.textContent = dark ? "☀" : "☾";
+    button.title = dark ? "Cambiar a tema claro" : "Cambiar a tema oscuro";
+}
+
+// Canvas y Google Maps no heredan las variables CSS: hay que repintarlos a mano.
+function onThemeChanged() {
+    renderDashboard();
+    renderLabResults();
+    rebuildMapsForTheme();
+}
+
+// `colorScheme` del mapa solo se puede fijar al construirlo, asi que se destruye
+// y se vuelve a armar desde `state`. renderMap()/renderLabMap() ya lo hacen todo.
+function rebuildMapsForTheme() {
+    if (!googleMapsLoaded) return;
+    if (map) {
+        stopGpsSimulation();
+        gmapMarkers = [];
+        gmapConnections = [];
+        gmapRouteMarkers = [];
+        directionsRenderer = null;
+        map = null;
+        mapHasAutoFit = false;
+        document.getElementById("route-map").innerHTML = "";
+        try { renderMap(); } catch (error) { showMapError(error.message); }
+        if (selectedMapTripId) focusMapTripById(selectedMapTripId, { shouldFit: false });
+    }
+    if (labMap) {
+        stopLabReplay();
+        labMarkers = [];
+        labConnections = [];
+        labRoutePolylines = [];
+        labMap = null;
+        document.getElementById("lab-map").innerHTML = "";
+        renderLabMap();
+    }
+}
+
+function mapColorScheme() {
+    if (!window.google || !google.maps || !google.maps.ColorScheme) return undefined;
+    return currentTheme() === "dark" ? google.maps.ColorScheme.DARK : google.maps.ColorScheme.LIGHT;
+}
+
+function themeColor(token, fallback) {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+    return value || fallback;
+}
 
 // El mapa nunca debe tumbar al resto de la aplicacion: si Google falla se
 // muestra el aviso en la pestana Mapa y las demas pestanas siguen funcionando.
@@ -99,16 +180,19 @@ function watchGoogleMaps() {
 }
 
 function showMapError(message) {
-    const box = document.getElementById("map-error");
-    if (!box) return;
-    if (!message) {
-        box.style.display = "none";
-        box.textContent = "";
-        return;
-    }
-    box.style.display = "";
-    box.textContent = `No se pudo cargar el mapa: ${message}`;
-    console.error("Google Maps:", message);
+    // Hay dos mapas (Mapa y Laboratorio) y ambos dependen del mismo loader.
+    ["map-error", "lab-map-error"].forEach((id) => {
+        const box = document.getElementById(id);
+        if (!box) return;
+        if (!message) {
+            box.style.display = "none";
+            box.textContent = "";
+            return;
+        }
+        box.style.display = "";
+        box.textContent = `No se pudo cargar el mapa: ${message}`;
+    });
+    if (message) console.error("Google Maps:", message);
 }
 
 function bindTabs() {
@@ -121,9 +205,21 @@ function bindTabs() {
             document.querySelectorAll(".panel").forEach((panel) => {
                 panel.classList.toggle("is-active", panel.id === `tab-${target}`);
             });
-            if (target === "map") {
-                window.setTimeout(onMapPanelShown, 80);
-            }
+            // Los mapas se miden mal si se construyen con el panel oculto.
+            if (target === "map") window.setTimeout(onMapPanelShown, 80);
+            if (target === "lab") window.setTimeout(onLabPanelShown, 80);
+        });
+    });
+
+    const subtabs = Array.from(document.querySelectorAll(".subtab"));
+    subtabs.forEach((subtab) => {
+        subtab.addEventListener("click", () => {
+            subtabs.forEach((x) => x.classList.remove("is-active"));
+            subtab.classList.add("is-active");
+            const target = subtab.dataset.subtab;
+            document.querySelectorAll(".subpanel").forEach((panel) => {
+                panel.classList.toggle("is-active", panel.id === `sub-${target}`);
+            });
         });
     });
 }
@@ -150,6 +246,9 @@ function bindForms() {
         document.getElementById("fuel-form").style.display = "none";
         document.getElementById("btn-edit-fuel").style.display = "";
     });
+    document.getElementById("lab-form").addEventListener("submit", onLabSubmit);
+    document.getElementById("btn-lab-replay").addEventListener("click", startLabReplay);
+    document.getElementById("lab-suggestions").addEventListener("click", onLabSuggestionClick);
 }
 
 
@@ -301,10 +400,12 @@ function renderAll() {
     renderEventTripSelect();
     renderTripFilterVehicles();
     renderUsers();
-    // Va al final y aislado: un fallo de Google Maps no debe dejar el resto
+    renderLabInputs();
+    // Van al final y aislados: un fallo de Google Maps no debe dejar el resto
     // de las pestanas a medio renderizar.
     try {
         renderMap();
+        renderLabMap();
     } catch (error) {
         showMapError(error.message);
     }
@@ -322,8 +423,8 @@ function renderUserInfo() {
     const isAdmin = user.role === "admin";
     const isSupervisor = user.role === "supervisor" || isAdmin;
 
-    document.getElementById("tab-users-btn").style.display = isAdmin ? "" : "none";
-    document.getElementById("tab-departments-btn").style.display = isSupervisor ? "" : "none";
+    document.getElementById("subtab-users-btn").style.display = isAdmin ? "" : "none";
+    document.getElementById("subtab-departments-btn").style.display = isSupervisor ? "" : "none";
     document.getElementById("vehicle-form-card").style.display = isSupervisor ? "" : "none";
     document.getElementById("driver-form-card").style.display = isSupervisor ? "" : "none";
     document.getElementById("order-form-card").style.display = isSupervisor ? "" : "none";
@@ -342,13 +443,13 @@ function renderDashboard() {
     setText("metric-total-cost", summary.total_cost.toFixed(2));
     setText("metric-total-distance", summary.total_distance_km.toFixed(2));
 
-    const statusLabels = dashboard.status_distribution.map((item) => item.status);
+    const statusLabels = dashboard.status_distribution.map((item) => statusLabel(item.status));
     const statusValues = dashboard.status_distribution.map((item) => item.total);
-    drawBarChart("status-chart", statusLabels, statusValues, "#f97316");
+    drawBarChart("status-chart", statusLabels, statusValues, themeColor("--accent", "#ea580c"));
 
     const timelineLabels = dashboard.timeline.map((item) => item.date.slice(5));
     const timelineValues = dashboard.timeline.map((item) => item.trips);
-    drawBarChart("timeline-chart", timelineLabels, timelineValues, "#0ea5a4");
+    drawBarChart("timeline-chart", timelineLabels, timelineValues, themeColor("--algo-dijkstra", "#2563eb"));
 
     const body = document.getElementById("vehicle-activity-body");
     body.innerHTML = "";
@@ -560,7 +661,7 @@ function renderTripsFiltered() {
     const body = document.getElementById("trips-body");
     body.innerHTML = "";
     if (!filtered.length) {
-        body.innerHTML = `<tr><td colspan="9">No hay viajes con estos filtros.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="10">No hay viajes con estos filtros.</td></tr>`;
         return;
     }
     filtered.forEach((trip) => {
@@ -571,14 +672,20 @@ function renderTripsFiltered() {
                 <td>${escapeHtml(trip.vehicle_plate)}</td>
                 <td>${escapeHtml(trip.driver_name || "-")}</td>
                 <td>${escapeHtml(trip.route_nodes.join(" → "))}</td>
-                <td>${trip.total_distance_km.toFixed(2)} km</td>
-                <td>${trip.estimated_fuel_gallons.toFixed(2)} gal</td>
-                <td>Q ${trip.estimated_cost.toFixed(2)}</td>
+                <td>${algoTag(trip.algorithm)}</td>
+                <td class="numeric">${trip.total_distance_km.toFixed(2)} km</td>
+                <td class="numeric">${trip.estimated_fuel_gallons.toFixed(2)} gal</td>
+                <td class="numeric">Q ${trip.estimated_cost.toFixed(2)}</td>
                 <td>${statusChip(trip.status)}</td>
                 <td>${buildTripActions(trip)}</td>
             </tr>`
         );
     });
+}
+
+function algoTag(algorithm) {
+    const key = algorithm || "dijkstra";
+    return `<span class="algo-tag" data-algo="${escapeHtml(key)}">${escapeHtml(ALGO_LABELS[key] || key)}</span>`;
 }
 
 function renderEventTripSelect() {
@@ -649,6 +756,7 @@ function renderMap() {
             // AdvancedMarkerElement exige un mapId. DEMO_MAP_ID sirve para
             // desarrollo; en produccion conviene uno propio de Cloud Console.
             mapId: window.GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID",
+            colorScheme: mapColorScheme(),
             streetViewControl: false,
             rotateControl: false
         });
@@ -656,8 +764,8 @@ function renderMap() {
         directionsRenderer = new google.maps.DirectionsRenderer({
             suppressMarkers: true,
             polylineOptions: {
-                strokeColor: "#1a73e8",
-                strokeOpacity: 0.9,
+                strokeColor: themeColor("--accent", "#ea580c"),
+                strokeOpacity: 0.95,
                 strokeWeight: 5
             }
         });
@@ -796,8 +904,8 @@ function updateMapData() {
                 { lat: Number(origin.latitude), lng: Number(origin.longitude) },
                 { lat: Number(destination.latitude), lng: Number(destination.longitude) }
             ],
-            strokeColor: "#67e8f9",
-            strokeOpacity: 0.45,
+            strokeColor: themeColor("--algo-dijkstra", "#2563eb"),
+            strokeOpacity: 0.35,
             strokeWeight: 2,
             map
         });
@@ -805,9 +913,7 @@ function updateMapData() {
     });
 
     state.departments.filter((d) => d.latitude && d.longitude).forEach((dept) => {
-        const el = document.createElement("div");
-        el.style.cssText = "background:#fb923c;color:#fff;padding:2px 5px;border-radius:10px;font-size:9px;font-weight:700;border:2px solid #fff;white-space:nowrap;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,.3)";
-        el.textContent = dept.code;
+        const el = deptPill(dept.code, themeColor("--accent", "#ea580c"));
         const marker = new google.maps.marker.AdvancedMarkerElement({
             position: { lat: Number(dept.latitude), lng: Number(dept.longitude) },
             map,
@@ -977,6 +1083,472 @@ function setSummaryField(id, value) {
     node.textContent = value;
 }
 
+// Etiqueta de departamento usada como contenido de AdvancedMarkerElement.
+function deptPill(code, background) {
+    const el = document.createElement("div");
+    el.style.cssText =
+        `background:${background};color:#fff;padding:2px 6px;border-radius:10px;` +
+        "font:700 9px system-ui,sans-serif;border:2px solid #fff;white-space:nowrap;" +
+        "cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.35)";
+    el.textContent = code;
+    return el;
+}
+
+// --- LABORATORIO DE ALGORITMOS -----------------------------------------------
+
+function renderLabInputs() {
+    const options = [
+        `<option value="">Seleccione...</option>`,
+        ...state.departments.map(
+            (d) => `<option value="${d.id}">${escapeHtml(d.name)} (${escapeHtml(d.code)})</option>`
+        )
+    ].join("");
+
+    ["lab-origin", "lab-destination"].forEach((id) => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        const previous = select.value;
+        select.innerHTML = options;
+        if (previous) select.value = previous;
+    });
+
+    renderLabSuggestions();
+}
+
+// Pares donde la heuristica voraz se desvia de la ruta optima. Se calculan en el
+// navegador con el mismo grafo que ya trae /api/connections/, para no pedirle al
+// usuario que adivine que par vale la pena comparar en la demo.
+function renderLabSuggestions() {
+    const box = document.getElementById("lab-suggestions");
+    if (!box) return;
+
+    const pairs = findDivergentPairs().slice(0, 4);
+    if (!pairs.length) {
+        box.innerHTML = "";
+        return;
+    }
+
+    box.innerHTML = "<span>Pares donde la ruta convencional se desvía:</span>" + pairs
+        .map((pair) => `<button type="button" class="btn-small lab-suggestion"
+            data-origin="${pair.originId}" data-destination="${pair.destinationId}">
+            ${escapeHtml(pair.originName)} → ${escapeHtml(pair.destinationName)}
+        </button>`)
+        .join("");
+}
+
+function onLabSuggestionClick(event) {
+    const button = event.target.closest(".lab-suggestion");
+    if (!button) return;
+    document.getElementById("lab-origin").value = button.dataset.origin;
+    document.getElementById("lab-destination").value = button.dataset.destination;
+    document.getElementById("lab-form").requestSubmit();
+}
+
+function buildClientGraph() {
+    const graph = new Map();
+    const push = (from, to, weight) => {
+        if (!graph.has(from)) graph.set(from, []);
+        graph.get(from).push({ to, weight });
+    };
+    state.connections.forEach((c) => {
+        push(c.origin_id, c.destination_id, c.distance_km);
+        if (c.is_bidirectional) push(c.destination_id, c.origin_id, c.distance_km);
+    });
+    return graph;
+}
+
+function straightLineKm(a, b) {
+    if (!a || !b || !a.latitude || !b.latitude) return 0;
+    const R = 6371;
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const dLat = toRad(Number(b.latitude) - Number(a.latitude));
+    const dLng = toRad(Number(b.longitude) - Number(a.longitude));
+    const lat1 = toRad(Number(a.latitude));
+    const lat2 = toRad(Number(b.latitude));
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function findDivergentPairs() {
+    const graph = buildClientGraph();
+    const byId = new Map(state.departments.map((d) => [d.id, d]));
+    const ids = state.departments.map((d) => d.id);
+    const found = [];
+
+    ids.forEach((origin) => {
+        ids.forEach((destination) => {
+            if (origin === destination) return;
+            const optimal = clientDijkstra(graph, origin, destination);
+            if (optimal === null) return;
+            const naive = clientGreedy(graph, byId, origin, destination);
+            if (naive === null || naive <= optimal + 0.01) return;
+            found.push({
+                originId: origin,
+                destinationId: destination,
+                originName: byId.get(origin).name,
+                destinationName: byId.get(destination).name,
+                gain: (naive - optimal) / naive
+            });
+        });
+    });
+
+    return found.sort((a, b) => b.gain - a.gain);
+}
+
+function clientDijkstra(graph, origin, destination) {
+    const dist = new Map([[origin, 0]]);
+    const visited = new Set();
+    while (true) {
+        let node = null;
+        let best = Infinity;
+        dist.forEach((value, key) => {
+            if (!visited.has(key) && value < best) { best = value; node = key; }
+        });
+        if (node === null) return null;
+        if (node === destination) return best;
+        visited.add(node);
+        (graph.get(node) || []).forEach(({ to, weight }) => {
+            const candidate = best + weight;
+            if (candidate < (dist.has(to) ? dist.get(to) : Infinity)) dist.set(to, candidate);
+        });
+    }
+}
+
+function clientGreedy(graph, byId, origin, destination) {
+    const target = byId.get(destination);
+    const path = [origin];
+    const costs = [];
+    const visited = new Set([origin]);
+    let total = 0;
+
+    while (path[path.length - 1] !== destination) {
+        const current = path[path.length - 1];
+        const options = (graph.get(current) || [])
+            .filter(({ to }) => !visited.has(to))
+            .sort((a, b) => straightLineKm(byId.get(a.to), target) - straightLineKm(byId.get(b.to), target));
+        if (!options.length) {
+            if (path.length === 1) return null;
+            path.pop();
+            total -= costs.pop();
+            continue;
+        }
+        visited.add(options[0].to);
+        path.push(options[0].to);
+        costs.push(options[0].weight);
+        total += options[0].weight;
+    }
+    return total;
+}
+
+async function onLabSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const originId = Number(form.origin_id.value);
+    const destinationId = Number(form.destination_id.value);
+
+    if (!originId || !destinationId) {
+        showToast("Selecciona origen y destino.", true);
+        return;
+    }
+    if (originId === destinationId) {
+        showToast("Origen y destino no pueden ser iguales.", true);
+        return;
+    }
+
+    stopLabReplay();
+    try {
+        const res = await postJson(API.compareRoutes, {
+            origin_id: originId,
+            destination_id: destinationId
+        });
+        labComparison = res.comparison;
+        renderLabResults();
+        drawLabRoute();
+        document.getElementById("btn-lab-replay").disabled = !googleMapsLoaded;
+    } catch (error) {
+        labComparison = null;
+        renderLabResults();
+        showToast(error.message, true);
+    }
+}
+
+function renderLabResults() {
+    const grid = document.getElementById("lab-results");
+    const verdict = document.getElementById("lab-verdict");
+    if (!grid || !verdict) return;
+
+    if (!labComparison) {
+        grid.innerHTML = "";
+        verdict.classList.add("is-empty");
+        verdict.textContent = "Elige un origen y un destino para ejecutar la comparación.";
+        return;
+    }
+
+    grid.innerHTML = labComparison.results.map((item) => `
+        <article class="algo-card" data-algo="${escapeHtml(item.key)}">
+            <span class="algo-role">${item.is_baseline ? "Línea base" : "Búsqueda de caminos"}</span>
+            <h4>${escapeHtml(item.label)}</h4>
+            <div class="algo-metrics">
+                <div class="algo-metric is-headline">
+                    <span>Distancia</span><strong>${item.distance_km.toFixed(2)} km</strong>
+                </div>
+                <div class="algo-metric">
+                    <span>Reducción</span>
+                    <strong>${item.is_baseline ? "—" : `${item.reduction_pct.toFixed(1)} %`}</strong>
+                </div>
+                <div class="algo-metric">
+                    <span>Nodos explorados</span><strong>${item.explored}</strong>
+                </div>
+                <div class="algo-metric">
+                    <span>Tiempo</span><strong>${item.elapsed_ms.toFixed(3)} ms</strong>
+                </div>
+            </div>
+            <p class="algo-route">${escapeHtml(item.route_nodes.join(" → "))}</p>
+        </article>
+    `).join("");
+
+    verdict.classList.remove("is-empty");
+    verdict.innerHTML = buildLabVerdict(labComparison);
+}
+
+// El texto se deriva de los numeros reales, nunca al reves: en grafos chicos A*
+// puede tardar mas que Dijkstra aunque explore menos nodos, y decir lo contrario
+// seria indefendible frente a un tribunal.
+function buildLabVerdict(comparison) {
+    const byKey = {};
+    comparison.results.forEach((item) => { byKey[item.key] = item; });
+    const greedy = byKey.greedy;
+    const dijkstra = byKey.dijkstra;
+    const astar = byKey.astar;
+    if (!greedy || !dijkstra || !astar) return "";
+
+    const route = `${escapeHtml(comparison.origin.name)} → ${escapeHtml(comparison.destination.name)}`;
+    const sameRoute = dijkstra.distance_km.toFixed(2) === astar.distance_km.toFixed(2);
+    const lines = [];
+
+    if (sameRoute && dijkstra.distance_km < greedy.distance_km) {
+        lines.push(
+            `<strong>${route}:</strong> Dijkstra y A* coinciden en la ruta óptima de ` +
+            `<strong>${dijkstra.distance_km.toFixed(2)} km</strong>, un ` +
+            `<strong>${dijkstra.reduction_pct.toFixed(1)}%</strong> menos que la planificación ` +
+            `convencional (${greedy.distance_km.toFixed(2)} km).`
+        );
+    } else if (sameRoute) {
+        lines.push(
+            `<strong>${route}:</strong> los tres coinciden en ` +
+            `<strong>${dijkstra.distance_km.toFixed(2)} km</strong>. En esta red la heurística ` +
+            `voraz ya encuentra la ruta óptima, así que la reducción es 0%.`
+        );
+    } else {
+        lines.push(
+            `<strong>${route}:</strong> Dijkstra devolvió ${dijkstra.distance_km.toFixed(2)} km y ` +
+            `A* ${astar.distance_km.toFixed(2)} km. Una diferencia entre ambos indica que la ` +
+            `heurística no es admisible para este grafo — conviene revisar las coordenadas.`
+        );
+    }
+
+    if (astar.explored < dijkstra.explored) {
+        lines.push(
+            `A* llegó explorando <strong>${astar.explored}</strong> nodos frente a los ` +
+            `<strong>${dijkstra.explored}</strong> de Dijkstra: la heurística Haversine descarta ` +
+            `los departamentos que se alejan del destino.`
+        );
+    } else if (astar.explored === dijkstra.explored) {
+        lines.push(
+            `Ambos exploraron ${astar.explored} nodos: en un grafo de ` +
+            `${state.departments.length} departamentos la heurística no alcanza a podar nada.`
+        );
+    }
+
+    if (astar.elapsed_ms > dijkstra.elapsed_ms) {
+        lines.push(
+            `<span class="hint">En tiempo de reloj A* fue más lento ` +
+            `(${astar.elapsed_ms.toFixed(3)} ms vs ${dijkstra.elapsed_ms.toFixed(3)} ms): ` +
+            `evaluar la heurística cuesta más de lo que ahorra a esta escala. La ventaja de A* ` +
+            `aparece cuando el grafo crece.</span>`
+        );
+    }
+
+    return lines.join(" ");
+}
+
+// --- MAPA DEL LABORATORIO ----------------------------------------------------
+
+function renderLabMap() {
+    if (googleMapsError || !googleMapsLoaded) return;
+    const container = document.getElementById("lab-map");
+    if (!container) return;
+
+    if (!labMap) {
+        labMap = new google.maps.Map(container, {
+            center: { lat: 15.45, lng: -90.3 },
+            zoom: 7,
+            mapTypeId: "roadmap",
+            mapId: window.GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID",
+            colorScheme: mapColorScheme(),
+            streetViewControl: false,
+            rotateControl: false
+        });
+    }
+
+    drawLabNetwork();
+    if (labComparison) drawLabRoute();
+}
+
+function drawLabNetwork() {
+    if (!labMap) return;
+    labConnections.forEach((p) => p.setMap(null));
+    labConnections = [];
+    labMarkers.forEach((m) => { m.map = null; });
+    labMarkers = [];
+
+    const byId = new Map(state.departments.map((d) => [d.id, d]));
+
+    state.connections.forEach((connection) => {
+        const origin = byId.get(connection.origin_id);
+        const destination = byId.get(connection.destination_id);
+        if (!origin || !destination || !origin.latitude || !destination.latitude) return;
+        labConnections.push(new google.maps.Polyline({
+            path: [
+                { lat: Number(origin.latitude), lng: Number(origin.longitude) },
+                { lat: Number(destination.latitude), lng: Number(destination.longitude) }
+            ],
+            strokeColor: themeColor("--border-strong", "#d4d4d8"),
+            strokeOpacity: 0.9,
+            strokeWeight: 2,
+            map: labMap
+        }));
+    });
+
+    state.departments.filter((d) => d.latitude && d.longitude).forEach((dept) => {
+        const marker = new google.maps.marker.AdvancedMarkerElement({
+            position: { lat: Number(dept.latitude), lng: Number(dept.longitude) },
+            map: labMap,
+            title: dept.name,
+            content: deptPill(dept.code, themeColor("--algo-greedy", "#71717a")),
+            zIndex: 10
+        });
+        marker.__deptId = dept.id;
+        labMarkers.push(marker);
+    });
+
+    fitLabMap();
+}
+
+function fitLabMap() {
+    if (!labMap) return;
+    const depts = state.departments.filter((d) => d.latitude && d.longitude);
+    if (depts.length < 2) return;
+    const container = document.getElementById("lab-map");
+    if (!container || !container.offsetWidth) return; // panel oculto: mide 0x0
+    const bounds = new google.maps.LatLngBounds();
+    depts.forEach((d) => bounds.extend({ lat: Number(d.latitude), lng: Number(d.longitude) }));
+    labMap.fitBounds(bounds, 32);
+}
+
+// Dibuja las rutas como polilineas sobre la red, sin llamar a Directions: aqui
+// lo que interesa es el grafo del algoritmo, no la geometria de la carretera.
+function drawLabRoute() {
+    if (!labMap || !labComparison) return;
+    labRoutePolylines.forEach((p) => p.setMap(null));
+    labRoutePolylines = [];
+
+    const byId = new Map(state.departments.map((d) => [d.id, d]));
+    const colors = {
+        greedy: themeColor("--algo-greedy", "#71717a"),
+        dijkstra: themeColor("--algo-dijkstra", "#2563eb"),
+        astar: themeColor("--algo-astar", "#7c3aed")
+    };
+
+    labComparison.results.forEach((item, index) => {
+        const path = item.route_ids
+            .map((id) => byId.get(id))
+            .filter((d) => d && d.latitude)
+            .map((d) => ({ lat: Number(d.latitude), lng: Number(d.longitude) }));
+        if (path.length < 2) return;
+        labRoutePolylines.push(new google.maps.Polyline({
+            path,
+            strokeColor: colors[item.key] || "#888",
+            strokeOpacity: 0.85,
+            // Se dibujan con grosor decreciente para que las tres se vean cuando
+            // Dijkstra y A* devuelven exactamente la misma ruta.
+            strokeWeight: 9 - index * 2.5,
+            zIndex: 5 + index,
+            map: labMap
+        }));
+    });
+
+    resetLabPills();
+}
+
+function resetLabPills() {
+    const base = themeColor("--algo-greedy", "#71717a");
+    labMarkers.forEach((marker) => {
+        marker.content = deptPill(deptCodeById(marker.__deptId), base);
+    });
+}
+
+function deptCodeById(id) {
+    const dept = state.departments.find((d) => d.id === id);
+    return dept ? dept.code : "?";
+}
+
+function startLabReplay() {
+    if (!labMap || !labComparison) return;
+    stopLabReplay();
+    resetLabPills();
+
+    // Se reproducen Dijkstra y A* en paralelo: la gracia es ver que Dijkstra se
+    // abre en todas direcciones mientras A* se estira hacia el destino.
+    const tracks = labComparison.results
+        .filter((item) => item.key !== "greedy")
+        .map((item) => ({
+            key: item.key,
+            color: themeColor(`--algo-${item.key}`, "#2563eb"),
+            order: item.visited_order
+        }));
+    if (!tracks.length) return;
+
+    const total = Math.max(...tracks.map((t) => t.order.length));
+    const status = document.getElementById("lab-replay-status");
+    let step = 0;
+
+    labReplayTimer = setInterval(() => {
+        tracks.forEach((track) => {
+            const deptId = track.order[step];
+            if (deptId === undefined) return;
+            const marker = labMarkers.find((m) => m.__deptId === deptId);
+            if (marker) marker.content = deptPill(deptCodeById(deptId), track.color);
+        });
+        step++;
+        if (status) status.textContent = `Paso ${Math.min(step, total)} de ${total}`;
+        if (step >= total) {
+            clearInterval(labReplayTimer);
+            labReplayTimer = null;
+            if (status) {
+                status.textContent = tracks
+                    .map((t) => `${ALGO_LABELS[t.key]}: ${t.order.length} nodos`)
+                    .join(" · ");
+            }
+        }
+    }, 550);
+}
+
+function stopLabReplay() {
+    if (labReplayTimer) {
+        clearInterval(labReplayTimer);
+        labReplayTimer = null;
+    }
+    const status = document.getElementById("lab-replay-status");
+    if (status) status.textContent = "";
+}
+
+function onLabPanelShown() {
+    if (!labMap || !googleMapsLoaded) return;
+    google.maps.event.trigger(labMap, "resize");
+    fitLabMap();
+}
+
 // --- FORM HANDLERS -----------------------------------------------------------
 
 async function onVehicleSubmit(event) {
@@ -1057,11 +1629,13 @@ async function onPlannerSubmit(event) {
         return;
     }
     const driverId = form.driver_id.value ? Number(form.driver_id.value) : null;
+    const algorithm = form.algorithm ? form.algorithm.value : "dijkstra";
     try {
         const response = await postJson(API.planTrip, {
             vehicle_id: vehicleId,
             driver_id: driverId,
-            order_ids: selectedOrders
+            order_ids: selectedOrders,
+            algorithm
         });
         showPlannerResult(response.trip);
         showToast("Viaje planificado correctamente.");
@@ -1156,6 +1730,7 @@ function showPlannerResult(trip) {
     box.innerHTML = `
         <h3>Resultado de planificación</h3>
         <p><strong>Código:</strong> ${escapeHtml(trip.code)}</p>
+        <p><strong>Algoritmo:</strong> ${algoTag(trip.algorithm)}</p>
         <p><strong>Vehículo:</strong> ${escapeHtml(trip.vehicle_plate)}</p>
         <p><strong>Conductor:</strong> ${escapeHtml(trip.driver_name || "No asignado")}</p>
         <p><strong>Ruta óptima:</strong> ${escapeHtml(trip.route_nodes.join(" → "))}</p>
@@ -1186,16 +1761,23 @@ function buildTripActions(trip) {
 
 // --- CHART -------------------------------------------------------------------
 
+// El canvas no hereda las variables CSS: los colores se leen de los tokens en
+// cada dibujo, y onThemeChanged() vuelve a llamar aqui al cambiar de tema.
 function drawBarChart(canvasId, labels, values, color) {
     const canvas = document.getElementById(canvasId);
     const ctx = canvas.getContext("2d");
     const width = canvas.width;
     const height = canvas.height;
+    const ink = themeColor("--text", "#18181b");
+    const muted = themeColor("--text-muted", "#71717a");
+    const line = themeColor("--border", "#e4e4e7");
+    const font = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+
     ctx.clearRect(0, 0, width, height);
 
     if (!labels.length || !values.length) {
-        ctx.fillStyle = "#3f5367";
-        ctx.font = "14px Trebuchet MS";
+        ctx.fillStyle = muted;
+        ctx.font = `13px ${font}`;
         ctx.fillText("Sin datos para mostrar.", 12, 26);
         return;
     }
@@ -1204,9 +1786,10 @@ function drawBarChart(canvasId, labels, values, color) {
     const graphWidth = width - padding.left - padding.right;
     const graphHeight = height - padding.top - padding.bottom;
     const maxValue = Math.max(...values, 1);
-    const barWidth = (graphWidth / values.length) * 0.66;
+    const barWidth = (graphWidth / values.length) * 0.6;
 
-    ctx.strokeStyle = "rgba(19, 33, 58, 0.24)";
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(padding.left, padding.top);
     ctx.lineTo(padding.left, padding.top + graphHeight);
@@ -1221,19 +1804,21 @@ function drawBarChart(canvasId, labels, values, color) {
         ctx.fillStyle = color;
         ctx.fillRect(x, y, barWidth, barHeight);
 
-        ctx.fillStyle = "#10273f";
-        ctx.font = "12px Trebuchet MS";
-        ctx.fillText(String(value), x, y - 6);
+        ctx.fillStyle = ink;
+        ctx.font = `600 12px ${font}`;
+        ctx.textAlign = "center";
+        ctx.fillText(String(value), x + barWidth / 2, y - 6);
 
-        const label = labels[index].replaceAll("_", " ");
         ctx.save();
         ctx.translate(x + barWidth / 2, height - 14);
         ctx.rotate(-0.42);
         ctx.textAlign = "right";
-        ctx.fillStyle = "#3a5369";
-        ctx.fillText(label, 0, 0);
+        ctx.fillStyle = muted;
+        ctx.font = `11px ${font}`;
+        ctx.fillText(String(labels[index]).replaceAll("_", " "), 0, 0);
         ctx.restore();
     });
+    ctx.textAlign = "start";
 }
 
 // --- HTTP --------------------------------------------------------------------
@@ -1300,12 +1885,15 @@ function getCookie(name) {
     return "";
 }
 
+let toastTimer = null;
+
 function showToast(message, isError = false) {
     const toast = document.getElementById("toast");
     toast.textContent = message;
-    toast.style.background = isError ? "rgba(127, 29, 29, 0.96)" : "rgba(15, 23, 42, 0.95)";
+    toast.classList.toggle("is-error", isError);
     toast.classList.add("show");
-    window.setTimeout(() => toast.classList.remove("show"), 2400);
+    if (toastTimer) window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
 function escapeHtml(value) {

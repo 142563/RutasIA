@@ -5,127 +5,62 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Rutas A* | Iniciar sesión</title>
+    <script>
+        // Mismo criterio que index.html: el tema se fija antes del primer render.
+        (function () {
+            var saved = null;
+            try { saved = localStorage.getItem("theme"); } catch (e) {}
+            var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+            document.documentElement.dataset.theme = saved || (dark ? "dark" : "light");
+        })();
+    </script>
+    <link rel="stylesheet" href="{% static 'logistics/style.css' %}">
     <style>
-        :root {
-            --bg-0: #0f172a;
-            --bg-1: #16213e;
-            --bg-2: #0f3d3e;
-            --accent: #f97316;
-            --accent-2: #0ea5a4;
-            --card: rgba(255, 255, 255, 0.92);
-            --ink: #13213a;
-            --ink-soft: #37506b;
-            --line: rgba(10, 38, 64, 0.14);
-        }
-
-        * { box-sizing: border-box; }
-
         body {
-            margin: 0;
-            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
-            color: var(--ink);
-            background: radial-gradient(circle at 10% 20%, var(--bg-2), transparent 42%),
-                radial-gradient(circle at 85% 5%, #3b82f6, transparent 35%),
-                linear-gradient(135deg, var(--bg-0), var(--bg-1));
+            display: grid;
+            place-items: center;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            padding: 1.5rem;
         }
 
         .login-box {
-            background: var(--card);
-            border: 1px solid var(--line);
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(3, 9, 28, 0.35);
-            padding: 2.2rem 2rem;
-            width: min(420px, 92vw);
+            width: min(360px, 100%);
+            display: grid;
+            gap: 1.25rem;
+            padding: 1.75rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
         }
 
         .brand {
-            text-align: center;
-            margin-bottom: 1.6rem;
-        }
-
-        .brand-logo {
-            width: min(390px, 98%);
-            height: auto;
-            display: block;
-            margin: 0 auto 0.7rem;
-        }
-
-        .chip {
-            display: inline-block;
-            padding: 0.28rem 0.72rem;
-            border-radius: 999px;
-            font-size: 0.78rem;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            background: rgba(14, 165, 164, 0.16);
-            color: #0f766e;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        h1 {
-            margin: 0.3rem 0 0.2rem;
-            font-size: 2.2rem;
-            letter-spacing: 0.03em;
-        }
-
-        .subtitle {
-            margin: 0;
-            color: var(--ink-soft);
-            font-size: 0.9rem;
-        }
-
-        form { display: grid; gap: 0.7rem; }
-
-        label {
             display: grid;
-            gap: 0.25rem;
-            font-size: 0.86rem;
-            color: #1f3c58;
-            font-weight: 700;
+            justify-items: center;
+            gap: 0.5rem;
+            text-align: center;
         }
 
-        input {
-            font: inherit;
-            border: 1px solid rgba(12, 65, 89, 0.25);
-            border-radius: 10px;
-            padding: 0.55rem 0.7rem;
-            background: #fff;
-            width: 100%;
+        .brand .brand-logo {
+            width: 150px;
+            height: auto;
         }
 
-        input:focus {
-            outline: 2px solid rgba(14, 165, 164, 0.35);
-            border-color: rgba(14, 165, 164, 0.75);
+        .brand .subtitle {
+            color: var(--text-muted);
+            font-size: var(--fs-sm);
         }
-
-        .btn-submit {
-            margin-top: 0.4rem;
-            border: 0;
-            border-radius: 10px;
-            padding: 0.65rem;
-            font: inherit;
-            font-weight: 700;
-            font-size: 1rem;
-            background: linear-gradient(135deg, var(--accent-2), #06b6d4);
-            color: #002633;
-            cursor: pointer;
-            transition: opacity 160ms;
-        }
-
-        .btn-submit:hover { opacity: 0.88; }
 
         .error-box {
-            background: rgba(185, 28, 28, 0.1);
-            border: 1px solid rgba(185, 28, 28, 0.3);
-            border-radius: 10px;
-            padding: 0.6rem 0.8rem;
-            color: #b91c1c;
-            font-size: 0.9rem;
+            padding: 0.625rem 0.75rem;
+            border: 1px solid var(--danger);
+            border-radius: var(--radius);
+            background: var(--danger-weak);
+            color: var(--danger);
+            font-size: var(--fs-sm);
+        }
+
+        .login-box button[type="submit"] {
+            justify-self: stretch;
+            text-align: center;
         }
     </style>
 </head>
@@ -139,7 +74,7 @@
 
         {% if form.errors %}
         <div class="error-box">
-            Usuario o contrasena incorrectos. Intenta de nuevo.
+            Usuario o contraseña incorrectos. Intenta de nuevo.
         </div>
         {% endif %}
 
@@ -148,10 +83,10 @@
             <label>Usuario
                 <input type="text" name="username" autofocus autocomplete="username" required>
             </label>
-            <label>Contrasena
+            <label>Contraseña
                 <input type="password" name="password" autocomplete="current-password" required>
             </label>
-            <button type="submit" class="btn-submit">Iniciar sesion</button>
+            <button type="submit" class="btn-primary">Iniciar sesión</button>
         </form>
     </div>
 </body>
