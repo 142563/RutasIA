@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Pedidos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;font-family:'Geist',system-ui,sans-serif;color:#111113;background:#FAFAF9}
+a{color:#111113}a:hover{color:#2F4BD8}
+button{font-family:inherit;cursor:pointer}
+input,textarea{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #FAFAF9; overflow: hidden; position: relative; font-family: 'Geist', system-ui, sans-serif; color: #111113">
+
+<nav aria-label="Principal" style="width: 220px; flex-shrink: 0; border-right: 1px solid #ECECEA; display: flex; flex-direction: column; padding: 24px 12px 16px; box-sizing: border-box; gap: 2px">
+<div style="display: flex; align-items: center; gap: 8px; padding: 0 10px 20px">
+<svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#111113"></rect><path d="M9 22c0-5 4-5 7-8s3-5 7-5" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"></path><circle cx="9" cy="22" r="2.6" fill="#FFFFFF"></circle><circle cx="23" cy="9" r="2.6" fill="#FFFFFF"></circle></svg>
+<span style="font-weight: 600; font-size: 17px; letter-spacing: -0.02em">enruta</span>
+</div>
+<button type="button" style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; margin-bottom: 14px; border: 1px solid #ECECEA; border-radius: 8px; background: #FFFFFF; color: #6B6F76; font-size: 13px; text-align: left">
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+<span style="flex-grow: 1">Buscar</span><span style="font-family: 'Geist Mono', monospace; font-size: 11px">⌘K</span></button>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Inicio</a>
+<a href="Pedidos.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #111113; background: #EFEFED; text-decoration: none; font-size: 14px; font-weight: 500">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"></path><path d="m3 8 9 5 9-5"></path><path d="M12 13v8"></path></svg>
+<span style="flex-grow: 1">Pedidos</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #56595F">15</span></a>
+<a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="3"></circle><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"></path><circle cx="18" cy="5" r="3"></circle></svg>Planificar</a>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11v10H3z"></path><path d="M14 9h4l3 3v4h-7"></path><circle cx="7" cy="17.5" r="1.8"></circle><circle cx="17" cy="17.5" r="1.8"></circle></svg>Rutas</a>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"></path><path d="M9 4v14M15 6v14"></path></svg>Monitoreo</a>
+<span style="font-size: 12px; color: #6B6F76; padding: 18px 10px 6px">Análisis</span>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg>Tráfico</a>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3"></path></svg>Laboratorio</a>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"></path><path d="M6 17V11M11 17V5M16 17v-8M21 17v-3"></path></svg>Reportes</a>
+<div style="flex-grow: 1"></div>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg>Configuración</a>
+<div style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px">
+<span style="width: 26px; height: 26px; border-radius: 50%; background: #EFEFED; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600">AC</span>
+<span style="font-size: 13px; color: #56595F">Andrea Castillo</span>
+</div>
+</nav>
+
+<main style="flex-grow: 1; display: flex; flex-direction: column; min-width: 0; padding: 40px 48px 0; box-sizing: border-box; gap: 24px; position: relative">
+
+<div style="display: flex; align-items: flex-end; gap: 12px">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px">
+<h1 style="margin: 0; font-weight: 600; font-size: 24px; letter-spacing: -0.025em">Pedidos</h1>
+<p style="margin: 0; font-size: 13px; color: #6B6F76">15 pendientes de asignar para hoy</p>
+</div>
+<button type="button" aria-label="Más opciones" style="width: 38px; height: 38px; border-radius: 9px; border: 1px solid #ECECEA; background: #FFFFFF; color: #111113; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+<button type="button" onClick="{{openDrawer}}" style="height: 38px; padding: 0 14px; border-radius: 9px; border: none; background: #111113; color: #FFFFFF; font-size: 14px; font-weight: 500">Nuevo pedido</button>
+</div>
+
+<div style="display: flex; align-items: center; gap: 24px; border-bottom: 1px solid #ECECEA">
+<div role="tablist" aria-label="Filtrar por estado" style="display: flex; gap: 20px; flex-grow: 1">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="6">
+<button type="button" role="tab" aria-selected="{{t.selected}}" onClick="{{t.pick}}" style="height: 40px; padding: 0; border: none; background: transparent; font-size: 14px; font-weight: {{t.weight}}; color: {{t.fg}}; box-shadow: inset 0 -2px 0 {{t.bar}}; display: flex; align-items: center; gap: 6px">{{t.label}}<span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6B6F76">{{t.count}}</span></button>
+</sc-for>
+</div>
+<label style="display: flex; align-items: center; gap: 8px; width: 260px; height: 34px; margin-bottom: 4px; padding: 0 10px; border: 1px solid #ECECEA; border-radius: 8px; background: #FFFFFF; box-sizing: border-box; color: #6B6F76">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+<span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Buscar pedidos</span>
+<input type="search" placeholder="Buscar" style="border: none; outline: none; background: transparent; font-size: 13px; flex-grow: 1; color: #111113">
+</label>
+</div>
+
+<div role="table" aria-label="Lista de pedidos" style="display: flex; flex-direction: column">
+<div role="row" style="display: grid; grid-template-columns: 36px 150px 1.1fr 1.6fr 90px 130px 100px; align-items: center; height: 36px; font-size: 12px; color: #6B6F76; border-bottom: 1px solid #ECECEA">
+<span role="columnheader" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Seleccionar</span><span aria-hidden="true"></span>
+<span role="columnheader">Código</span><span role="columnheader">Destinatario</span><span role="columnheader">Dirección</span><span role="columnheader" style="text-align: right; padding-right: 20px">Peso</span><span role="columnheader">Estado</span><span role="columnheader">Creado</span>
+</div>
+<sc-for list="{{rows}}" as="row" hint-placeholder-count="10">
+<div role="row" style="display: grid; grid-template-columns: 36px 150px 1.1fr 1.6fr 90px 130px 100px; align-items: center; height: 52px; border-bottom: 1px solid #F1F1EF; font-size: 14px; background: {{row.bg}}">
+<span role="cell" style="display: flex; align-items: center"><input type="checkbox" checked="{{row.selected}}" onChange="{{row.toggle}}" aria-label="Seleccionar {{row.code}}" style="width: 16px; height: 16px; margin: 0; accent-color: #111113"></span>
+<span role="cell" style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6B6F76">{{row.code}}</span>
+<span role="cell" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 12px">{{row.name}}<sc-if value="{{row.high}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #C2410C; margin-left: 8px">Alta</span></sc-if></span>
+<span role="cell" style="color: #56595F; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 12px">{{row.address}}</span>
+<span role="cell" style="font-family: 'Geist Mono', monospace; font-size: 13px; text-align: right; padding-right: 20px">{{row.weight}}</span>
+<span role="cell" style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #56595F"><span style="width: 7px; height: 7px; border-radius: 50%; background: {{row.dot}}"></span>{{row.status}}</span>
+<span role="cell" style="font-size: 13px; color: #6B6F76">{{row.created}}</span>
+</div>
+</sc-for>
+</div>
+
+<sc-if value="{{hasSelection}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 50%; bottom: 32px; transform: translateX(-50%); background: #111113; color: #FFFFFF; border-radius: 12px; padding: 6px 6px 6px 18px; display: flex; align-items: center; gap: 14px; font-size: 14px; white-space: nowrap">
+<span>{{selCount}} seleccionados <span style="color: #9A9DA3">· {{selWeight}}</span></span>
+<button type="button" onClick="{{clearSel}}" style="height: 36px; padding: 0 12px; border-radius: 8px; border: none; background: transparent; color: #C9CBCF; font-size: 13px">Quitar</button>
+<a href="Main.dc.html" style="height: 36px; padding: 0 14px; border-radius: 8px; background: #FFFFFF; color: #111113; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Planificar ruta</a>
+</div>
+</sc-if>
+</main>
+
+<sc-if value="{{drawerOpen}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px; background: rgba(17,17,19,0.2)"></div>
+<aside role="dialog" aria-modal="true" aria-labelledby="np-title" style="position: absolute; right: 0; top: 0; width: 440px; height: 900px; background: #FFFFFF; border-left: 1px solid #ECECEA; display: flex; flex-direction: column">
+<div style="display: flex; align-items: center; gap: 12px; padding: 28px 28px 8px">
+<h2 id="np-title" style="margin: 0; flex-grow: 1; font-weight: 600; font-size: 20px; letter-spacing: -0.02em">Nuevo pedido</h2>
+<button type="button" onClick="{{closeDrawer}}" aria-label="Cerrar" style="width: 36px; height: 36px; border-radius: 8px; border: none; background: transparent; color: #56595F; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+</div>
+
+<div style="flex-grow: 1; overflow: auto; padding: 20px 28px; display: flex; flex-direction: column; gap: 20px">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #56595F">Destinatario
+<input type="text" placeholder="Nombre o empresa" style="height: 40px; border: 1px solid #E4E4E2; border-radius: 8px; padding: 0 12px; font-size: 14px; color: #111113; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #56595F">Teléfono
+<input type="tel" placeholder="0000-0000" style="height: 40px; border: 1px solid #E4E4E2; border-radius: 8px; padding: 0 12px; font-size: 14px; color: #111113; box-sizing: border-box"></label>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="np-address" style="font-size: 13px; color: #56595F">Dirección de entrega</label>
+<input id="np-address" type="text" value="{{address}}" onChange="{{onAddress}}" autocomplete="off" placeholder="Empieza a escribir" style="height: 40px; border: 1px solid #111113; border-radius: 8px; padding: 0 12px; font-size: 14px; color: #111113; box-sizing: border-box; outline: none">
+<sc-if value="{{showSuggest}}" hint-placeholder-val="{{true}}">
+<ul role="listbox" aria-label="Sugerencias de dirección" style="list-style: none; margin: 0; padding: 4px; border: 1px solid #ECECEA; border-radius: 10px; background: #FFFFFF; box-shadow: 0 8px 24px rgba(17,17,19,0.08); display: flex; flex-direction: column">
+<sc-for list="{{suggestions}}" as="s" hint-placeholder-count="3">
+<li role="option" aria-selected="false"><button type="button" onClick="{{s.pick}}" style="width: 100%; text-align: left; border: none; background: transparent; border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; color: #111113">
+<span style="font-size: 14px">{{s.main}}</span><span style="font-size: 12px; color: #6B6F76">{{s.sub}}</span>
+</button></li>
+</sc-for>
+</ul>
+</sc-if>
+<sc-if value="{{picked}}" hint-placeholder-val="{{false}}">
+<div style="height: 132px; border-radius: 10px; overflow: hidden; position: relative; background: #F2F2F0">
+<svg width="384" height="132" viewBox="0 0 384 132" aria-hidden="true" style="position: absolute; left: 0; top: 0">
+<g stroke="#FFFFFF" stroke-width="8" fill="none"><path d="M0 56H384M0 112H384M104 0V132M262 0V132"></path></g>
+<g stroke="#FFFFFF" stroke-width="3" fill="none"><path d="M0 26H384M0 86H384M46 0V132M186 0V132M330 0V132"></path></g>
+</svg>
+<div style="position: absolute; left: 176px; top: 38px; width: 20px; height: 20px; border-radius: 50%; background: #111113; border: 3px solid #FFFFFF; box-sizing: border-box"></div>
+<span style="position: absolute; left: 10px; bottom: 10px; background: #FFFFFF; border-radius: 999px; padding: 3px 10px; font-size: 12px; color: #1A7F4B">Ubicación confirmada</span>
+</div>
+</sc-if>
+</div>
+
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #56595F">Referencias
+<textarea rows="2" placeholder="Portón negro, entregar en recepción" style="border: 1px solid #E4E4E2; border-radius: 8px; padding: 10px 12px; font-size: 14px; color: #111113; resize: none"></textarea></label>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #56595F">Peso (kg)
+<input type="number" min="0" step="0.1" placeholder="0.0" style="height: 40px; border: 1px solid #E4E4E2; border-radius: 8px; padding: 0 12px; font-size: 14px; color: #111113; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #56595F">Bultos
+<input type="number" min="1" placeholder="1" style="height: 40px; border: 1px solid #E4E4E2; border-radius: 8px; padding: 0 12px; font-size: 14px; color: #111113; box-sizing: border-box"></label>
+</div>
+
+<div role="radiogroup" aria-label="Prioridad" style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 13px; color: #56595F">Prioridad</span>
+<div style="display: flex; gap: 2px; padding: 3px; background: #F4F4F2; border-radius: 9px">
+<sc-for list="{{prios}}" as="p" hint-placeholder-count="3">
+<button type="button" role="radio" aria-checked="{{p.checked}}" onClick="{{p.pick}}" style="flex: 1; height: 32px; border: none; border-radius: 7px; font-size: 13px; font-weight: 500; background: {{p.bg}}; color: {{p.fg}}; box-shadow: {{p.shadow}}">{{p.label}}</button>
+</sc-for>
+</div>
+</div>
+</div>
+
+<div style="display: flex; gap: 8px; padding: 16px 28px 28px; justify-content: flex-end">
+<button type="button" onClick="{{closeDrawer}}" style="height: 40px; padding: 0 16px; border-radius: 9px; border: none; background: transparent; color: #56595F; font-size: 14px; font-weight: 500">Cancelar</button>
+<button type="button" onClick="{{closeDrawer}}" style="height: 40px; padding: 0 18px; border-radius: 9px; border: none; background: #111113; color: #FFFFFF; font-size: 14px; font-weight: 500">Guardar pedido</button>
+</div>
+</aside>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      tab: 'all',
+      selected: { '4812': true, '4813': true, '4820': true },
+      drawerOpen: true,
+      address: '5a avenida 10',
+      picked: false,
+      prio: 'normal'
+    };
+  }
+  renderVals() {
+    const S = {
+      pending: ['Pendiente', '#A3A6AC'],
+      assigned: ['Asignado', '#2F4BD8'],
+      in_route: ['En ruta', '#D97706'],
+      delivered: ['Entregado', '#1A7F4B'],
+      failed: ['Fallido', '#B42318']
+    };
+    const data = [
+      ['4812', 'PED-0928-4812', 'Lucía Morales', '12 calle 3-40, Zona 10', 4.5, false, 'pending', 'Hoy 08:14'],
+      ['4813', 'PED-0928-4813', 'Distribuidora El Roble', 'Calzada Roosevelt 22-43, Zona 11', 38.0, true, 'pending', 'Hoy 08:20'],
+      ['4817', 'PED-0928-4817', 'Mario Chávez', '6a avenida 1-25, Zona 4', 2.1, false, 'pending', 'Hoy 08:41'],
+      ['4820', 'PED-0928-4820', 'Farmacia San Rafael', '7a avenida 14-52, Zona 9', 12.6, true, 'pending', 'Hoy 09:02'],
+      ['4822', 'PED-0928-4822', 'Sofía Ramírez', '20 calle 10-15, Zona 1', 1.3, false, 'pending', 'Hoy 09:15'],
+      ['4790', 'PED-0927-4790', 'Óscar Lemus', 'Blvd. Los Próceres 18-80, Zona 10', 6.8, false, 'assigned', 'Ayer 16:30'],
+      ['4785', 'PED-0927-4785', 'Taller Hermanos Cux', '4a calle 8-20, Zona 12', 54.0, false, 'in_route', 'Ayer 15:10'],
+      ['4781', 'PED-0927-4781', 'Andrea Solís', '13 avenida 5-66, Zona 15', 3.2, false, 'delivered', 'Ayer 14:02'],
+      ['4776', 'PED-0927-4776', 'Librería Cervantes', '9a calle 6-12, Zona 1', 22.4, false, 'delivered', 'Ayer 11:48'],
+      ['4770', 'PED-0927-4770', 'Ricardo Tzul', 'Av. Petapa 45-10, Zona 12', 9.9, true, 'failed', 'Ayer 10:05']
+    ];
+    const sel = this.state.selected;
+    const tab = this.state.tab;
+    const rows = data
+      .filter((d) => tab === 'all' || d[6] === tab)
+      .map((d) => {
+        const on = !!sel[d[0]];
+        return {
+          code: d[1], name: d[2], address: d[3], weight: d[4].toFixed(1) + ' kg', high: d[5],
+          status: S[d[6]][0], dot: S[d[6]][1], created: d[7],
+          selected: on, bg: on ? '#F4F4F2' : 'transparent',
+          toggle: () => {
+            const next = Object.assign({}, this.state.selected);
+            if (next[d[0]]) { delete next[d[0]]; } else { next[d[0]] = true; }
+            this.setState({ selected: next });
+          }
+        };
+      });
+    const chosen = data.filter((d) => sel[d[0]]);
+    const selWeight = chosen.reduce((a, d) => a + d[4], 0);
+    const tabDefs = [
+      ['all', 'Todos', 42], ['pending', 'Pendientes', 15], ['assigned', 'Asignados', 12],
+      ['in_route', 'En ruta', 6], ['delivered', 'Entregados', 7], ['failed', 'Fallidos', 2]
+    ];
+    const tabs = tabDefs.map((t) => ({
+      label: t[1], count: t[2], selected: tab === t[0] ? 'true' : 'false',
+      fg: tab === t[0] ? '#111113' : '#6B6F76', weight: tab === t[0] ? 500 : 400,
+      bar: tab === t[0] ? '#111113' : 'transparent',
+      pick: () => this.setState({ tab: t[0] })
+    }));
+    const addr = this.state.address;
+    const sugg = [
+      ['5a avenida 10-20, Zona 1', 'Ciudad de Guatemala'],
+      ['5a avenida 10-68, Zona 9', 'Ciudad de Guatemala'],
+      ['5a avenida 10-05, Zona 1', 'Mixco, Guatemala']
+    ].map((s) => ({ main: s[0], sub: s[1], pick: () => this.setState({ address: s[0] + ', ' + s[1], picked: true }) }));
+    const prios = [['low', 'Baja'], ['normal', 'Normal'], ['high', 'Alta']].map((p) => {
+      const on = this.state.prio === p[0];
+      return {
+        label: p[1], checked: on ? 'true' : 'false',
+        bg: on ? '#FFFFFF' : 'transparent', fg: on ? '#111113' : '#6B6F76',
+        shadow: on ? '0 1px 2px rgba(17,17,19,0.1)' : 'none',
+        pick: () => this.setState({ prio: p[0] })
+      };
+    });
+    return {
+      tabs: tabs,
+      rows: rows,
+      hasSelection: chosen.length > 0 && !this.state.drawerOpen,
+      selCount: chosen.length,
+      selWeight: selWeight.toFixed(1) + ' kg',
+      clearSel: () => this.setState({ selected: {} }),
+      drawerOpen: this.state.drawerOpen,
+      openDrawer: () => this.setState({ drawerOpen: true, address: '', picked: false }),
+      closeDrawer: () => this.setState({ drawerOpen: false }),
+      address: addr,
+      onAddress: (e) => this.setState({ address: e.target.value, picked: false }),
+      showSuggest: !this.state.picked && addr.trim().length >= 3,
+      picked: this.state.picked,
+      suggestions: sugg,
+      prios: prios
+    };
+  }
+}
+</script>
+</body>
+</html>

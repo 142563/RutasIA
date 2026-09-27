@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Detalle de parada</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;font-family:'Geist',system-ui,sans-serif;color:#111113;background:#FFFFFF}
+a{color:#111113}a:hover{color:#2F4BD8}
+button{font-family:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; background: #F2F2F0; overflow: hidden; font-family: 'Geist', system-ui, sans-serif; color: #111113">
+
+<svg width="390" height="330" viewBox="0 0 390 330" aria-hidden="true" style="position: absolute; left: 0; top: 0">
+<rect width="390" height="330" fill="#F2F2F0"></rect>
+<rect x="250" y="40" width="100" height="70" rx="10" fill="#E4EADF"></rect>
+<g stroke="#FFFFFF" stroke-width="4" fill="none"><path d="M0 60H390M0 150H390M0 260H390M60 0V330M220 0V330M330 0V330"></path></g>
+<g stroke="#FFFFFF" stroke-width="11" fill="none"><path d="M140 0V330M280 0V330"></path></g>
+<g stroke="#F3C4AE" stroke-width="11" fill="none"><path d="M0 205H390"></path></g>
+<polyline points="80,290 140,290 140,150 280,150 280,140" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></polyline>
+<polyline points="80,290 140,290 140,150 280,150 280,140" fill="none" stroke="#2F4BD8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+<circle cx="80" cy="290" r="13" fill="#2F4BD8" opacity="0.15"></circle>
+<circle cx="80" cy="290" r="6" fill="#2F4BD8" stroke="#FFFFFF" stroke-width="2.5"></circle>
+<circle cx="280" cy="130" r="11" fill="#111113" stroke="#FFFFFF" stroke-width="3"></circle>
+</svg>
+
+<div style="position: absolute; left: 16px; top: 20px; right: 16px; display: flex; align-items: center; gap: 10px">
+<a href="Conductor-Hoy.dc.html" aria-label="Volver a mi ruta" style="width: 44px; height: 44px; border-radius: 50%; background: #FFFFFF; color: #111113; display: flex; align-items: center; justify-content: center; border: 1px solid #ECECEA; box-sizing: border-box"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></a>
+<span style="background: #FFFFFF; border: 1px solid #ECECEA; border-radius: 999px; padding: 7px 14px; font-size: 13px">Parada 3 de 5</span>
+</div>
+
+<section aria-labelledby="stop-name" style="position: absolute; left: 0; right: 0; bottom: 0; top: 300px; background: #FFFFFF; border-radius: 20px 20px 0 0; padding: 28px 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; color: #2F4BD8; font-weight: 500">Llegada <span style="font-family: 'Geist Mono', monospace">08:34</span> · 1.8 km</span>
+<h1 id="stop-name" style="margin: 0; font-weight: 600; font-size: 24px; letter-spacing: -0.025em">Lucía Morales</h1>
+<span style="font-size: 15px; color: #56595F">12 calle 3-40, Zona 10</span>
+<span style="font-size: 13px; color: #6B6F76">Edificio de fachada azul. Entregar en recepción.</span>
+</div>
+
+<span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6B6F76">PED-0928-4812 · 1 bulto · 4.5 kg</span>
+
+<sc-if value="{{isIdle}}" hint-placeholder-val="{{true}}">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<a href="#" style="height: 44px; border-radius: 10px; border: 1px solid #ECECEA; text-decoration: none; font-size: 14px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 8px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg>Llamar</a>
+<a href="#" style="height: 44px; border-radius: 10px; border: 1px solid #ECECEA; text-decoration: none; font-size: 14px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 8px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 22 2l-9 19-2-8z"></path></svg>Navegar</a>
+</div>
+<div style="flex-grow: 1"></div>
+<button type="button" onClick="{{markDone}}" style="height: 54px; border-radius: 12px; border: none; background: #111113; color: #FFFFFF; font-size: 16px; font-weight: 500">Marcar como entregado</button>
+<button type="button" onClick="{{markFail}}" style="height: 44px; border-radius: 12px; border: none; background: transparent; color: #B42318; font-size: 14px; font-weight: 500">No se pudo entregar</button>
+</sc-if>
+
+<sc-if value="{{isFail}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 500">¿Qué pasó?</h2>
+<div role="radiogroup" aria-label="Motivo" style="display: flex; flex-direction: column">
+<sc-for list="{{reasons}}" as="r" hint-placeholder-count="4">
+<button type="button" role="radio" aria-checked="{{r.checked}}" onClick="{{r.pick}}" style="height: 46px; padding: 0; border: none; border-bottom: 1px solid #F1F1EF; background: transparent; color: #111113; font-size: 15px; display: flex; align-items: center; justify-content: space-between; text-align: left">{{r.label}}<span style="width: 18px; height: 18px; border-radius: 50%; box-sizing: border-box; border: {{r.ring}}"></span></button>
+</sc-for>
+</div>
+</div>
+<div style="flex-grow: 1"></div>
+<button type="button" onClick="{{confirmFail}}" disabled="{{noReason}}" style="height: 54px; border-radius: 12px; border: none; background: {{confirmBg}}; color: #FFFFFF; font-size: 16px; font-weight: 500">Registrar</button>
+<button type="button" onClick="{{reset}}" style="height: 44px; border-radius: 12px; border: none; background: transparent; color: #56595F; font-size: 14px; font-weight: 500">Cancelar</button>
+</sc-if>
+
+<sc-if value="{{isDone}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; color: #1A7F4B"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"></path></svg>Entregado</span>
+<span style="font-size: 13px; color: #6B6F76">Registrado a las <span style="font-family: 'Geist Mono', monospace">08:33</span>. El despachador ya lo ve.</span>
+</div>
+<div style="flex-grow: 1"></div>
+<a href="Conductor-Hoy.dc.html" style="height: 54px; border-radius: 12px; background: #111113; color: #FFFFFF; text-decoration: none; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: center">Siguiente parada</a>
+<button type="button" onClick="{{reset}}" style="height: 44px; border-radius: 12px; border: none; background: transparent; color: #56595F; font-size: 14px; font-weight: 500">Deshacer</button>
+</sc-if>
+
+<sc-if value="{{isFailed}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; color: #B42318"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>No entregado</span>
+<span style="font-size: 13px; color: #6B6F76">Motivo: {{reasonLabel}}. El pedido vuelve a pendientes.</span>
+</div>
+<div style="flex-grow: 1"></div>
+<a href="Conductor-Hoy.dc.html" style="height: 54px; border-radius: 12px; background: #111113; color: #FFFFFF; text-decoration: none; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: center">Siguiente parada</a>
+<button type="button" onClick="{{reset}}" style="height: 44px; border-radius: 12px; border: none; background: transparent; color: #56595F; font-size: 14px; font-weight: 500">Deshacer</button>
+</sc-if>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 'idle', reason: null };
+  }
+  renderVals() {
+    const step = this.state.step;
+    const labels = { away: 'Cliente ausente', address: 'Dirección incorrecta', refused: 'Rechazó el paquete', closed: 'Negocio cerrado' };
+    const reasons = Object.keys(labels).map((k) => {
+      const on = this.state.reason === k;
+      return {
+        label: labels[k], checked: on ? 'true' : 'false',
+        ring: on ? '6px solid #111113' : '1.5px solid #C9CBCF',
+        pick: () => this.setState({ reason: k })
+      };
+    });
+    return {
+      isIdle: step === 'idle',
+      isFail: step === 'fail',
+      isDone: step === 'done',
+      isFailed: step === 'failed',
+      reasons: reasons,
+      noReason: this.state.reason === null,
+      confirmBg: this.state.reason === null ? '#C9CBCF' : '#111113',
+      reasonLabel: this.state.reason ? labels[this.state.reason].toLowerCase() : '',
+      markDone: () => this.setState({ step: 'done' }),
+      markFail: () => this.setState({ step: 'fail', reason: null }),
+      confirmFail: () => { if (this.state.reason) { this.setState({ step: 'failed' }); } },
+      reset: () => this.setState({ step: 'idle', reason: null })
+    };
+  }
+}
+</script>
+</body>
+</html>
