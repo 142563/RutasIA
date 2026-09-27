@@ -7,154 +7,196 @@
 
 ## 1. Visión
 
-En Guatemala, sobre todo en el área metropolitana, **la ruta más corta casi nunca es la más rápida**. Una misma entrega puede tardar 20 minutos a las 10:00 y 70 minutos a las 7:00. El sistema responde a esta pregunta:
+En Guatemala **la ruta más corta casi nunca es la más rápida**. Salir de la capital hacia Quetzaltenango puede tardar 1 hora más a las 7:00 que a las 10:00, y un tramo corto con un tranque puede costar más que un desvío largo. El sistema responde a esta pregunta:
 
-> *"Dado el tráfico a la hora en que voy a salir, ¿cuál es la mejor ruta para llegar a mis entregas?"*
+> *"Dado el tráfico a la hora en que voy a salir, ¿cuál es la mejor ruta para llevar mis paquetes por Guatemala?"*
 
-Para responderla, el núcleo del proyecto es **Dijkstra y A\* implementados y usados correctamente** sobre un **grafo vial real** cuyas aristas pesan **tiempo** (no kilómetros), y ese tiempo cambia según el **tráfico por hora y día**. Encima de ese motor va una aplicación moderna por roles: el despachador planifica y el conductor entrega.
+El núcleo del proyecto es **Dijkstra y A\* implementados y usados correctamente** sobre una **red vial nacional** (todo Guatemala), cuyas aristas pesan **tiempo** (no kilómetros). Ese tiempo sale de **Google Maps con tráfico** y cambia según la hora y el día. Encima del motor va una aplicación moderna por roles: el despachador planifica y el conductor entrega.
 
 ### Decisiones tomadas
 
 | # | Decisión | Resultado |
 |---|----------|-----------|
-| 1 | **Núcleo algorítmico** | **Dijkstra + A\*** propios, sobre un grafo vial con pesos de tiempo según tráfico |
-| 2 | Objetivo del sistema | Proponer la **ruta más rápida considerando el tráfico** (y compararla con la más corta) |
-| 3 | Alcance | Rutas con **varias paradas** y direcciones reales |
-| 4 | Frontend | **React** (SPA) consumiendo la API de Django |
-| 5 | Conductor | Rol propio con su usuario y **vista móvil** |
-| 6 | Nombre | Nuevo desde cero (§12) |
-| 7 | Plazo | ~3 semanas |
+| 1 | **Núcleo algorítmico** | **Dijkstra + A\*** propios, con pesos de tiempo según tráfico |
+| 2 | **Cobertura** | **Todo Guatemala** (red nacional, como la versión actual) |
+| 3 | **Datos viales y de tráfico** | **Google Maps APIs**: sin descargar mapas de calles, así el servidor en Render usa muy poca memoria |
+| 4 | Objetivo | Proponer la **ruta más rápida considerando el tráfico** y compararla con la más corta |
+| 5 | Alcance | Varias paradas por ruta |
+| 6 | Frontend | **React** (SPA) + API de Django, con estilo **minimalista** |
+| 7 | Conductor | Rol propio con vista móvil |
+| 8 | Nombre | Nuevo desde cero (§12) |
+| 9 | Plazo | ~3 semanas |
+
+### Reparto de trabajo: nuestro motor vs. Google
+
+| Lo hace **nuestro motor** (el aporte de la tesis) | Lo hace **Google Maps** (datos y dibujo) |
+|---|---|
+| Decidir **por qué nodos pasar** (Dijkstra / A\*) | Dar la **duración con y sin tráfico** de cada tramo |
+| Decidir el **orden de las paradas** | Autocompletar y geocodificar direcciones |
+| Estimar la hora de llegada con el perfil de tráfico | **Dibujar** el recorrido real por carretera entre los nodos elegidos |
+| Comparar "más corta" vs "más rápida" | Mapa base |
 
 ### Lo que cambia respecto a la versión actual
 
 | Hoy | Nueva versión |
 |-----|---------------|
-| Grafo de 22 departamentos | Grafo vial real de la ciudad (miles de intersecciones) |
-| Peso = km fijos | Peso = **minutos**, que varían según la hora (tráfico) |
-| A* y Dijkstra dan lo mismo y no se nota diferencia (grafo muy pequeño) | La diferencia se **mide y se ve**: nodos explorados, milisegundos |
-| A* existe en el backend pero la UI nunca lo usa | Cada algoritmo tiene un **rol concreto** en el sistema (§2.6) y hay un laboratorio para compararlos |
-| Google traza la ruta | **Nuestro motor calcula la ruta**; Google Maps solo la dibuja y aporta datos para calibrar |
+| 10 departamentos y 13 conexiones con km escritos a mano | Red nacional de **~100–150 nodos** (cabeceras, municipios clave y cruces de carreteras), con aristas verificadas por Google |
+| Peso = km fijos | Peso = **minutos**, según la franja horaria (tráfico) |
+| A\* y Dijkstra dan lo mismo y no se mide nada | Cada algoritmo tiene un rol (§2.6) y se miden nodos explorados y tiempo |
+| La UI siempre usa Dijkstra | Se elige y se compara; hay un laboratorio visual |
+| Google Directions traza la ruta | Google **solo dibuja** la secuencia de nodos que eligió nuestro algoritmo (se reutiliza `fetchRoadGeometryGoogleMaps`) |
 
 ---
 
 ## 2. Núcleo: Dijkstra y A\* con tráfico
 
-### 2.1 Modelo del problema (grafo)
+### 2.1 Modelo del problema (grafo nacional)
 
-- **Nodos:** intersecciones de calles del área metropolitana (Ciudad de Guatemala, Mixco, Villa Nueva, etc.), obtenidas de **OpenStreetMap**.
-- **Aristas dirigidas:** tramos de calle. Respetan los **sentidos únicos**; una calle de doble vía son dos aristas.
+- **Nodos (~100–150):**
+  - Las 22 cabeceras departamentales.
+  - Municipios con mucha actividad logística.
+  - **Cruces de carreteras** (p. ej. Los Encuentros, Cuatro Caminos, El Rancho, Cocales, La Ruidosa, Río Hondo, Palín, San Lucas Sacatepéquez).
+  - Salidas de la capital (Periférico, CA-9 Sur, CA-9 Norte, CA-1 Oeste).
+- **Aristas dirigidas:** tramos de carretera entre nodos vecinos (CA-1, CA-2, CA-9, CA-10, CA-13, CA-14, RN…). Cada tramo lo verifica Google con una ruta real.
 - **Atributos de cada arista `e`:**
-  - `L_e`: longitud (km).
-  - `tipo_e`: clase de vía (primaria, secundaria, residencial…).
-  - `v_e`: velocidad a flujo libre (km/h), según el límite o la clase de vía.
-  - `corredor_e`: corredor al que pertenece (Roosevelt, Periférico, Aguilar Batres, CA-9…), si aplica.
+  - `L_e`: km por carretera (de Google).
+  - `t0_e`: minutos sin tráfico (`staticDuration`).
+  - `m_e(franja, tipo_de_día)`: multiplicador de tráfico ≥ 1.
+- **Memoria:** unos pocos cientos de aristas; cabe en KB. Se guarda en PostgreSQL (se extiende el modelo `RouteConnection` que ya existe) y se carga a memoria al iniciar.
 
 ### 2.2 Función de costo: tiempo con tráfico
 
 ```
-tiempo_libre(e)   = L_e / v_e                              (en minutos)
-costo(e, t)       = tiempo_libre(e) × m_e(t)
-m_e(t)            = multiplicador de congestión ≥ 1, según hora y día de t
-                    (1.0 = sin tráfico; 2.5 = tarda 2.5 veces más)
+costo(e, t) = t0_e × m_e(franja(t), tipo_de_día(t))        (en minutos)
+m_e ≥ 1  →  1.0 = sin tráfico, 2.0 = tarda el doble
 ```
 
-- `m_e(t)` sale del **perfil de tráfico** (§2.3) y puede aumentar por **incidentes** reportados (accidente, cierre, manifestación).
 - Como `m ≥ 1`, **los pesos nunca son negativos**. Es un requisito de Dijkstra y de A\*.
+- Los **incidentes** (accidente, derrumbe, manifestación, cierre) multiplican aún más, o bloquean la arista (`costo = ∞`) durante una ventana de tiempo.
 
-### 2.3 Modelo de tráfico (de dónde salen los multiplicadores)
+### 2.3 Datos de tráfico con Google (sin descargar mapas)
 
-**1. Calibración con Google Routes API** (proceso por lotes, sin tiempo real)
-- Para cada corredor principal se consulta la ruta entre sus extremos a distintas horas con `routingPreference = TRAFFIC_AWARE_OPTIMAL` y `departureTime`.
-- La API devuelve `duration` (con tráfico) y `staticDuration` (sin tráfico):
+**1. Construir el grafo** (script, una vez)
+- Se definen los nodos con sus coordenadas.
+- Se proponen aristas con cada nodo y sus *k* vecinos más cercanos.
+- Google **Routes API** (`computeRouteMatrix`) confirma que hay carretera y da `L_e` y `t0_e`.
+- Se descartan las aristas redundantes (las que pasan por otro nodo del grafo).
+
+**2. Perfiles de tráfico por franja horaria** (script por lotes, se repite cada semana)
+
+| Franja | Horario |
+|--------|---------|
+| Madrugada | 05:00–07:00 |
+| **Pico mañana** | 07:00–09:00 |
+| Media mañana | 09:00–12:00 |
+| Mediodía | 12:00–14:00 |
+| Tarde | 14:00–17:00 |
+| **Pico tarde** | 17:00–20:00 |
+| Noche | 20:00–05:00 |
+
+- 7 franjas × 2 tipos de día (laboral y fin de semana) = 14 perfiles.
+- Para cada arista y perfil se consulta la matriz con `departureTime` futuro y `routingPreference = TRAFFIC_AWARE_OPTIMAL`:
   ```
-  m_corredor(hora, tipo_de_día) = duration / staticDuration
+  m_e = duration / staticDuration
   ```
-- Para ~15 corredores × 24 horas × 2 tipos de día (laboral y fin de semana) son ~720 consultas, una sola vez. Cabe en el crédito gratuito de Google.
+- Con ~300 aristas × 14 perfiles son ~4,200 elementos por calibración. Se guardan en BD y **no se vuelven a pedir en cada búsqueda**.
 
-**2. Aristas sin corredor**
-- Usan un multiplicador por **clase de vía y hora** (por ejemplo, una residencial en hora pico = promedio de los corredores cercanos, atenuado).
+**3. Refinamiento en vivo** (Should)
+- Al planificar para *ahora*, se piden a Google las duraciones actuales **solo de las aristas de la ruta candidata y sus alternativas cercanas**.
+- Se actualizan y se re-ejecuta A\*. Pocas consultas por planificación, con caché de 10–15 minutos.
 
-**3. Incidentes en vivo**
-- El despachador o el conductor reportan un incidente sobre el mapa.
-- Las aristas cercanas reciben un multiplicador extra, o se bloquean (`m = ∞`) durante una ventana de tiempo.
+**4. Validación del modelo**
+- Se compara el tiempo que estima nuestro motor contra el de Google para la ruta completa en ~50 viajes a distintas horas.
+- Se reporta el **error porcentual medio (MAPE)**.
 
-> ⚠️ No se "leen" datos de la capa de tráfico de Google Maps: sus condiciones de uso no lo permiten. La calibración usa la API de rutas, que sí es legítima.
-
-**Validación del modelo.** Se comparan los tiempos estimados por nuestro motor contra los de Google en ~50 viajes aleatorios a distintas horas y se reporta el **error porcentual medio (MAPE)**. Es un resultado directo para la tesis.
+> ⚠️ No se "leen" datos de la capa visual de tráfico de Google Maps: sus condiciones de uso no lo permiten. Todo sale de las APIs de rutas, que es el uso legítimo.
 
 ### 2.4 Dijkstra — el algoritmo exacto de referencia
 
-- **Qué hace:** expande los nodos en orden de **tiempo acumulado** `g(n)` desde el origen, usando una cola de prioridad (min-heap).
-- **Complejidad:** `O((V + E) log V)` con heap binario.
-- **Por qué es correcto aquí:** todos los pesos son ≥ 0 (§2.2).
+- **Qué hace:** expande los nodos en orden de **tiempo acumulado** `g(n)` desde el origen, con cola de prioridad (min-heap).
+- **Complejidad:** `O((V + E) log V)`.
+- **Correcto aquí** porque todos los pesos son ≥ 0.
 - **Dos modos de uso:**
-  - **Punto a punto:** se detiene al sacar el destino de la cola.
-  - **Uno a todos:** se deja correr completo y da el tiempo desde un origen a **todas** las paradas en una sola ejecución. Por eso es ideal para construir la matriz de tiempos entre paradas (§2.7).
+  - **Punto a punto:** se detiene al sacar el destino.
+  - **Uno a todos:** una corrida da el tiempo desde un origen a **todos** los nodos. Es la forma eficiente de construir la matriz de tiempos entre paradas (§2.7).
 
 ### 2.5 A\* — la búsqueda guiada
 
-- **Qué hace:** expande los nodos en orden de `f(n) = g(n) + h(n)`, donde `h(n)` estima el tiempo que falta hasta el destino.
+- **Qué hace:** expande en orden de `f(n) = g(n) + h(n)`, donde `h(n)` estima el tiempo que falta.
 - **Heurística correcta para costos en tiempo:**
   ```
-  h(n) = distancia_haversine(n, destino) / v_max
-  v_max = velocidad máxima a flujo libre de TODO el grafo
+  h(n) = haversine(n, destino) / v_max
   ```
-- **Es admisible** (nunca sobreestima). Ningún vehículo puede ir más rápido que `v_max` ni recorrer menos que la línea recta, y el tráfico solo hace más lento (`m ≥ 1`).
-- **Es consistente:** `h(u) ≤ costo(u,v) + h(v)` por la desigualdad triangular y porque `L_uv ≥ haversine(u,v)`. Así cada nodo se cierra **una sola vez** y A\* devuelve **exactamente el mismo costo que Dijkstra** explorando menos nodos.
-- **Desempate:** con `f` iguales se prefiere el nodo con mayor `g` (el más cercano al destino). Reduce expansiones sin afectar el resultado óptimo.
-- *Extensión opcional:* **ALT** (A\* con puntos de referencia y desigualdad triangular), una heurística más informada que sigue siendo admisible.
+- **Cómo se elige `v_max` para que A\* sea óptimo** (clave para la tesis):
+  ```
+  v_max = max sobre todas las aristas de  haversine(u, v) / costo_mínimo(u, v)
+  ```
+  - `costo_mínimo(u, v)` es el tiempo de esa arista en su franja **más rápida**.
+  - Con `v_max` calculado así **desde los datos de Google**, se cumple para toda arista `haversine(u,v) / v_max ≤ costo(u,v)`.
+  - Junto con la desigualdad triangular, eso hace la heurística **consistente**: `h(u) ≤ costo(u,v) + h(v)`.
+  - Y **admisible**: nunca sobreestima.
+- **Consecuencias:**
+  - Cada nodo se cierra una sola vez.
+  - A\* devuelve **exactamente el mismo costo que Dijkstra** explorando menos nodos.
+- **Desempate:** con `f` iguales se prefiere el mayor `g`.
+- *Extensión opcional:* **ALT** (A\* con puntos de referencia). Con 22 cabeceras como puntos de referencia da una heurística más informada que sigue siendo admisible.
 
-### 2.6 Qué algoritmo se usa para qué (uso correcto)
+### 2.6 Qué algoritmo se usa para qué
 
-| Necesidad en el sistema | Algoritmo | Por qué |
-|-------------------------|-----------|---------|
-| Matriz de tiempos entre bodega y paradas | **Dijkstra uno-a-todos** (una corrida por punto) | Con N paradas son N corridas, en vez de N² búsquedas punto a punto |
-| Trazar cada tramo de la ruta final | **A\*** | Un solo destino con una buena heurística: explora mucho menos |
-| Recalcular en vivo por un incidente o un retraso | **A\*** | Debe responder en milisegundos |
-| "¿A qué hora conviene salir?" | **A\*** repetido por hora de salida | Muchas consultas punto a punto |
-| Validación y referencia | **Dijkstra** | Es el patrón de oro: A\* debe dar el mismo costo |
-| Laboratorio visual (defensa) | **Ambos, lado a lado** | Mostrar la diferencia en nodos explorados |
+| Necesidad | Algoritmo | Por qué |
+|-----------|-----------|---------|
+| Matriz de tiempos entre bodega y paradas | **Dijkstra uno-a-todos** | N corridas en vez de N² búsquedas |
+| Ruta entre dos puntos (planificar un tramo) | **A\*** | Un destino y una buena heurística: explora menos |
+| Recalcular por un incidente o el refinamiento en vivo | **A\*** | Respuesta inmediata |
+| "¿A qué hora conviene salir?" | **A\*** en cada franja | Una consulta por franja |
+| Validación | **Dijkstra** | Referencia exacta: A\* debe dar el mismo costo |
+| Laboratorio (defensa) | **Ambos, lado a lado** | Mostrar la diferencia en nodos explorados |
 
-### 2.7 Varias paradas (orden de visita)
+### 2.7 Varias paradas
 
-1. Construir la **matriz de tiempos** con Dijkstra uno-a-todos desde la bodega y desde cada parada, a la hora de salida planificada.
-2. Ordenar las paradas con **vecino más cercano** y mejorar el orden con **2-opt** (quita cruces), minimizando el **tiempo total**, no los km.
-3. Trazar cada tramo con **A\*** y calcular la **hora estimada de llegada (ETA)** a cada parada. La hora de llegada a la parada *k* es la hora de salida del tramo *k+1*, así que el tráfico se evalúa a la hora correcta de cada tramo.
-4. Con varios vehículos, el reparto de paradas entre ellos (VRP) queda como **Could**: primero cada vehículo con sus paradas asignadas.
+1. Cada dirección se geocodifica con Google Places y se asocia a su **nodo más cercano** del grafo (su municipio o cruce).
+2. **Matriz de tiempos** entre bodega y paradas con Dijkstra uno-a-todos, para la franja de salida.
+3. **Orden de visita** con vecino más cercano + **2-opt**, minimizando el **tiempo total**.
+4. Cada tramo entre paradas con **A\***. La hora de llegada a una parada es la hora de salida del siguiente tramo, así que el tráfico se evalúa en la franja correcta de cada tramo.
+5. El dibujo en el mapa y la "última milla" dentro de la ciudad destino los traza **Google Directions** usando como *waypoints* los nodos que eligió nuestro algoritmo.
 
-### 2.8 Tráfico dependiente del tiempo (nivel avanzado)
+*El reparto de paradas entre varios vehículos (VRP) queda como Could.*
 
-- **Versión base (Must):** "foto" del tráfico. Cada búsqueda usa los multiplicadores de la hora de salida de ese tramo.
-- **Versión avanzada (Should):** el costo de cada arista se evalúa a la hora en que el vehículo **llega** a ella. Dijkstra y A\* siguen siendo correctos si se cumple la **propiedad FIFO** (salir más tarde nunca hace llegar antes).
-  - Los multiplicadores escalonados por hora pueden romper FIFO en el cambio de hora.
-  - Se evita con el modelo de velocidades por intervalos de **Ichoua, Gendreau y Potvin (2003)**, que garantiza FIFO.
+### 2.8 Tráfico dependiente del tiempo (avanzado)
 
-### 2.9 Errores a evitar (checklist de uso correcto)
+- **Base (Must):** cada tramo usa la franja en la que **empieza**.
+- **Avanzado (Should):** cada arista usa la franja en la que el vehículo **llega a ella**.
+  - Es importante en viajes largos: si sales a las 6:30, llegas a la capital en hora pico.
+  - Dijkstra y A\* siguen siendo correctos si se cumple **FIFO** (salir más tarde nunca hace llegar antes).
+  - Con franjas escalonadas FIFO puede romperse en los cambios de franja. Se evita con el modelo de velocidades por intervalos de **Ichoua, Gendreau y Potvin (2003)**.
 
-- [ ] Pesos siempre ≥ 0 (el tráfico **multiplica** por ≥ 1, nunca resta).
-- [ ] **Misma unidad** en costo y heurística: minutos con minutos. Usar km en la heurística cuando el costo está en minutos rompe la optimalidad.
-- [ ] `v_max` = máxima del grafo, **no** la velocidad promedio (con el promedio la heurística sobreestima).
-- [ ] No redondear la heurística hacia arriba. *El código actual usa `ROUND_HALF_UP` en `haversine_km` (`logistics/domain/services.py:29`); hay que truncar o usar `float` sin redondear.*
-- [ ] Grafo **dirigido** (sentidos únicos de OSM).
+### 2.9 Checklist de uso correcto
+
+- [ ] Pesos ≥ 0 (el tráfico **multiplica** por ≥ 1, nunca resta).
+- [ ] **Misma unidad** en costo y heurística: minutos con minutos.
+- [ ] `v_max` **calculado desde los datos** (§2.5), no inventado ni el promedio.
+- [ ] No redondear la heurística hacia arriba. *El código actual usa `ROUND_HALF_UP` en `haversine_km` (`logistics/domain/services.py:29`); hay que truncar o usar `float`.*
+- [ ] Grafo **dirigido**: los tiempos de ida y vuelta pueden diferir por el tráfico (entrar a la capital en la mañana ≠ salir).
 - [ ] Cola con *lazy deletion* y conjunto de cerrados (ya existe en el código actual).
-- [ ] Grafo cargado **en memoria** al iniciar, nunca consultas a la BD por arista.
-- [ ] Prueba automática: en miles de pares aleatorios, `costo(A*) == costo(Dijkstra)`.
-- [ ] Comparar siempre con el **mismo grafo y la misma hora**, y reportar **nodos expandidos** además de milisegundos.
-- [ ] Ubicar cada dirección en el grafo: *snap* al nodo más cercano con un índice espacial por cuadrícula.
+- [ ] Grafo **en memoria**; las consultas a Google nunca se hacen dentro del bucle del algoritmo.
+- [ ] Prueba automática: en todos los pares de nodos y todas las franjas, `costo(A*) == costo(Dijkstra)`.
+- [ ] Reportar **nodos expandidos** como métrica principal. En un grafo de ~150 nodos los milisegundos son muy pequeños: medir con el promedio de muchas repeticiones.
 
 ### 2.10 Experimentos para el documento de tesis
 
 | # | Experimento | Métrica | Resultado esperado |
 |---|-------------|---------|--------------------|
-| E1 | Correctitud | % de pares donde costo(A\*) = costo(Dijkstra) | 100 % |
-| E2 | Eficiencia | Nodos expandidos y ms, según la distancia de la consulta | A\* expande una fracción de lo que expande Dijkstra |
-| E3 | Impacto del tráfico | Tiempo real de la ruta más corta (km) vs la más rápida (tráfico), por hora | En hora pico la ruta "rápida" ahorra X min |
-| E4 | Precisión del modelo | MAPE de nuestros tiempos vs Google | Idealmente < 20 % |
+| E1 | Correctitud | % de pares y franjas con costo(A\*) = costo(Dijkstra) | 100 % |
+| E2 | Eficiencia | Nodos expandidos por A\* vs Dijkstra, por distancia de la consulta | A\* expande menos, sobre todo en viajes largos |
+| E3 | Impacto del tráfico | Tiempo de la ruta más corta (km) vs la más rápida, por franja | En pico, la "rápida" ahorra X min y a veces cambia de carretera |
+| E4 | Precisión | MAPE de nuestro estimado vs Google en la ruta completa | Idealmente < 20 % |
 | E5 | Varias paradas | Tiempo total: orden de captura vs vecino más cercano vs + 2-opt | 2-opt mejora el orden inicial |
-| E6 | Hora de salida | Tiempo del mismo recorrido de 5:00 a 22:00 | Curva con picos de mañana y tarde |
-| E7 | Escalabilidad | ms vs tamaño del grafo o número de paradas | Crece según la complejidad teórica |
+| E6 | Hora de salida | Tiempo del mismo viaje en cada franja | Curva con picos de mañana y tarde |
+| E7 | Escalabilidad | Nodos expandidos y ms en grafos sintéticos de 1,000 a 100,000 nodos | La ventaja de A\* crece con el tamaño del grafo |
 
-Los resultados se generan con un comando (`python manage.py run_experiments`) que exporta CSV y gráficas para el documento.
+> E7 usa grafos generados (cuadrículas y grafos geométricos aleatorios), así se demuestra la escalabilidad **sin gastar memoria en producción**: corre en tu computadora, no en Render.
+
+Todo se genera con `python manage.py run_experiments` → CSV + gráficas para el documento.
 
 ---
 
@@ -167,100 +209,92 @@ Los resultados se generan con un comando (`python manage.py run_experiments`) qu
 | Planificador de rutas | ✅ | ✅ | — |
 | Rutas / viajes | ✅ | ✅ | — |
 | Monitoreo en vivo + incidentes | ✅ | ✅ | — |
-| Mapa de tráfico por hora | ✅ | ✅ | — |
+| Tráfico por franja horaria | ✅ | ✅ | — |
 | **Laboratorio Dijkstra vs A\*** | ✅ | ✅ | — |
 | Flota | ✅ | ✅ (ver) | — |
 | Reportes | ✅ | ✅ | — |
-| Configuración (usuarios, bodegas, calibración de tráfico) | ✅ | — | — |
+| Configuración (usuarios, bodegas, nodos, calibración de tráfico) | ✅ | — | — |
 | **Mi ruta de hoy / marcar entregas** | — | — | ✅ |
-| **Reportar tráfico o incidente** | — | — | ✅ |
+| **Reportar incidente** | — | — | ✅ |
 | **Aviso de ruta alternativa** | — | — | ✅ |
-
-El rol *supervisor* actual pasa a ser *despachador*. Un conductor es un `User` enlazado a un `Driver`.
 
 ---
 
 ## 4. Alcance (MoSCoW)
 
 ### Must
-- Grafo vial real del área metropolitana (OSM) cargado en memoria.
-- Perfil de tráfico por hora y tipo de día, calibrado con Google Routes API.
-- **Dijkstra y A\*** propios sobre ese grafo, con pesos en tiempo y todo el checklist de §2.9.
-- Ruta **más rápida con tráfico** vs **más corta en km**, comparadas en pantalla.
-- Varias paradas: matriz con Dijkstra, orden con vecino más cercano + 2-opt, tramos con A\*.
-- **Laboratorio**: Dijkstra y A\* lado a lado sobre el mapa, con nodos explorados, ms y costo.
-- Experimentos E1–E3 y E5 automatizados.
-- Pedidos con dirección real (Google Places) y *snap* al grafo.
-- Vista del conductor: ruta del día, paradas en orden, marcar entregado / no entregado.
-- Login y navegación por rol.
+- Grafo nacional (~100–150 nodos) construido y verificado con Google.
+- Perfiles de tráfico por franja horaria (14 perfiles) calibrados con Google.
+- **Dijkstra y A\*** propios con pesos en tiempo y el checklist de §2.9 completo.
+- Comparación **más rápida (tráfico)** vs **más corta (km)** en el Planificador.
+- Varias paradas: Dijkstra para la matriz, vecino más cercano + 2-opt, A\* por tramo, ETAs.
+- **Laboratorio**: Dijkstra y A\* lado a lado sobre el mapa de Guatemala.
+- Experimentos E1, E2, E3, E5 y E7.
+- Pedidos con dirección real (Google Places) asociada al nodo más cercano.
+- Vista del conductor y login por rol.
 
 ### Should
-- **Mapa de tráfico** con control deslizante de hora (0–23 h).
-- **"¿A qué hora conviene salir?"** (E6).
-- Incidentes en vivo y **recálculo con A\*** con aviso al conductor: *"Ruta alternativa: ahorras 12 min"*.
+- Refinamiento en vivo con duraciones actuales de Google (§2.3.3).
 - Tráfico dependiente del tiempo con FIFO (§2.8).
-- Validación contra Google (E4) y escalabilidad (E7).
-- GPS real del conductor y monitoreo en vivo.
+- Mapa de tráfico por franja con control deslizante.
+- "¿A qué hora conviene salir?" (E6).
+- Incidentes + recálculo con A\* + aviso al conductor.
+- Validación contra Google (E4).
 
 ### Could
-- ALT (A\* con puntos de referencia).
+- ALT con las cabeceras como puntos de referencia.
 - Reparto de paradas entre varios vehículos (VRP).
-- Modo interurbano reutilizando el grafo actual de departamentos.
 - Modo oscuro, exportar hoja de ruta en PDF.
 
 ### Won't (por ahora)
-- Tráfico en tiempo real de sensores o de terceros.
-- App nativa (la vista del conductor será web responsive).
+- Grafo de calles de cada ciudad.
+- App nativa.
 - Multi-empresa.
 
 ---
 
 ## 5. Arquitectura técnica
 
-### Stack
-
 | Capa | Tecnología |
 |------|-----------|
-| Frontend | React + Vite + TypeScript, Tailwind CSS + shadcn/ui, React Router, TanStack Query, react-hook-form + zod |
-| Mapa | `@vis.gl/react-google-maps` (solo dibuja: nuestras rutas, nodos explorados, capa de congestión) |
+| Frontend | React + Vite + TypeScript, Tailwind CSS + shadcn/ui, React Router, TanStack Query |
+| Mapa | `@vis.gl/react-google-maps`: mapa base, recorridos de Google Directions, nodos explorados del laboratorio |
 | Gráficas | Recharts |
-| Backend | Django como API JSON (se mantiene) |
+| Backend | Django como API JSON |
 | **Motor de rutas** | **Python puro** (`heapq`), sin librerías de ruteo: el algoritmo es nuestro |
-| Construcción del grafo | Script **offline** con OSMnx (no se instala en producción) |
-| Tráfico | Script de calibración con Google Routes API; resultados guardados en BD |
+| Datos viales y de tráfico | Google Routes API (matrices por lotes y refinamiento en vivo), Places API, Directions (dibujo) |
 | BD | PostgreSQL (Neon) |
-| Deploy | Render, un solo servicio (Django sirve la API y el build de React) |
+| Deploy | Render, un solo servicio. **Memoria mínima**: el grafo son unos cientos de aristas |
 
 ### Estructura del motor
 
 ```
 logistics/
 └── routing/
-    ├── graph.py        # carga el grafo en memoria (listas de adyacencia compactas)
-    ├── traffic.py      # multiplicadores m_e(t): perfil + incidentes
-    ├── dijkstra.py     # punto a punto y uno-a-todos
-    ├── astar.py        # A* con heurística admisible y consistente en tiempo
-    ├── snap.py         # dirección → nodo más cercano (índice por cuadrícula)
-    ├── multistop.py    # matriz de tiempos, vecino más cercano, 2-opt, ETAs
-    └── instrument.py   # contadores: nodos expandidos, ms, orden de exploración
-scripts/
-├── build_graph.py      # OSM → grafo recortado → archivo comprimido
-└── calibrate_traffic.py# Google Routes → multiplicadores por corredor y hora
+    ├── graph.py         # carga nodos/aristas de BD a listas de adyacencia en memoria
+    ├── traffic.py       # franja(t), multiplicadores m_e, incidentes
+    ├── dijkstra.py      # punto a punto y uno-a-todos
+    ├── astar.py         # A* con v_max derivado de los datos
+    ├── multistop.py     # matriz, vecino más cercano, 2-opt, ETAs
+    ├── google.py        # cliente Routes API con caché (nunca se llama dentro del algoritmo)
+    └── instrument.py    # nodos expandidos, ms, orden de exploración
 logistics/management/commands/
-└── run_experiments.py  # E1–E7 → CSV + gráficas
+├── build_graph.py       # nodos → aristas candidatas → verificación con Google
+├── calibrate_traffic.py # 14 perfiles por arista
+└── run_experiments.py   # E1–E7 → CSV + gráficas
 ```
 
-### API del motor (nuevos endpoints)
+### Endpoints nuevos
 
 | Endpoint | Uso |
 |----------|-----|
-| `POST /api/routing/route` | origen, destino, hora de salida, algoritmo → ruta, tiempo, km, nodos expandidos, ms |
-| `POST /api/routing/compare` | la misma consulta con Dijkstra y A\*, más la ruta más corta en km |
+| `POST /api/routing/route` | origen, destino, hora de salida, algoritmo, criterio (tiempo/km) → ruta, minutos, km, nodos expandidos |
+| `POST /api/routing/compare` | Dijkstra vs A\*, y más rápida vs más corta, en una sola respuesta |
 | `POST /api/routing/explore` | orden de exploración de nodos (para animar el laboratorio) |
 | `POST /api/routes/optimize` | varias paradas → orden, tramos, ETAs |
-| `GET /api/traffic/profile?hour=7&day=weekday` | multiplicadores para la capa de congestión |
+| `GET /api/traffic/profile?band=peak_am&day=weekday` | multiplicadores por arista para el mapa de tráfico |
 | `POST /api/traffic/incidents` | reportar incidente |
-| `GET /api/routing/best-departure` | tiempo estimado por hora de salida |
+| `GET /api/routing/best-departure` | tiempo estimado por franja de salida |
 
 ---
 
@@ -268,82 +302,81 @@ logistics/management/commands/
 
 | Modelo | Cambio |
 |--------|--------|
-| `TrafficProfile` (nuevo) | corredor o clase de vía, tipo de día, hora → multiplicador `m`; fecha y fuente de calibración |
-| `Corridor` (nuevo) | nombre (p. ej. Calzada Roosevelt), aristas que lo componen |
-| `Incident` (nuevo) | tipo, ubicación, radio, multiplicador o bloqueo, inicio/fin, quién lo reportó |
-| `Depot` (nuevo) | bodega: nombre, dirección, coordenadas, nodo del grafo |
-| `Order` | + destinatario, teléfono, dirección, `place_id`, coordenadas, nodo del grafo |
-| `Trip` → **Route** | + hora de salida, algoritmo, **tiempo con tráfico**, km, **nodos expandidos**, ms, comparación contra la ruta más corta |
+| `Department` → **`Node`** | Se generaliza: cabecera, municipio o cruce (`kind`), coordenadas, departamento al que pertenece |
+| `RouteConnection` → **`Edge`** | + `duration_free_min` (sin tráfico), `distance_km` de Google, carretera (CA-1…), fecha de verificación. **Dirigida** |
+| `TrafficProfile` (nuevo) | arista, franja, tipo de día → multiplicador `m`, fecha y fuente de calibración |
+| `Incident` (nuevo) | tipo, arista(s) o ubicación, multiplicador o bloqueo, inicio/fin, quién reportó |
+| `Depot` (nuevo) | bodega: nombre, dirección, coordenadas, nodo |
+| `Order` | + destinatario, teléfono, dirección, `place_id`, coordenadas, nodo |
+| `Trip` → **`Route`** | + hora de salida, algoritmo, criterio, **minutos con tráfico**, km, **nodos expandidos**, comparación contra la ruta más corta |
 | `RouteStop` (nuevo) | ruta, pedido, secuencia, ETA, estado, motivo, hora de entrega |
 | `Driver` | + `user` (OneToOne) |
 | `UserProfile.Role` | `admin`, `dispatcher`, `driver` |
-| Grafo vial | **Archivo** comprimido versionado (no tablas: se carga completo en memoria) |
 
-`Department` y `RouteConnection` se quedan como la versión 1 del proyecto (grafo interdepartamental).
+Los datos actuales (10 departamentos, 13 conexiones con km a mano) se reemplazan por el grafo construido con `build_graph`.
 
 ---
 
 ## 7. Pantallas
 
-### Despachador / Administrador (escritorio)
+### Despachador / Administrador (escritorio, minimalista)
 
 | Pantalla | Contenido clave |
 |----------|-----------------|
-| **Inicio** | Tráfico actual (índice de congestión), rutas en curso, retrasos, pedidos sin asignar |
-| **Pedidos** | Tabla, filtros, selección múltiple; alta con autocompletado de dirección |
-| **Planificador** ⭐ | Hora de salida, paradas, resultado. Comparación **"más rápida con tráfico" vs "más corta en km"**, ETA por parada y ahorro en minutos |
-| **Laboratorio de algoritmos** ⭐ | Mismo origen y destino. Mapa dividido: Dijkstra a la izquierda y A\* a la derecha, **animando los nodos explorados**. Contadores de nodos expandidos, ms y costo (idéntico en ambos). Selector de hora para ver cómo cambia la ruta con el tráfico |
-| **Tráfico** | Mapa de congestión por corredor con control de hora; curva "mejor hora para salir" |
+| **Inicio** | Franja de tráfico actual, rutas en curso, retrasos, pedidos sin asignar |
+| **Pedidos** | Tabla, filtros, selección múltiple, alta con autocompletado de dirección |
+| **Planificador** ⭐ | Mapa de Guatemala; hora de salida; **"Más rápida" vs "Más corta"**; ETAs; ahorro en minutos |
+| **Laboratorio** ⭐ | Mapa de Guatemala dividido: **Dijkstra | A\***. Animación de nodos explorados; contadores de nodos, ms y costo (idéntico); selector de franja para ver cómo cambia la ruta |
+| **Tráfico** | Red nacional coloreada por multiplicador según la franja elegida; curva "mejor hora para salir" |
 | **Rutas** | Lista y detalle: paradas, línea de tiempo, estimado vs real |
-| **Monitoreo** | Rutas en curso, incidentes activos, avisos de recálculo |
-| **Reportes** | Minutos ahorrados vs ruta más corta, puntualidad, resultados de los experimentos |
-| **Configuración** | Usuarios, bodegas, calibración de tráfico (última fecha, re-ejecutar) |
+| **Monitoreo** | Rutas en curso, incidentes, avisos de recálculo |
+| **Reportes** | Minutos ahorrados, puntualidad, resultados de los experimentos |
+| **Configuración** | Usuarios, bodegas, nodos del grafo, calibración de tráfico (última fecha, re-ejecutar) |
 
 ### Conductor (móvil)
 - **Mi ruta de hoy:** paradas en orden con ETA según el tráfico.
 - **Detalle de parada:** navegar, llamar, entregado / no entregado.
-- **Aviso de ruta alternativa:** *"Hay tránsito pesado en Calzada Roosevelt. Nueva ruta: −12 min"* → Aceptar / Mantener.
-- **Reportar:** tráfico pesado, accidente o calle cerrada (un toque, con la ubicación actual).
+- **Aviso de ruta alternativa:** *"Tránsito pesado en CA-9 Sur. Nueva ruta por Palín: −18 min"* → Aceptar / Mantener.
+- **Reportar:** tráfico, accidente, derrumbe, carretera cerrada.
 
-*(El prototipo actual en el lienzo cubre Planificador, Pedidos y Conductor. Falta agregar el Laboratorio, la pantalla de Tráfico y el aviso de ruta alternativa.)*
+*(El prototipo del lienzo cubre Planificador, Pedidos y Conductor en estilo minimalista. Falta: el mapa del Planificador a escala nacional, el Laboratorio, el mapa de Tráfico y el aviso de ruta alternativa.)*
 
 ---
 
 ## 8. Flujos estrella
 
 ### A. Planificar con tráfico
-1. Elegir bodega, **hora de salida** y pedidos.
-2. **Optimizar:** Dijkstra construye la matriz, 2-opt ordena y A\* traza los tramos.
-3. Resultado: la ruta en el mapa con ETA por parada, y la tarjeta **"Con tráfico: 1 h 12 min · La ruta más corta tardaría 1 h 38 min"**.
-4. Sugerencia: *"Si sales a las 9:30 en lugar de 7:30, ahorras 25 min"*.
+1. Elegir bodega, **hora de salida** y pedidos (p. ej. entregas en Chimaltenango, Quetzaltenango y Retalhuleu).
+2. **Optimizar:** Dijkstra arma la matriz, 2-opt ordena y A\* elige los tramos.
+3. Resultado: *"Más rápida: 5 h 10 min por CA-1 · La más corta (por CA-2) tardaría 5 h 55 min con el tráfico de las 07:00"*.
+4. Sugerencia: *"Si sales a las 09:00, ahorras 40 min"*.
 5. Confirmar y asignar al conductor.
 
 ### B. Laboratorio (para la defensa)
-1. Elegir dos puntos en el mapa y una hora.
-2. **Ejecutar:** ambos algoritmos animan su exploración al mismo tiempo.
-3. Se ve que Dijkstra "se expande en círculo" y A\* "apunta al destino". Mismo costo, menos nodos.
-4. Mover la hora a 7:00 y ver cómo la ruta cambia de corredor por el tráfico.
+1. Elegir origen y destino en el mapa de Guatemala (p. ej. Ciudad de Guatemala → Flores) y una franja.
+2. **Ejecutar:** los dos algoritmos animan su exploración al mismo tiempo.
+3. Dijkstra se expande hacia todos lados (también hacia la costa sur y occidente); A\* avanza hacia el norte. Mismo costo, menos nodos.
+4. Cambiar a "Pico mañana" y ver cómo la ruta cambia de carretera.
 
 ### C. Recálculo en vivo
-1. Se reporta un incidente en un corredor.
-2. Los multiplicadores de esas aristas suben y A\* recalcula los tramos pendientes de las rutas afectadas.
+1. Se reporta un derrumbe o tranque en un tramo.
+2. Ese tramo se penaliza o bloquea y A\* recalcula los tramos pendientes.
 3. El conductor recibe el aviso con los minutos que ahorra.
 
 ---
 
-## 9. Sistema de diseño
+## 9. Sistema de diseño (minimalista)
 
-- **Estilo: minimalista.** Fondo casi blanco, sin sombras pesadas, sin tarjetas dentro de tarjetas, separadores de 1 px en lugar de cajas, mucho espacio en blanco.
+- **Estilo:** fondo casi blanco, sin sombras pesadas, sin tarjetas dentro de tarjetas, separadores de 1 px en lugar de cajas, mucho espacio en blanco.
 - **Principios:** el mapa es protagonista · los números del algoritmo siempre visibles (tiempo, km, nodos, ms) · una acción principal por pantalla · todo estado tiene diseño (vacío, cargando, error, éxito).
 - **Tipografía:** una sola familia (**Geist**) y **Geist Mono** para cifras, horas y códigos. Jerarquía por tamaño y peso, no por color.
-- **Color con propósito:** interfaz en neutros. Acción principal en **negro** (`#111113`). El color se reserva para **rutas, tráfico y estados**: si algo tiene color, significa algo.
+- **Color con propósito:** interfaz en neutros. Acción principal en **negro** (`#111113`). El color se reserva para **rutas, tráfico y estados**.
 - **Tokens base:** fondo `#FAFAF9` · superficie `#FFFFFF` · texto `#111113` · texto secundario `#6B6F76` · línea `#ECECEA` · acento `#2F4BD8` · éxito `#1A7F4B` · error `#B42318` · tránsito pesado `#F3C4AE`.
+- **Escala de congestión:** secuencial de un solo tono, de claro a oscuro según `m`, legible para personas con daltonismo. Nunca solo verde/rojo.
+- **Algoritmos:** Dijkstra y A\* con dos tonos que también difieren en luminosidad. Nodos explorados = puntos translúcidos; ruta final = línea gruesa.
+- **Mapa base de Google** con estilo desaturado (vía *Map ID*) para que las rutas destaquen.
 - **Navegación:** barra lateral clara, sin barra superior; búsqueda global con ⌘K.
-- **Estados como punto + texto** (no "pastillas" de color).
-- **Escala de congestión:** secuencial de un solo tono, de claro a oscuro según `m` (1.0 → 3.0+), legible para personas con daltonismo. Nunca solo verde/rojo.
-- **Colores de algoritmo** (fijos en todo el sistema): Dijkstra y A\* con dos tonos distinguibles también por luminosidad. Nodos explorados = puntos translúcidos; ruta final = línea gruesa.
-- **Estados:** pendiente = gris · planificado = azul · en curso = ámbar · entregado = verde · fallido = rojo.
-- **Componentes:** botón, input, combobox de dirección, badge, tabla, panel lateral, modal, toast, tarjeta de métrica, **control deslizante de hora**, **leyenda de congestión**, **contador animado**, *skeleton*, estado vacío, marcador numerado.
+- **Estados como punto + texto** (sin "pastillas" de color).
 - **Accesibilidad:** contraste AA, teclado, objetivos táctiles ≥ 44 px en la vista del conductor.
 
 ---
@@ -353,31 +386,31 @@ logistics/management/commands/
 ### Semana 1 — Motor de rutas (el corazón de la tesis)
 | Día | Entregable |
 |-----|-----------|
-| 1 | Definir el área (municipios); `build_graph.py` con OSM; medir nodos, aristas y memoria |
-| 2 | `graph.py` + `snap.py`; Dijkstra punto a punto y uno-a-todos con instrumentación |
-| 3 | A\* con heurística en tiempo; prueba E1 (A\* = Dijkstra en miles de pares); corregir el redondeo de la heurística |
-| 4 | Corredores + `calibrate_traffic.py` (Google Routes) + `TrafficProfile`; costos por hora |
-| 5 | Varias paradas (matriz, vecino más cercano, 2-opt, ETAs) + endpoints `/api/routing/*` + E2, E3, E5 |
+| 1 | Lista de nodos (cabeceras, municipios clave, cruces) con coordenadas; modelos `Node`, `Edge`, `TrafficProfile` |
+| 2 | `build_graph` con Google (aristas verificadas, `t0`, km); `graph.py` en memoria |
+| 3 | Dijkstra (punto a punto y uno-a-todos) + A\* con `v_max` derivado; corregir el redondeo; **E1** |
+| 4 | `calibrate_traffic` (14 perfiles); costos por franja; **E2, E3** |
+| 5 | Varias paradas (matriz, vecino más cercano, 2-opt, ETAs) + endpoints `/api/routing/*` + **E5, E7** |
 
 ### Semana 2 — Aplicación React
 | Día | Entregable |
 |-----|-----------|
-| 6 | Vite, Tailwind, shadcn, layout, login y ruteo por rol; **probar el deploy en Render hoy** |
-| 7 | Pedidos con autocompletado de dirección y *snap* al grafo |
-| 8 | **Planificador** con hora de salida, comparación con tráfico y ETAs |
-| 9 | **Laboratorio** Dijkstra vs A\* con animación de exploración |
-| 10 | Mapa de tráfico por hora + "mejor hora para salir" |
+| 6 | Vite, Tailwind, shadcn, layout minimalista, login por rol; **probar el deploy en Render hoy** |
+| 7 | Pedidos con Places y asociación al nodo más cercano |
+| 8 | **Planificador** (hora de salida, más rápida vs más corta, ETAs, dibujo con Directions) |
+| 9 | **Laboratorio** Dijkstra vs A\* con animación |
+| 10 | Mapa de tráfico por franja + mejor hora para salir |
 
 ### Semana 3 — Conductor, tiempo real y cierre
 | Día | Entregable |
 |-----|-----------|
-| 11 | Vista del conductor: ruta del día, paradas y entregas |
-| 12 | Incidentes + recálculo con A\* + aviso de ruta alternativa |
-| 13 | Rutas, Monitoreo, Inicio y Reportes |
-| 14 | E4 (validación contra Google), E6, E7; gráficas para el documento |
-| 15 | Pulido responsive y accesibilidad, datos de demo, deploy final, guion de la defensa, README |
+| 11 | Vista del conductor |
+| 12 | Incidentes + recálculo con A\* + aviso; refinamiento en vivo |
+| 13 | Rutas, Monitoreo, Inicio, Reportes |
+| 14 | E4, E6; gráficas finales para el documento |
+| 15 | Pulido, datos de demo, deploy final, guion de defensa, README |
 
-> Regla: si un día se atrasa, se recorta de **Could/Should**, nunca del motor ni de los experimentos E1–E3.
+> Regla: si un día se atrasa, se recorta de **Could/Should**, nunca del motor ni de E1–E3.
 
 ---
 
@@ -385,13 +418,12 @@ logistics/management/commands/
 
 | Riesgo | Impacto | Mitigación |
 |--------|---------|------------|
-| Grafo demasiado grande para la memoria de Render | Alto | Recortar al área metropolitana; listas compactas (arrays); medir el día 1 |
-| Calidad del modelo de tráfico | Alto | Calibrar con Google, validar con MAPE (E4) y documentar limitaciones con honestidad |
-| Python lento en grafos grandes | Medio | A\* reduce las expansiones; caché de matrices por hora; medir con E7 |
-| Condiciones de uso de Google | Medio | Solo usar la Routes API para calibrar; nada de leer la capa de tráfico |
-| Licencia de OpenStreetMap (ODbL) | Bajo | Atribución "© OpenStreetMap contributors" en el mapa y en el documento |
-| API key expuesta | Medio | Restringir por HTTP referrer; key separada para el servidor |
-| Alcance | Alto | MoSCoW estricto; la semana 1 es el motor, sin excepciones |
+| Costo o cuota de las APIs de Google | Medio | Calibración por lotes (una vez por semana), caché en BD, refinamiento en vivo limitado a pocas aristas, alertas de presupuesto en Google Cloud |
+| Grafo pequeño → poca diferencia visible entre A\* y Dijkstra | Medio | ~100–150 nodos (no 10); consultas largas en el laboratorio (capital → Petén); E7 con grafos sintéticos grandes |
+| Precisión del modelo por franjas | Medio | Validar con MAPE (E4); refinamiento en vivo; documentar limitaciones |
+| Condiciones de uso de Google | Medio | Solo APIs de rutas; nada de leer la capa visual de tráfico |
+| API key expuesta | Medio | Key del navegador restringida por HTTP referrer; key separada para el servidor (Routes API) |
+| Alcance | Alto | MoSCoW estricto; la semana 1 es el motor |
 
 ---
 
@@ -410,18 +442,18 @@ logistics/management/commands/
 ## 13. Pendientes que conviene decidir
 
 - [ ] **Nombre** final.
-- [ ] **Área del grafo:** ¿solo Ciudad de Guatemala o también Mixco y Villa Nueva? A más área, más memoria.
-- [ ] **Corredores** a calibrar (propuesta: Roosevelt, Periférico, Aguilar Batres, Petapa, Liberación, Las Américas, Reforma, CA-9 Norte y Sur, CA-1 hacia Mixco, Bulevar San Cristóbal…).
-- [ ] Título y objetivos formales de la tesis alineados con *"búsqueda de rutas óptimas con Dijkstra y A\* en una red vial con tráfico dependiente del tiempo"*. Si el título menciona **IA**, A\* es un algoritmo clásico de búsqueda informada en IA (Russell & Norvig).
+- [ ] **Lista de nodos:** confirmar las 22 cabeceras + qué municipios y cruces incluir (se propone una lista inicial el día 1).
+- [ ] **Bodega(s) de demo:** ¿una en la capital o también regionales (p. ej. Quetzaltenango)?
+- [ ] Título y objetivos de la tesis alineados con *"búsqueda de rutas óptimas con Dijkstra y A\* en la red vial de Guatemala con tráfico dependiente del tiempo"*. Si el título menciona **IA**, A\* es un algoritmo clásico de búsqueda informada en IA (Russell & Norvig).
 - [ ] ¿Qué métricas o formato pide el asesor para los experimentos?
 
 ---
 
 ## 14. Definición de "terminado" para la defensa
 
-- En el **Laboratorio**, Dijkstra y A\* encuentran la **misma ruta óptima**, y A\* explora visiblemente menos nodos.
-- Al cambiar la hora de 10:00 a 7:00, el sistema **propone otra ruta** por el tráfico y muestra cuántos minutos ahorra frente a la ruta más corta.
-- Un despachador planifica varias paradas con ETAs realistas según el tráfico.
-- Un conductor recibe su ruta en el celular, reporta un incidente y recibe una ruta alternativa.
-- Los experimentos E1–E3 y E5 (idealmente todos) tienen tablas y gráficas listas para el documento.
-- Todo desplegado en Render con datos de demo coherentes.
+- En el **Laboratorio**, Dijkstra y A\* encuentran la **misma ruta** entre dos puntos de Guatemala y A\* explora visiblemente menos nodos.
+- Al cambiar la franja de "Media mañana" a "Pico mañana", el sistema **propone otra ruta** y muestra cuántos minutos ahorra frente a la más corta.
+- Un despachador planifica varias paradas con ETAs realistas.
+- Un conductor recibe su ruta, reporta un incidente y recibe una ruta alternativa.
+- E1, E2, E3, E5 y E7 (idealmente todos) tienen tablas y gráficas listas.
+- Desplegado en Render con uso de memoria mínimo.
