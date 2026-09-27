@@ -333,7 +333,13 @@ logistics/management/commands/
 
 ## 9. Sistema de diseño
 
+- **Estilo: minimalista.** Fondo casi blanco, sin sombras pesadas, sin tarjetas dentro de tarjetas, separadores de 1 px en lugar de cajas, mucho espacio en blanco.
 - **Principios:** el mapa es protagonista · los números del algoritmo siempre visibles (tiempo, km, nodos, ms) · una acción principal por pantalla · todo estado tiene diseño (vacío, cargando, error, éxito).
+- **Tipografía:** una sola familia (**Geist**) y **Geist Mono** para cifras, horas y códigos. Jerarquía por tamaño y peso, no por color.
+- **Color con propósito:** interfaz en neutros. Acción principal en **negro** (`#111113`). El color se reserva para **rutas, tráfico y estados**: si algo tiene color, significa algo.
+- **Tokens base:** fondo `#FAFAF9` · superficie `#FFFFFF` · texto `#111113` · texto secundario `#6B6F76` · línea `#ECECEA` · acento `#2F4BD8` · éxito `#1A7F4B` · error `#B42318` · tránsito pesado `#F3C4AE`.
+- **Navegación:** barra lateral clara, sin barra superior; búsqueda global con ⌘K.
+- **Estados como punto + texto** (no "pastillas" de color).
 - **Escala de congestión:** secuencial de un solo tono, de claro a oscuro según `m` (1.0 → 3.0+), legible para personas con daltonismo. Nunca solo verde/rojo.
 - **Colores de algoritmo** (fijos en todo el sistema): Dijkstra y A\* con dos tonos distinguibles también por luminosidad. Nodos explorados = puntos translúcidos; ruta final = línea gruesa.
 - **Estados:** pendiente = gris · planificado = azul · en curso = ámbar · entregado = verde · fallido = rojo.
