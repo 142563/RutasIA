@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Mi ruta de hoy</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;font-family:'Geist',system-ui,sans-serif;color:#111113;background:#FFFFFF}
+a{color:#111113}a:hover{color:#2F4BD8}
+button{font-family:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: #FFFFFF; overflow: hidden; font-family: 'Geist', system-ui, sans-serif; color: #111113">
+
+<div style="flex-grow: 1; overflow: auto; display: flex; flex-direction: column; gap: 24px; padding: 32px 24px 24px">
+
+<header style="display: flex; align-items: flex-start; gap: 12px">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 13px; color: #6B6F76">Lunes 28 de septiembre</span>
+<h1 style="margin: 0; font-weight: 600; font-size: 26px; letter-spacing: -0.025em">Hola, Carlos</h1>
+</div>
+<span style="width: 36px; height: 36px; border-radius: 50%; background: #F4F4F2; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600">CM</span>
+</header>
+
+<section aria-label="Avance de la ruta" style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: baseline; justify-content: space-between">
+<span style="font-size: 15px"><span style="font-weight: 600">2</span> de 5 entregas</span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6B6F76">Ruta A · P-512DKM</span>
+</div>
+<div style="height: 4px; border-radius: 999px; background: #F1F1EF; overflow: hidden"><div style="width: 40%; height: 4px; border-radius: 999px; background: #111113"></div></div>
+<span style="font-size: 13px; color: #6B6F76">14.2 km restantes · regreso aprox. <span style="font-family: 'Geist Mono', monospace">09:32</span></span>
+</section>
+
+<div style="height: 150px; border-radius: 14px; overflow: hidden; position: relative; background: #F2F2F0; flex-shrink: 0">
+<svg width="342" height="150" viewBox="0 0 342 150" aria-hidden="true" style="position: absolute; left: 0; top: 0">
+<g stroke="#FFFFFF" stroke-width="3" fill="none"><path d="M0 30H342M0 95H342M40 0V150M170 0V150M300 0V150"></path></g>
+<g stroke="#FFFFFF" stroke-width="8" fill="none"><path d="M0 130H342M240 0V150"></path></g>
+<g stroke="#F3C4AE" stroke-width="8" fill="none"><path d="M0 64H342M100 0V150"></path></g>
+<polyline points="310,130 240,130 240,95 170,95" fill="none" stroke="#B9BBBF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+<polyline points="170,95 170,30 40,30 40,95 300,95 300,130 310,130" fill="none" stroke="#2F4BD8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+<rect x="300" y="120" width="20" height="20" rx="5" fill="#111113" stroke="#FFFFFF" stroke-width="2"></rect>
+<circle cx="240" cy="95" r="6" fill="#B9BBBF" stroke="#FFFFFF" stroke-width="2"></circle>
+<circle cx="170" cy="95" r="6" fill="#B9BBBF" stroke="#FFFFFF" stroke-width="2"></circle>
+<circle cx="170" cy="30" r="10" fill="#2F4BD8" stroke="#FFFFFF" stroke-width="2.5"></circle>
+<text x="170" y="34" text-anchor="middle" font-size="11" font-weight="500" fill="#FFFFFF" font-family="Geist Mono, monospace">3</text>
+<circle cx="40" cy="30" r="8" fill="#FFFFFF" stroke="#2F4BD8" stroke-width="2"></circle>
+<circle cx="40" cy="95" r="8" fill="#FFFFFF" stroke="#2F4BD8" stroke-width="2"></circle>
+</svg>
+</div>
+
+<section aria-label="Paradas" style="display: flex; flex-direction: column">
+
+<div style="display: flex; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid #F1F1EF">
+<span style="width: 24px; display: flex; justify-content: center; color: #1A7F4B"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"></path></svg></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-size: 14px; color: #6B6F76">Mario Chávez</span><span style="font-size: 13px; color: #6B6F76">6a avenida 1-25, Zona 4</span></span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6B6F76">07:52</span>
+</div>
+
+<div style="display: flex; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid #F1F1EF">
+<span style="width: 24px; display: flex; justify-content: center; color: #1A7F4B"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"></path></svg></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-size: 14px; color: #6B6F76">Farmacia San Rafael</span><span style="font-size: 13px; color: #6B6F76">7a avenida 14-52, Zona 9</span></span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6B6F76">08:15</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 18px 0; border-bottom: 1px solid #F1F1EF">
+<div style="display: flex; gap: 14px; align-items: flex-start">
+<span style="width: 24px; height: 24px; border-radius: 50%; background: #2F4BD8; color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: 'Geist Mono', monospace; font-size: 12px">3</span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0">
+<span style="font-size: 12px; color: #2F4BD8; font-weight: 500">Siguiente · llegada <span style="font-family: 'Geist Mono', monospace">08:34</span></span>
+<span style="font-size: 17px; font-weight: 600; letter-spacing: -0.01em">Lucía Morales</span>
+<span style="font-size: 14px; color: #56595F">12 calle 3-40, Zona 10</span>
+<span style="font-size: 12px; color: #1A7F4B; margin-top: 2px">Ruta ajustada por tránsito · −8 min</span>
+</span>
+</div>
+<a href="Conductor-Parada.dc.html" style="height: 48px; margin-left: 38px; border-radius: 12px; background: #111113; color: #FFFFFF; font-size: 15px; font-weight: 500; text-decoration: none; display: flex; align-items: center; justify-content: center">Abrir parada</a>
+</div>
+
+<div style="display: flex; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid #F1F1EF">
+<span style="width: 24px; text-align: center; font-family: 'Geist Mono', monospace; font-size: 12px; color: #56595F">4</span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-size: 14px">Distribuidora El Roble</span><span style="font-size: 13px; color: #6B6F76">Calzada Roosevelt 22-43, Zona 11</span></span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6B6F76">08:51</span>
+</div>
+
+<div style="display: flex; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid #F1F1EF">
+<span style="width: 24px; text-align: center; font-family: 'Geist Mono', monospace; font-size: 12px; color: #56595F">5</span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-size: 14px">Sofía Ramírez</span><span style="font-size: 13px; color: #6B6F76">20 calle 10-15, Zona 1</span></span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6B6F76">09:10</span>
+</div>
+
+<div style="display: flex; gap: 14px; align-items: center; padding: 14px 0">
+<span style="width: 24px; display: flex; justify-content: center; color: #56595F"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V9l9-5 9 5v12"></path><path d="M7 21v-8h10v8"></path></svg></span>
+<span style="flex-grow: 1; font-size: 14px; color: #56595F">Regreso a bodega</span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6B6F76">09:32</span>
+</div>
+</section>
+</div>
+
+<nav aria-label="Conductor" style="height: 68px; flex-shrink: 0; background: #FFFFFF; border-top: 1px solid #ECECEA; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))">
+<a href="Conductor-Hoy.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #111113; text-decoration: none; font-size: 11px; font-weight: 500">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="3"></circle><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"></path><circle cx="18" cy="5" r="3"></circle></svg>Hoy</a>
+<a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #6B6F76; text-decoration: none; font-size: 11px">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20z"></path><path d="M12 10v4M12 17h.01"></path></svg>Reportar</a>
+<a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #6B6F76; text-decoration: none; font-size: 11px">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>Perfil</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

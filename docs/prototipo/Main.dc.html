@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Planificador de rutas</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;font-family:'Geist',system-ui,sans-serif;color:#111113;background:#FAFAF9}
+a{color:#111113}a:hover{color:#2F4BD8}
+button{font-family:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #FAFAF9; overflow: hidden; font-family: 'Geist', system-ui, sans-serif; color: #111113">
+
+<nav aria-label="Principal" style="width: 220px; flex-shrink: 0; border-right: 1px solid #ECECEA; display: flex; flex-direction: column; padding: 24px 12px 16px; box-sizing: border-box; gap: 2px">
+<div style="display: flex; align-items: center; gap: 8px; padding: 0 10px 20px">
+<svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#111113"></rect><path d="M9 22c0-5 4-5 7-8s3-5 7-5" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"></path><circle cx="9" cy="22" r="2.6" fill="#FFFFFF"></circle><circle cx="23" cy="9" r="2.6" fill="#FFFFFF"></circle></svg>
+<span style="font-weight: 600; font-size: 17px; letter-spacing: -0.02em">enruta</span>
+</div>
+<button type="button" style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; margin-bottom: 14px; border: 1px solid #ECECEA; border-radius: 8px; background: #FFFFFF; color: #6B6F76; font-size: 13px; text-align: left">
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+<span style="flex-grow: 1">Buscar</span><span style="font-family: 'Geist Mono', monospace; font-size: 11px">⌘K</span></button>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Inicio</a>
+<a href="Pedidos.dc.html" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"></path><path d="m3 8 9 5 9-5"></path><path d="M12 13v8"></path></svg>
+<span style="flex-grow: 1">Pedidos</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #6B6F76">15</span></a>
+<a href="Main.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #111113; background: #EFEFED; text-decoration: none; font-size: 14px; font-weight: 500">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="3"></circle><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"></path><circle cx="18" cy="5" r="3"></circle></svg>Planificar</a>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11v10H3z"></path><path d="M14 9h4l3 3v4h-7"></path><circle cx="7" cy="17.5" r="1.8"></circle><circle cx="17" cy="17.5" r="1.8"></circle></svg>Rutas</a>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"></path><path d="M9 4v14M15 6v14"></path></svg>Monitoreo</a>
+<span style="font-size: 12px; color: #6B6F76; padding: 18px 10px 6px">Análisis</span>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg>Tráfico</a>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3"></path></svg>Laboratorio</a>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"></path><path d="M6 17V11M11 17V5M16 17v-8M21 17v-3"></path></svg>Reportes</a>
+<div style="flex-grow: 1"></div>
+<a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; color: #56595F; text-decoration: none; font-size: 14px">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg>Configuración</a>
+<div style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px">
+<span style="width: 26px; height: 26px; border-radius: 50%; background: #EFEFED; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600">AC</span>
+<span style="font-size: 13px; color: #56595F">Andrea Castillo</span>
+</div>
+</nav>
+
+<section aria-label="Resultado de la planificación" style="width: 380px; flex-shrink: 0; background: #FFFFFF; border-right: 1px solid #ECECEA; display: flex; flex-direction: column">
+<div style="flex-grow: 1; overflow: auto; padding: 32px 28px 24px; display: flex; flex-direction: column; gap: 28px">
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; color: #6B6F76">Paso 3 de 4 · Revisar</span>
+<h1 style="margin: 0; font-weight: 600; font-size: 24px; letter-spacing: -0.025em">Rutas de hoy</h1>
+<span style="font-size: 13px; color: #6B6F76">Lun 28 sep · Salida 07:30 · Bodega Central</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div role="group" aria-label="Criterio de ruta" style="display: flex; gap: 2px; padding: 3px; background: #F4F4F2; border-radius: 9px">
+<button type="button" onClick="{{setShort}}" aria-pressed="{{shortPressed}}" style="flex: 1; height: 34px; border: none; border-radius: 7px; font-size: 13px; font-weight: 500; background: {{shortBg}}; color: {{shortFg}}; box-shadow: {{shortShadow}}">Más corta</button>
+<button type="button" onClick="{{setFast}}" aria-pressed="{{fastPressed}}" style="flex: 1; height: 34px; border: none; border-radius: 7px; font-size: 13px; font-weight: 500; background: {{fastBg}}; color: {{fastFg}}; box-shadow: {{fastShadow}}">Más rápida</button>
+</div>
+<span style="font-size: 12px; color: #6B6F76">{{criterion}}</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; color: #6B6F76">Tiempo total de manejo</span>
+<span style="font-weight: 500; font-size: 46px; line-height: 1; letter-spacing: -0.04em">{{totalT}}</span>
+<sc-if value="{{fast}}" hint-placeholder-val="{{true}}">
+<span style="font-size: 13px; color: #1A7F4B; font-weight: 500">62 min menos que la ruta más corta</span>
+</sc-if>
+<sc-if value="{{short}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 13px; color: #9A3412; font-weight: 500">Pasa por corredores con tránsito pesado</span>
+</sc-if>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #6B6F76">Distancia</span><span style="font-family: 'Geist Mono', monospace; font-size: 15px">{{totalKm}}</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #6B6F76">Paradas</span><span style="font-family: 'Geist Mono', monospace; font-size: 15px">15</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #6B6F76">Último regreso</span><span style="font-family: 'Geist Mono', monospace; font-size: 15px">{{lastBack}}</span></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 8px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 500">Rutas</h2>
+<span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #6B6F76">{{algoLabel}}</span>
+</div>
+<sc-for list="{{routes}}" as="r" hint-placeholder-count="3">
+<button type="button" onClick="{{r.pick}}" aria-pressed="{{r.pressed}}" style="text-align: left; width: 100%; border: none; background: {{r.rowBg}}; border-radius: 10px; padding: 12px; display: flex; gap: 12px; align-items: flex-start; color: #111113; opacity: {{r.rowOpacity}}">
+<span style="width: 8px; height: 8px; border-radius: 50%; background: {{r.color}}; margin-top: 6px; flex-shrink: 0"></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px">
+<span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 14px; font-weight: 500">Ruta {{r.id}} · {{r.driver}}</span><span style="font-family: 'Geist Mono', monospace; font-size: 13px">{{r.time}}</span></span>
+<span style="display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #6B6F76"><span>5 paradas · {{r.km}} km</span><span>Carga {{r.pct}} %</span></span>
+</span>
+</button>
+</sc-for>
+</div>
+
+</div>
+<div style="flex-shrink: 0; padding: 16px 28px 24px; display: flex; flex-direction: column; gap: 8px">
+<button type="button" style="height: 44px; border-radius: 10px; border: none; background: #111113; color: #FFFFFF; font-size: 14px; font-weight: 500">Confirmar y asignar</button>
+<button type="button" style="height: 36px; border-radius: 10px; border: none; background: transparent; color: #56595F; font-size: 13px; font-weight: 500">Ajustar paradas</button>
+</div>
+</section>
+
+<section aria-label="Mapa de rutas" style="flex-grow: 1; position: relative; background: #F2F2F0; overflow: hidden">
+<svg width="840" height="900" viewBox="-16 -32 840 900" style="position: absolute; left: 0; top: 0" aria-hidden="true">
+<rect x="-16" y="-32" width="840" height="900" fill="#F2F2F0"></rect>
+<rect x="46" y="54" width="104" height="84" rx="10" fill="#E4EADF"></rect>
+<rect x="682" y="512" width="92" height="106" rx="10" fill="#E4EADF"></rect>
+<rect x="190" y="760" width="120" height="60" rx="10" fill="#E4EADF"></rect>
+<g stroke="#FFFFFF" stroke-width="4" fill="none">
+<path d="M-16 180H824M-16 320H824M-16 400H824M-16 520H824M-16 560H824M-16 730H824"></path>
+<path d="M250 -32V868M300 -32V868M320 -32V868M360 -32V868M450 -32V868M550 -32V868M700 -32V868"></path>
+</g>
+<g stroke="#FFFFFF" stroke-width="10" fill="none">
+<path d="M-16 250H824M-16 640H824M180 -32V868M620 -32V868"></path>
+</g>
+<g stroke="#F3C4AE" stroke-width="12" fill="none">
+<path d="M-16 470H824M404 -32V868"></path>
+</g>
+<polyline points="{{ra.points}}" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" opacity="{{ra.opacity}}"></polyline>
+<polyline points="{{ra.points}}" fill="none" stroke="#2F4BD8" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" opacity="{{ra.opacity}}"></polyline>
+<polyline points="{{rb.points}}" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" opacity="{{rb.opacity}}"></polyline>
+<polyline points="{{rb.points}}" fill="none" stroke="#C2410C" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" opacity="{{rb.opacity}}"></polyline>
+<polyline points="{{rc.points}}" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" opacity="{{rc.opacity}}"></polyline>
+<polyline points="{{rc.points}}" fill="none" stroke="#0F7A5A" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" opacity="{{rc.opacity}}"></polyline>
+</svg>
+
+<sc-for list="{{markers}}" as="m" hint-placeholder-count="15">
+<div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: 22px; height: 22px; box-sizing: border-box; border-radius: 50%; border: 2px solid #FFFFFF; background: {{m.color}}; opacity: {{m.opacity}}; color: #FFFFFF; font-family: 'Geist Mono', monospace; font-size: 11px; font-weight: 500; display: flex; align-items: center; justify-content: center">{{m.n}}</div>
+</sc-for>
+
+<div title="Bodega Central" style="position: absolute; left: 404px; top: 486px; width: 32px; height: 32px; border-radius: 8px; background: #111113; border: 2px solid #FFFFFF; box-sizing: border-box; color: #FFFFFF; display: flex; align-items: center; justify-content: center">
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V9l9-5 9 5v12"></path><path d="M7 21v-8h10v8"></path></svg>
+</div>
+
+<div style="position: absolute; left: 20px; top: 20px; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; background: #FFFFFF; border: 1px solid #ECECEA; border-radius: 999px; font-size: 13px">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#56595F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+<span>Tráfico de las <span style="font-family: 'Geist Mono', monospace">07:30</span></span>
+</div>
+
+<div style="position: absolute; left: 20px; bottom: 20px; display: flex; align-items: center; gap: 16px; font-size: 12px; color: #56595F">
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 16px; height: 6px; border-radius: 3px; background: #F3C4AE"></span>Tránsito pesado</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #111113"></span>Bodega</span>
+<span>© OpenStreetMap</span>
+</div>
+
+<div style="position: absolute; right: 20px; top: 20px; display: flex; flex-direction: column; background: #FFFFFF; border: 1px solid #ECECEA; border-radius: 10px; overflow: hidden">
+<button type="button" aria-label="Acercar" style="width: 36px; height: 36px; border: none; border-bottom: 1px solid #ECECEA; background: #FFFFFF; color: #111113; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+<button type="button" aria-label="Alejar" style="width: 36px; height: 36px; border: none; background: #FFFFFF; color: #111113; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+</div>
+
+<sc-if value="{{hasFocus}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); background: #111113; color: #FFFFFF; border-radius: 999px; padding: 4px 4px 4px 16px; display: flex; align-items: center; gap: 10px; font-size: 13px">
+<span>Ruta {{focusId}}</span>
+<button type="button" onClick="{{clearFocus}}" style="height: 30px; padding: 0 12px; border-radius: 999px; border: none; background: #2A2B2F; color: #FFFFFF; font-size: 13px">Ver todas</button>
+</div>
+</sc-if>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { mode: 'fast', focus: null };
+  }
+  renderVals() {
+    const fast = this.state.mode === 'fast';
+    const focus = this.state.focus;
+    const D = [404, 470];
+    const base = [
+      { id: 'A', color: '#2F4BD8', driver: 'Carlos Méndez', load: 624, cap: 800,
+        stops: [[320, 400], [250, 320], [180, 250], [250, 180], [320, 250]],
+        shortIn: [[404, 400]], shortOut: [[404, 250]],
+        fastIn: [[360, 470], [360, 400]], fastOut: [[360, 250], [360, 470]],
+        shortKm: '22.1', fastKm: '24.6', shortT: '1 h 04 min', fastT: '46 min' },
+      { id: 'B', color: '#C2410C', driver: 'Ana Lucía Pérez', load: 512, cap: 800,
+        stops: [[500, 400], [560, 320], [640, 250], [700, 180], [560, 180]],
+        shortIn: [[404, 400]], shortOut: [[404, 180]],
+        fastIn: [[450, 470], [450, 400]], fastOut: [[450, 180], [450, 470]],
+        shortKm: '27.0', fastKm: '29.8', shortT: '1 h 11 min', fastT: '52 min' },
+      { id: 'C', color: '#0F7A5A', driver: 'Jorge Xicará', load: 2275, cap: 2500,
+        stops: [[470, 560], [550, 640], [470, 730], [340, 700], [300, 590]],
+        shortIn: [[404, 560]], shortOut: [[300, 470]],
+        fastIn: [[450, 470], [450, 560]], fastOut: [[300, 520], [404, 520]],
+        shortKm: '29.3', fastKm: '31.0', shortT: '1 h 23 min', fastT: '58 min' }
+    ];
+    const routes = base.map((r) => {
+      const seq = [D].concat(fast ? r.fastIn : r.shortIn, r.stops, fast ? r.fastOut : r.shortOut, [D]);
+      const isFocus = focus === r.id;
+      const dim = focus !== null && !isFocus;
+      return Object.assign({}, r, {
+        points: seq.map((p) => p.join(',')).join(' '),
+        opacity: dim ? 0.15 : 1,
+        rowOpacity: dim ? 0.5 : 1,
+        rowBg: isFocus ? '#F4F4F2' : 'transparent',
+        km: fast ? r.fastKm : r.shortKm,
+        time: fast ? r.fastT : r.shortT,
+        pct: Math.round((r.load / r.cap) * 100),
+        pressed: isFocus ? 'true' : 'false',
+        pick: () => this.setState({ focus: this.state.focus === r.id ? null : r.id })
+      });
+    });
+    const markers = [];
+    routes.forEach((r) => {
+      r.stops.forEach((p, k) => {
+        markers.push({ left: p[0] + 16 - 11, top: p[1] + 32 - 11, color: r.color, n: k + 1, opacity: r.opacity });
+      });
+    });
+    const on = { bg: '#FFFFFF', fg: '#111113', sh: '0 1px 2px rgba(17,17,19,0.1)' };
+    const off = { bg: 'transparent', fg: '#6B6F76', sh: 'none' };
+    const f = fast ? on : off;
+    const s = fast ? off : on;
+    return {
+      fast: fast,
+      short: !fast,
+      routes: routes,
+      ra: routes[0], rb: routes[1], rc: routes[2],
+      markers: markers,
+      criterion: fast ? 'Minimiza el tiempo con el tráfico de las 07:30' : 'Minimiza los kilómetros, sin considerar el tráfico',
+      algoLabel: fast ? 'A* · tiempo · 38 ms' : 'A* · distancia · 31 ms',
+      totalKm: fast ? '85.4 km' : '78.4 km',
+      totalT: fast ? '2 h 36 min' : '3 h 38 min',
+      lastBack: fast ? '08:28' : '08:53',
+      fastBg: f.bg, fastFg: f.fg, fastShadow: f.sh, fastPressed: fast ? 'true' : 'false',
+      shortBg: s.bg, shortFg: s.fg, shortShadow: s.sh, shortPressed: fast ? 'false' : 'true',
+      setFast: () => this.setState({ mode: 'fast' }),
+      setShort: () => this.setState({ mode: 'short' }),
+      hasFocus: focus !== null,
+      focusId: focus || '',
+      clearFocus: () => this.setState({ focus: null })
+    };
+  }
+}
+</script>
+</body>
+</html>
