@@ -97,7 +97,6 @@ ALLOWED_HOSTS = _env_list(
 )
 CSRF_TRUSTED_ORIGINS = _env_list("CSRF_TRUSTED_ORIGINS", default="")
 
-ORS_API_KEY = os.getenv("ORS_API_KEY", "")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 # AdvancedMarkerElement exige un Map ID. DEMO_MAP_ID funciona para desarrollo;
 # en produccion conviene crear uno propio en Google Cloud Console.

@@ -28,3 +28,7 @@ RutasIA.Web/
 
 # Resultados de run_experiments (se regeneran)
 experiments/output/
+
+# Configuración local de Claude Code y worktrees de agentes
+.claude/settings.local.json
+.claude/worktrees/
