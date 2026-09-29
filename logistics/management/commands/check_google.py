@@ -3,11 +3,13 @@ from django.core.management.base import BaseCommand, CommandError
 
 from logistics.routing.google import RoutesApiError, RoutesClient
 
-# Ciudad de Guatemala → Antigua Guatemala: una sola consulta (1 elemento)
+# Ciudad de Guatemala -> Antigua Guatemala: una sola consulta (1 elemento)
 PROBE_ORIGIN = (14.6349, -90.5069)
 PROBE_DESTINATION = (14.5586, -90.7295)
 
 HINTS = {
+    "REFERRER_BLOCKED": "Esa es la key del NAVEGADOR (restringida por sitio web). En .env van al revés: "
+                        "pon la key \"RutasIA servidor - Routes API\" en GOOGLE_ROUTES_API_KEY.",
     "403": "La key existe pero no tiene permiso: activa \"Routes API\" en el proyecto y revisa que la "
            "restricción de la key incluya Routes API (docs/GOOGLE_KEYS.md, pasos 2 y 4).",
     "400": "Google rechazó la solicitud: suele ser una key mal copiada (espacios o comillas en .env).",
@@ -33,7 +35,7 @@ class Command(BaseCommand):
             if not element.ok:
                 raise RoutesApiError(f"Google respondió sin ruta: {element.status}")
             self.stdout.write(self.style.SUCCESS(
-                f"  OK · Ciudad de Guatemala → Antigua: {element.distance_m / 1000:.1f} km, "
+                f"  OK · Ciudad de Guatemala -> Antigua: {element.distance_m / 1000:.1f} km, "
                 f"{(element.static_duration_s or element.duration_s) / 60:.0f} min sin tráfico (1 elemento consultado)"
             ))
         except RoutesApiError as exc:

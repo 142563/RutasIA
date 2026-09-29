@@ -45,3 +45,13 @@ class CheckGoogleTests(SimpleTestCase):
         with self.assertRaises(CommandError):
             call_command("check_google", stdout=out)
         self.assertIn("GOOGLE_ROUTES_API_KEY", out.getvalue())
+
+
+class SwappedKeysHintTests(SimpleTestCase):
+    def test_browser_key_in_server_slot_is_explained(self):
+        out = StringIO()
+        response = httpx.Response(403, text='{"reason": "API_KEY_HTTP_REFERRER_BLOCKED"}')
+        with mock.patch("logistics.management.commands.check_google.RoutesClient", fake_client(response)):
+            with self.assertRaises(CommandError):
+                call_command("check_google", stdout=out)
+        self.assertIn("key del NAVEGADOR", out.getvalue())
