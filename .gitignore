@@ -25,3 +25,6 @@ tmp_*.txt
 
 # Previous scaffold not used in final stack
 RutasIA.Web/
+
+# Resultados de run_experiments (se regeneran)
+experiments/output/

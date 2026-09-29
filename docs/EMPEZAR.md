@@ -49,6 +49,28 @@ python manage.py runserver
 
 Abre http://127.0.0.1:8000
 
+## 4b. Grafo nacional y experimentos
+
+Sin key de Google (datos **estimados y sintéticos**, solo para desarrollar):
+
+```powershell
+python manage.py seed_graph_nodes
+python manage.py build_graph --estimate
+python manage.py calibrate_traffic --synthetic
+pip install -r requirements-dev.txt
+python manage.py run_experiments --max-nodes 10000
+```
+
+Con `GOOGLE_ROUTES_API_KEY` en `.env` (datos reales, para la tesis):
+
+```powershell
+python manage.py build_graph
+python manage.py calibrate_traffic
+python manage.py run_experiments
+```
+
+Los resultados quedan en `experiments/output/` (CSV + PNG). Cada CSV trae la columna `data_source`.
+
 ## 5. Programar con Claude Code
 
 ```powershell

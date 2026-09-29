@@ -15,13 +15,20 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
 ## Estado actual del código
 
 - Django 6 (requiere **Python ≥ 3.12**), app única `logistics`, organizada por capas:
-  - `logistics/domain/services.py` — Dijkstra (`RouteOptimizer`) y A\* (`AStarOptimizer`) sobre `Department`/`RouteConnection`.
-  - `logistics/application/services.py` — `TripPlanner` y `TripLifecycleService` (casos de uso).
-  - `logistics/presentation/views.py` — API JSON (`/api/...`) con sesión de Django + CSRF.
+  - **Motor nuevo** `logistics/routing/` (Semana 1, Días 1–5):
+    - `graph.py` (`RoadGraph` en memoria), `dijkstra.py`, `astar.py` (`v_max` derivado de los datos), `instrument.py`.
+    - `traffic.py` (franjas), `multistop.py` (matriz + vecino más cercano + 2-opt + ETAs).
+    - `google.py` (Routes API, solo en comandos), `build.py`, `calibration.py`.
+    - `experiments.py`, `synthetic.py`, `charts.py`, y los datos semilla en `seed_data.py`.
+  - Modelos del grafo: `Node`, `Edge` (dirigida), `TrafficProfile` (m ≥ 1) y `RouteSample` (caché/bitácora de Google).
+  - Comandos: `seed_graph_nodes` → `build_graph [--estimate]` → `calibrate_traffic [--synthetic]` → `run_experiments`.
+  - `logistics/application/routing.py` + `logistics/presentation/routing_views.py`: `/api/routing/*`, `/api/routes/optimize/`, `/api/traffic/profile/`.
+  - **Motor viejo** (sigue funcionando hasta que llegue React): `logistics/domain/services.py` (`RouteOptimizer`, `AStarOptimizer` sobre `Department`/`RouteConnection`), `logistics/application/services.py` (`TripPlanner`), `logistics/presentation/views.py`.
   - `templates/logistics/index.html` + `static/logistics/app.js` — frontend actual en JS sin framework (se reemplazará por React).
+- **Datos:** mientras no haya `GOOGLE_ROUTES_API_KEY`, el grafo usa aristas `estimate` y tráfico `synthetic`. Toda respuesta y todo CSV indica la fuente (`data_source`). **Nunca** presentar esos números como resultados de tesis.
 - BD: PostgreSQL (Neon) vía `DATABASE_URL`; sin esa variable usa SQLite local.
-- Deploy: Render (`render.yaml`, `Procfile`), archivos estáticos con WhiteNoise.
-- Pruebas: `python manage.py test` (3 pruebas, pasan).
+- Deploy: Render (`render.yaml`, `Procfile`), archivos estáticos con WhiteNoise. `matplotlib` solo en `requirements-dev.txt`.
+- Pruebas: `python manage.py test` (86 pruebas, ~30 s; incluye E1 completa en `logistics/tests/test_search.py`).
 
 ## Hacia dónde vamos (resumen de docs/PLAN.md)
 
