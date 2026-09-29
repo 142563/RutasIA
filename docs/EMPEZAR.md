@@ -79,7 +79,7 @@ pip install -r requirements-dev.txt
 python manage.py run_experiments --max-nodes 10000
 ```
 
-Con `GOOGLE_ROUTES_API_KEY` en `.env` (datos reales, para la tesis):
+Con `GOOGLE_ROUTES_API_KEY` en `.env` (datos reales, para la tesis). Cómo conseguir las keys, paso a paso: [`docs/GOOGLE_KEYS.md`](GOOGLE_KEYS.md). Primero verifícala con `python manage.py check_google`:
 
 ```powershell
 python manage.py build_graph
