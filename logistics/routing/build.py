@@ -20,7 +20,7 @@ from django.utils import timezone
 
 from logistics.models import Edge, Node, RouteSample
 from logistics.routing.geo import haversine_km
-from logistics.routing.google import TRAFFIC_UNAWARE, RoutesClient
+from logistics.routing.google import TRAFFIC_AWARE_OPTIMAL, TRAFFIC_UNAWARE, RoutesClient
 from logistics.routing.graph import RoadGraph, invalidate_graph
 from logistics.routing.seed_data import NODES, ROAD_SEGMENTS, RoadSegment
 
@@ -64,17 +64,24 @@ def _upsert_edge(origin: Node, destination: Node, defaults: dict, report: BuildR
 
 # --- Google ----------------------------------------------------------------
 
-def fetch_free_flow_samples(
+def fetch_samples(
     client: RoutesClient,
     nodes: dict[str, Node],
     pairs: list[tuple[str, str]],
+    band: str = "",
+    day_type: str = "",
+    departure_time=None,
+    traffic: bool = False,
     refresh: bool = False,
 ) -> dict[tuple[str, str], RouteSample]:
-    """Muestras sin tráfico por par dirigido. Solo pide a Google lo que falta o está viejo."""
+    """Muestras de Google por par dirigido para un perfil (vacío = sin tráfico).
+
+    Solo pide lo que falta o tiene más de 7 días; lo demás sale de RouteSample.
+    """
     fresh_after = timezone.now() - SAMPLE_MAX_AGE
     existing = {
         (s.origin.code, s.destination.code): s
-        for s in RouteSample.objects.filter(band="", day_type="").select_related("origin", "destination")
+        for s in RouteSample.objects.filter(band=band, day_type=day_type).select_related("origin", "destination")
     }
     missing: dict[str, list[str]] = defaultdict(list)
     for pair in pairs:
@@ -89,15 +96,17 @@ def fetch_free_flow_samples(
         elements = client.compute_route_matrix(
             [(origin.latitude, origin.longitude)],
             [(d.latitude, d.longitude) for d in destinations],
+            departure_time=departure_time,
+            traffic=traffic,
         )
         now = timezone.now()
         for el in elements:
             destination = destinations[el.destination_index]
             sample, _ = RouteSample.objects.update_or_create(
-                origin=origin, destination=destination, band="", day_type="",
+                origin=origin, destination=destination, band=band, day_type=day_type,
                 defaults={
-                    "departure_time": None,
-                    "routing_preference": TRAFFIC_UNAWARE,
+                    "departure_time": departure_time,
+                    "routing_preference": TRAFFIC_AWARE_OPTIMAL if traffic else TRAFFIC_UNAWARE,
                     "status": el.status,
                     "distance_m": el.distance_m,
                     "duration_s": el.duration_s,
@@ -114,7 +123,7 @@ def build_from_google(client: RoutesClient, refresh: bool = False, segments=ROAD
     report = BuildReport()
     nodes = {n.code: n for n in Node.objects.all()}
     pairs = _directed_pairs(segments)
-    samples = fetch_free_flow_samples(client, nodes, list(pairs), refresh=refresh)
+    samples = fetch_samples(client, nodes, list(pairs), refresh=refresh)
     report.requests, report.elements = client.requests_made, client.elements_requested
 
     for (a, b), segment in pairs.items():
