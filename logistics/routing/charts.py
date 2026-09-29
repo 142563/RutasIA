@@ -129,3 +129,61 @@ def e7_chart(rows: list[dict], out: Path) -> Path:
     ax.set_ylabel("Nodos expandidos, promedio (escala log)")
     ax.legend(loc="upper left", fontsize=8)
     return _save(fig, out / "e7_escalabilidad.png", "grafos sintéticos (docs/PLAN.md §2.10)")
+
+
+# --- E4 y E6 -------------------------------------------------------------------
+
+PURPLE = "#8a5fd0"
+PAIR_COLORS = [BLUE, ORANGE, AQUA, PURPLE]
+
+
+def _is_test_data(source: str) -> bool:
+    return any(k in source for k in ("estimate", "synthetic", "none"))
+
+
+def _title(text: str, source: str) -> str:
+    """Con datos estimados/sintéticos el título advierte que no son resultados de tesis."""
+    return f"{text}\n[DATOS DE PRUEBA · NO son resultados de tesis]" if _is_test_data(source) else text
+
+
+def e6_chart(rows: list[dict], out: Path) -> Path:
+    plt = _pyplot()
+    bands = list(TrafficBand.values)
+    labels = [TrafficBand(b).label.split(" (")[0] for b in bands]
+    pairs = list(dict.fromkeys(r["pair"] for r in rows))
+    source = rows[0]["data_source"]
+    fig, axes = plt.subplots(1, 2, figsize=(9.6, 4.2), sharey=True)
+    for ax, (day, name) in zip(axes, [("weekday", "Día laboral"), ("weekend", "Fin de semana")]):
+        for k, pair in enumerate(pairs):
+            by_band = {r["band"]: r["minutes"] for r in rows if r["pair"] == pair and r["day_type"] == day}
+            xs = [i for i, b in enumerate(bands) if b in by_band]
+            ax.plot(xs, [by_band[bands[i]] for i in xs], marker="o", color=PAIR_COLORS[k % len(PAIR_COLORS)],
+                    label=pair.split(" -> ")[1].replace("-", " ").title())
+        ax.set_xticks(range(len(bands)), labels, rotation=30, ha="right")
+        ax.set_title(name)
+        ax.set_xlabel("Franja de salida")
+    axes[0].set_ylabel("Minutos desde Ciudad de Guatemala")
+    fig.legend(*axes[0].get_legend_handles_labels(), loc="upper right", ncol=4, fontsize=8)
+    fig.suptitle(_title("E6 · Tiempo del mismo viaje según la hora de salida", source), x=0.01, ha="left",
+                 fontsize=10, fontweight="bold", color=INK)
+    return _save(fig, out / "e6_hora_de_salida.png", source)
+
+
+def e4_chart(rows: list[dict], out: Path) -> Path:
+    plt = _pyplot()
+    source = rows[0]["data_source"]
+    mape = statistics.mean(r["error_pct"] for r in rows)
+    top = max(max(r["engine_min"], r["google_min"]) for r in rows) * 1.05
+    fig, ax = plt.subplots(figsize=(5.4, 5.2))
+    ax.plot([0, top], [0, top], color=INK_SECONDARY, linestyle="--", linewidth=1, label="Coincidencia exacta")
+    ax.scatter([r["google_min"] for r in rows], [r["engine_min"] for r in rows], color=BLUE, s=22,
+               alpha=0.85, label=f"Viajes (n = {len(rows)})")
+    ax.set_xlim(0, top)
+    ax.set_ylim(0, top)
+    ax.set_aspect("equal")
+    ax.set_xlabel("Minutos según Google Routes API (con tráfico)")
+    ax.set_ylabel("Minutos según nuestro motor")
+    ax.text(0.04, 0.95, f"MAPE = {mape:.1f} %", transform=ax.transAxes, va="top", fontsize=9, color=INK)
+    ax.legend(loc="lower right", fontsize=8)
+    ax.set_title(_title("E4 · Estimado del motor vs Google", source), fontsize=9)
+    return _save(fig, out / "e4_motor_vs_google.png", source)
