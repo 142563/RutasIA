@@ -9,6 +9,7 @@ import type { Role } from "@/lib/types";
 import { HomePage } from "@/pages/Home";
 import { LoginPage } from "@/pages/Login";
 import { OrdersPage } from "@/pages/orders/OrdersPage";
+import { PlannerPage } from "@/pages/planner/PlannerPage";
 import { ComingSoonPage, NotFoundPage } from "@/pages/Placeholder";
 
 const queryClient = new QueryClient({
@@ -42,7 +43,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <HomePage /> },
           { path: "pedidos", element: <OrdersPage /> },
-          { path: "planificar", element: soon("Planificar", "Semana 2 · Día 8", "La ruta más rápida con el tráfico de la hora de salida.") },
+          { path: "planificar", element: <PlannerPage /> },
           { path: "rutas", element: soon("Rutas", "Semana 3", "Lista y detalle de las rutas asignadas.") },
           { path: "monitoreo", element: soon("Monitoreo", "Semana 3", "Rutas en curso, incidentes y recálculos.") },
           { path: "trafico", element: soon("Tráfico", "Semana 2 · Día 10", "Red nacional coloreada por franja horaria.") },

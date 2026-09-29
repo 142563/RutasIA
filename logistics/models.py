@@ -469,3 +469,74 @@ class Depot(TimestampedModel):
 
     def __str__(self) -> str:
         return self.name
+
+
+class Route(TimestampedModel):
+    """Ruta de reparto planificada con el motor nuevo (docs/PLAN.md §6)."""
+
+    class Status(models.TextChoices):
+        PLANNED = "planned", "Planificada"
+        IN_PROGRESS = "in_progress", "En curso"
+        COMPLETED = "completed", "Completada"
+        CANCELED = "canceled", "Cancelada"
+
+    class Criterion(models.TextChoices):
+        TIME = "time", "Más rápida (tráfico)"
+        DISTANCE = "distance", "Más corta (km)"
+
+    code = models.CharField(max_length=24, unique=True, blank=True)
+    depot = models.ForeignKey(Depot, on_delete=models.PROTECT, related_name="routes")
+    driver = models.ForeignKey(Driver, on_delete=models.SET_NULL, null=True, blank=True, related_name="routes")
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.SET_NULL, null=True, blank=True, related_name="routes")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    departure_at = models.DateTimeField()
+    criterion = models.CharField(max_length=10, choices=Criterion.choices, default=Criterion.TIME)
+    algorithm = models.CharField(max_length=16, default="astar")
+    return_to_depot = models.BooleanField(default=True)
+    service_min = models.FloatField(default=10)
+    driving_minutes = models.FloatField(help_text="Minutos de manejo con el tráfico de cada tramo.")
+    total_km = models.FloatField()
+    shortest_minutes = models.FloatField(
+        null=True, blank=True, help_text="Minutos de la ruta más corta con el mismo tráfico (para el ahorro).")
+    expanded_nodes = models.PositiveIntegerField(default=0)
+    finish_at = models.DateTimeField()
+    legs = models.JSONField(default=list, help_text="Tramos: nodos, minutos, km, franja.")
+    data_source = models.CharField(max_length=80, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PLANNED)
+
+    class Meta:
+        ordering = ["-departure_at", "-id"]
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            stamp = timezone.localtime().strftime("%Y%m%d")  # fecha de Guatemala, no UTC
+            self.code = f"RUT-{stamp}-{_random_suffix()}"
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return self.code
+
+
+class RouteStop(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pendiente"
+        DELIVERED = "delivered", "Entregado"
+        FAILED = "failed", "No entregado"
+
+    route = models.ForeignKey(Route, on_delete=models.CASCADE, related_name="stops")
+    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name="route_stops")
+    sequence = models.PositiveIntegerField()
+    eta = models.DateTimeField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    reason = models.CharField(max_length=120, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["route", "sequence"]
+        constraints = [
+            models.UniqueConstraint(fields=["route", "sequence"], name="uniq_route_stop_sequence"),
+            models.UniqueConstraint(fields=["route", "order"], name="uniq_route_stop_order"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.route.code} #{self.sequence} {self.order.code}"

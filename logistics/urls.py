@@ -26,6 +26,8 @@ urlpatterns = [
     # Aplicación nueva: pedidos y bodegas
     path("api/v2/orders/", orders_views.api_v2_orders, name="api-v2-orders"),
     path("api/v2/depots/", orders_views.api_v2_depots, name="api-v2-depots"),
+    path("api/v2/routes/plan/", orders_views.api_v2_routes_plan, name="api-v2-routes-plan"),
+    path("api/v2/routes/", orders_views.api_v2_routes, name="api-v2-routes"),
     # Motor de rutas nuevo (grafo nacional con tráfico)
     path("api/routing/nodes/", routing_views.api_routing_nodes, name="api-routing-nodes"),
     path("api/routing/route/", routing_views.api_routing_route, name="api-routing-route"),

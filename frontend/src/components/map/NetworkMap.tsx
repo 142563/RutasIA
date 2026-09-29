@@ -39,6 +39,8 @@ export interface NetworkMapProps {
   nodeMarks?: MapNodeMark[];
   markers?: MapMarker[];
   labels?: "cabeceras" | "none";
+  /** Acerca el mapa a estos puntos (p. ej. la ruta). Sin puntos se ve todo el país. */
+  fitTo?: LatLng[];
   onPick?: (point: LatLng) => void;
   className?: string;
   ariaLabel?: string;
@@ -55,13 +57,18 @@ export function NetworkMap({
   nodeMarks = [],
   markers = [],
   labels = "cabeceras",
+  fitTo,
   onPick,
   className,
   ariaLabel = "Mapa esquemático de la red vial de Guatemala",
   children,
 }: NetworkMapProps) {
   const svgRef = React.useRef<SVGSVGElement>(null);
-  const projection = React.useMemo(() => makeProjection(nodes, width, height, 28), [nodes, width, height]);
+  const fitKey = fitTo?.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join("|") ?? "";
+  const projection = React.useMemo(
+    () => (fitTo && fitTo.length > 0 ? makeProjection(fitTo, width, height, 64, 0.35) : makeProjection(nodes, width, height, 28)),
+    [nodes, width, height, fitKey],
+  );
   const byCode = React.useMemo(() => new Map(nodes.map((n) => [n.code, n])), [nodes]);
   const xy = (code: string) => {
     const node = byCode.get(code);
@@ -81,7 +88,7 @@ export function NetworkMap({
     <svg
       ref={svgRef}
       viewBox={`0 0 ${width} ${height}`}
-      className={cn("h-auto w-full select-none", onPick && "cursor-crosshair", className)}
+      className={cn("h-auto w-full select-none overflow-hidden", onPick && "cursor-crosshair", className)}
       role="img"
       aria-label={ariaLabel}
       onClick={handleClick}

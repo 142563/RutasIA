@@ -17,13 +17,22 @@ export interface Projection {
   toLatLng(x: number, y: number): LatLng;
 }
 
-export function makeProjection(points: LatLng[], width: number, height: number, padding = 24): Projection {
+export function makeProjection(points: LatLng[], width: number, height: number, padding = 24, minSpanDeg = 0): Projection {
   const lats = points.map((p) => p.lat);
   const lngs = points.map((p) => p.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  let minLat = Math.min(...lats);
+  let maxLat = Math.max(...lats);
+  let minLng = Math.min(...lngs);
+  let maxLng = Math.max(...lngs);
+  // Evita acercar de más cuando hay pocos puntos juntos (p. ej. una ruta corta)
+  if (maxLat - minLat < minSpanDeg) {
+    const c = (minLat + maxLat) / 2;
+    [minLat, maxLat] = [c - minSpanDeg / 2, c + minSpanDeg / 2];
+  }
+  if (maxLng - minLng < minSpanDeg) {
+    const c = (minLng + maxLng) / 2;
+    [minLng, maxLng] = [c - minSpanDeg / 2, c + minSpanDeg / 2];
+  }
   const kx = Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180);
 
   const spanX = Math.max((maxLng - minLng) * kx, 1e-9);

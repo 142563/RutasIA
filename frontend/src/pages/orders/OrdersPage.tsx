@@ -105,7 +105,7 @@ export function OrdersPage() {
             <table className="w-full min-w-[820px] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-ink-2">
-                  <th className="w-12 py-2.5 pl-6 lg:pl-8">
+                  <th className="w-12 py-2.5 pl-6 pr-3 lg:pl-8">
                     <input type="checkbox" aria-label="Seleccionar todos los pendientes" className="size-4 accent-ink"
                       checked={allChecked} disabled={allSelectable.length === 0}
                       onChange={() => setSelected(allChecked ? new Set() : new Set(allSelectable.map((o) => o.id)))} />
@@ -121,7 +121,7 @@ export function OrdersPage() {
               <tbody>
                 {rows.map((o) => (
                   <tr key={o.id} className={cn("border-b border-line transition-colors hover:bg-hover/50", selected.has(o.id) && "bg-hover/60")}>
-                    <td className="py-3 pl-6 lg:pl-8">
+                    <td className="py-3 pl-6 pr-3 lg:pl-8">
                       <input type="checkbox" className="size-4 accent-ink" aria-label={`Seleccionar ${o.code}`}
                         checked={selected.has(o.id)} disabled={!selectable(o)} onChange={() => toggle(o.id)} />
                     </td>

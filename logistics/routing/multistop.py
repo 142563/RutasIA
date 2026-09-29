@@ -19,7 +19,7 @@ from typing import Sequence
 
 from logistics.routing.astar import astar
 from logistics.routing.dijkstra import dijkstra_all
-from logistics.routing.graph import TIME, RoadGraph
+from logistics.routing.graph import DISTANCE, TIME, RoadGraph
 from logistics.routing.instrument import INF, SearchResult
 from logistics.routing.traffic import profile_for, to_local
 
@@ -95,10 +95,7 @@ class Leg:
     day_type: str
     search: SearchResult
     km: float
-
-    @property
-    def minutes(self) -> float:
-        return self.search.cost
+    minutes: float  # SIEMPRE minutos con el tráfico de la franja del tramo, sea cual sea el criterio
 
 
 @dataclass
@@ -111,9 +108,11 @@ class MultiStopPlan:
     service_min: float
     return_to_depot: bool
     matrix_expanded: int
+    # Costos de la matriz (minutos o km, según el criterio) para comparar métodos de orden (E5):
     capture_minutes: float  # orden tal como se capturaron las paradas
     nearest_neighbor_minutes: float
     optimized_minutes: float  # vecino más cercano + 2-opt (con la matriz de la franja de salida)
+    criterion: str = TIME
     etas: list[datetime] = field(default_factory=list)  # llegada a cada parada, en orden de visita
 
     @property
@@ -123,6 +122,11 @@ class MultiStopPlan:
     @property
     def total_km(self) -> float:
         return sum(leg.km for leg in self.legs)
+
+    @property
+    def expanded(self) -> int:
+        """Nodos expandidos en total: matriz (Dijkstra) + tramos (A*)."""
+        return self.matrix_expanded + sum(leg.search.expanded for leg in self.legs)
 
     @property
     def finish_at(self) -> datetime:
@@ -136,10 +140,19 @@ def plan_multistop(
     departure: datetime,
     service_min: float = DEFAULT_SERVICE_MIN,
     return_to_depot: bool = False,
+    criterion: str = TIME,
+    fixed_order: Sequence[int] | None = None,
 ) -> MultiStopPlan:
+    """criterion="time": la más rápida con tráfico; "distance": la más corta en km.
+
+    En ambos casos las ETAs y los minutos se calculan con el tráfico de cada
+    tramo, así "la más corta" se compara con la más rápida en igualdad de condiciones.
+
+    fixed_order (índices 0..k-1 de `stops`) evalúa un orden dado en vez de optimizarlo.
+    """
     departure = to_local(departure)
     band, day_type = profile_for(departure)
-    weights = graph.weights(TIME, band, day_type)
+    weights = graph.weights(TIME, band, day_type) if criterion == TIME else graph.weights(DISTANCE)
     nodes = [depot, *stops]
 
     matrix, matrix_expanded = time_matrix(graph, weights, nodes)
@@ -149,19 +162,27 @@ def plan_multistop(
 
     capture = list(range(1, len(nodes)))
     nn = nearest_neighbor(matrix)
-    optimized = two_opt(nn, matrix, return_to_depot)
+    if fixed_order is not None:
+        if sorted(fixed_order) != list(range(len(stops))):
+            raise ValueError("fixed_order debe ser una permutación de las paradas")
+        optimized = [i + 1 for i in fixed_order]
+    else:
+        optimized = two_opt(nn, matrix, return_to_depot)
 
     legs, etas = [], []
     current_time, current_node = departure, depot
     sequence = [nodes[i] for i in optimized] + ([depot] if return_to_depot else [])
     for position, target in enumerate(sequence):
         leg_band, leg_day = profile_for(current_time)
-        leg_weights = graph.weights(TIME, leg_band, leg_day)
-        result = astar(graph, leg_weights, current_node, target)
+        time_weights = graph.weights(TIME, leg_band, leg_day)
+        search_weights = time_weights if criterion == TIME else graph.weights(DISTANCE)
+        result = astar(graph, search_weights, current_node, target)
         if not result.found:
             raise UnreachableStopError(target)
-        arrive = current_time + timedelta(minutes=result.cost)
-        legs.append(Leg(current_node, target, current_time, arrive, leg_band, leg_day, result, result.total(graph.km)))
+        minutes = result.total(time_weights)
+        arrive = current_time + timedelta(minutes=minutes)
+        legs.append(Leg(current_node, target, current_time, arrive, leg_band, leg_day, result,
+                        result.total(graph.km), minutes))
         is_stop = position < len(optimized)
         if is_stop:
             etas.append(arrive)
@@ -180,5 +201,6 @@ def plan_multistop(
         capture_minutes=route_cost(capture, matrix, return_to_depot),
         nearest_neighbor_minutes=route_cost(nn, matrix, return_to_depot),
         optimized_minutes=route_cost(optimized, matrix, return_to_depot),
+        criterion=criterion,
         etas=etas,
     )
