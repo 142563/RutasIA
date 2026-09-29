@@ -13,7 +13,18 @@ class LogisticsConfig(AppConfig):
         def _invalidate(sender, **kwargs):
             invalidate_route_cache()
 
-        post_save.connect(_invalidate, sender=RouteConnection)
-        post_delete.connect(_invalidate, sender=RouteConnection)
-        post_save.connect(_invalidate, sender=Department)
-        post_delete.connect(_invalidate, sender=Department)
+        post_save.connect(_invalidate, sender=RouteConnection, weak=False)
+        post_delete.connect(_invalidate, sender=RouteConnection, weak=False)
+        post_save.connect(_invalidate, sender=Department, weak=False)
+        post_delete.connect(_invalidate, sender=Department, weak=False)
+
+        # Grafo nacional en memoria (motor nuevo)
+        from logistics.models import Edge, Node, TrafficProfile
+        from logistics.routing.graph import invalidate_graph
+
+        def _invalidate_road_graph(sender, **kwargs):
+            invalidate_graph()
+
+        for model in (Node, Edge, TrafficProfile):
+            post_save.connect(_invalidate_road_graph, sender=model, weak=False)
+            post_delete.connect(_invalidate_road_graph, sender=model, weak=False)

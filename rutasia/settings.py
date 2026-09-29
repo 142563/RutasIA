@@ -101,6 +101,9 @@ GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 # AdvancedMarkerElement exige un Map ID. DEMO_MAP_ID funciona para desarrollo;
 # en produccion conviene crear uno propio en Google Cloud Console.
 GOOGLE_MAPS_MAP_ID = os.getenv("GOOGLE_MAPS_MAP_ID", "DEMO_MAP_ID")
+# Key del SERVIDOR para Routes API: solo la usan los comandos por lotes
+# (build_graph, calibrate_traffic), nunca el motor de rutas.
+GOOGLE_ROUTES_API_KEY = os.getenv("GOOGLE_ROUTES_API_KEY", "")
 
 
 # Application definition

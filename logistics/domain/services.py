@@ -3,11 +3,11 @@ from __future__ import annotations
 from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
 import heapq
-import math
 
 from django.core.cache import cache
 
 from logistics.models import Department, RouteConnection
+from logistics.routing.geo import haversine_km  # noqa: F401  (también se re-exporta)
 from logistics.domain.exceptions import PlanningError
 
 ZERO = Decimal("0")
@@ -17,20 +17,6 @@ INF = Decimal("Infinity")
 _GRAPH_CACHE_KEY = "dijkstra_graph_v1"
 _COORDS_CACHE_KEY = "dept_coords_v1"
 _CACHE_TTL = 120  # segundos — se invalida si cambian las conexiones
-
-
-def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Straight-line distance between two GPS points (admissible A* heuristic).
-
-    Se devuelve sin redondear: redondear hacia arriba puede hacer que h(u) supere
-    el costo de una arista y la heurística deje de ser admisible y consistente.
-    """
-    R = 6371.0
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    return 2 * R * math.asin(math.sqrt(a))
 
 
 def to_decimal(value: Decimal | float | int | str) -> Decimal:

@@ -325,6 +325,8 @@ class Edge(TimestampedModel):
     class Source(models.TextChoices):
         GOOGLE = "google", "Google Routes API"
         MANUAL = "manual", "Manual"
+        # Solo para desarrollar sin key: km y minutos ESTIMADOS, no aptos para la tesis.
+        ESTIMATE = "estimate", "Estimado sin conexión"
 
     origin = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="edges_out")
     destination = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="edges_in")
@@ -391,3 +393,40 @@ class TrafficProfile(models.Model):
 
     def __str__(self) -> str:
         return f"{self.edge} · {self.get_band_display()} · {self.get_day_type_display()}: ×{self.multiplier:.2f}"
+
+
+class RouteSample(models.Model):
+    """Respuesta de Google Routes API para un par de nodos (caché y bitácora).
+
+    band y day_type vacíos = consulta sin tráfico (t0, build_graph); con valor =
+    consulta con tráfico para ese perfil (calibrate_traffic). Se guarda todo lo
+    que devolvió Google para poder auditar de dónde sale cada peso del grafo.
+    """
+
+    origin = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="samples_out")
+    destination = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="samples_in")
+    band = models.CharField(max_length=12, choices=TrafficBand.choices, blank=True)
+    day_type = models.CharField(max_length=8, choices=DayType.choices, blank=True)
+    departure_time = models.DateTimeField(null=True, blank=True)
+    routing_preference = models.CharField(max_length=30)
+    status = models.CharField(max_length=40, blank=True, help_text="Vacío = OK; si no, el error de Google.")
+    duration_s = models.FloatField(null=True, blank=True)
+    static_duration_s = models.FloatField(null=True, blank=True)
+    distance_m = models.FloatField(null=True, blank=True)
+    fetched_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-fetched_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["origin", "destination", "band", "day_type"], name="uniq_route_sample"
+            ),
+        ]
+
+    @property
+    def ok(self) -> bool:
+        return not self.status and self.duration_s is not None and self.distance_m is not None
+
+    def __str__(self) -> str:
+        profile = f"{self.band}/{self.day_type}" if self.band else "sin tráfico"
+        return f"{self.origin.code} -> {self.destination.code} [{profile}]"
