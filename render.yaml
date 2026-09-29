@@ -4,7 +4,7 @@ services:
     name: rutasia
     runtime: python
     # Primero se compila la aplicación React (frontend/dist) y luego collectstatic la publica.
-    buildCommand: cd frontend && npm ci && npm run build && cd .. && pip install -r requirements.txt && python manage.py collectstatic --noinput
+    buildCommand: cd frontend && npm ci && npm run build && cd .. && pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput
     startCommand: gunicorn rutasia.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --timeout 120
     envVars:
       - key: DATABASE_URL
