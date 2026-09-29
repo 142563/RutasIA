@@ -259,7 +259,10 @@ def api_vehicles(request: HttpRequest):
 @require_http_methods(["GET", "POST"])
 def api_orders(request: HttpRequest):
     if request.method == "GET":
-        orders = Order.objects.select_related("origin", "destination").all()
+        # La interfaz clásica solo maneja pedidos entre departamentos
+        orders = Order.objects.select_related("origin", "destination").filter(
+            origin__isnull=False, destination__isnull=False,
+        )
         status_filter = request.GET.get("status")
         origin_filter = request.GET.get("origin_id")
         destination_filter = request.GET.get("destination_id")

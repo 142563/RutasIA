@@ -1,5 +1,5 @@
 from django.urls import path
-from logistics.presentation import app_views, routing_views, views
+from logistics.presentation import app_views, orders_views, routing_views, views
 
 urlpatterns = [
     # Interfaz anterior (JS sin framework), mientras se retira
@@ -23,6 +23,9 @@ urlpatterns = [
     path("api/trips/<int:trip_id>/action/", views.api_trip_action, name="api-trip-action"),
     path("api/trips/<int:trip_id>/events/", views.api_trip_event, name="api-trip-event"),
     path("api/fuel-price/", views.api_fuel_price, name="api-fuel-price"),
+    # Aplicación nueva: pedidos y bodegas
+    path("api/v2/orders/", orders_views.api_v2_orders, name="api-v2-orders"),
+    path("api/v2/depots/", orders_views.api_v2_depots, name="api-v2-depots"),
     # Motor de rutas nuevo (grafo nacional con tráfico)
     path("api/routing/nodes/", routing_views.api_routing_nodes, name="api-routing-nodes"),
     path("api/routing/route/", routing_views.api_routing_route, name="api-routing-route"),

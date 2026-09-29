@@ -21,6 +21,9 @@ class TripPlanner:
         if not order_list:
             raise PlanningError("Debes seleccionar al menos un pedido.")
 
+        if any(o.origin_id is None or o.destination_id is None for o in order_list):
+            raise PlanningError("Los pedidos con dirección se planifican en la aplicación nueva, no en la clásica.")
+
         pending_only = [o for o in order_list if o.status == Order.Status.PENDING]
         if len(pending_only) != len(order_list):
             raise PlanningError("Todos los pedidos deben estar en estado pendiente.")

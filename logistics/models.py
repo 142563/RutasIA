@@ -146,8 +146,9 @@ class Order(TimestampedModel):
     class Status(models.TextChoices):
         PENDING = "pending", "Pendiente"
         ASSIGNED = "assigned", "Asignado"
-        IN_TRANSIT = "in_transit", "En tránsito"
+        IN_TRANSIT = "in_transit", "En ruta"
         DELIVERED = "delivered", "Entregado"
+        FAILED = "failed", "No entregado"
         CANCELED = "canceled", "Cancelado"
 
     class Priority(models.TextChoices):
@@ -156,12 +157,27 @@ class Order(TimestampedModel):
         HIGH = "high", "Alta"
 
     code = models.CharField(max_length=24, unique=True, blank=True)
-    origin = models.ForeignKey(Department, on_delete=models.PROTECT, related_name="orders_origin")
+    # Interfaz clásica: pedidos entre departamentos. Opcionales en los pedidos nuevos.
+    origin = models.ForeignKey(
+        Department, on_delete=models.PROTECT, related_name="orders_origin", null=True, blank=True,
+    )
     destination = models.ForeignKey(
         Department,
         on_delete=models.PROTECT,
         related_name="orders_destination",
+        null=True,
+        blank=True,
     )
+    # Pedido con dirección real (docs/PLAN.md §6): se asocia al nodo más cercano del grafo.
+    recipient = models.CharField(max_length=120, blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    reference = models.CharField(max_length=255, blank=True, help_text="Referencias para encontrar la dirección.")
+    place_id = models.CharField(max_length=255, blank=True, help_text="Google Places (cuando haya key del navegador).")
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    node = models.ForeignKey("Node", on_delete=models.SET_NULL, null=True, blank=True, related_name="orders")
+    is_demo = models.BooleanField(default=False)
     weight_kg = models.DecimalField(max_digits=8, decimal_places=2)
     package_count = models.PositiveIntegerField(default=1)
     priority = models.CharField(max_length=10, choices=Priority.choices, default=Priority.NORMAL)
@@ -173,12 +189,14 @@ class Order(TimestampedModel):
 
     def save(self, *args, **kwargs):
         if not self.code:
-            stamp = timezone.now().strftime("%Y%m%d")
+            stamp = timezone.localtime().strftime("%Y%m%d")  # fecha de Guatemala, no UTC
             self.code = f"PED-{stamp}-{_random_suffix()}"
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
-        return f"{self.code} ({self.origin.code}->{self.destination.code})"
+        if self.origin_id and self.destination_id:
+            return f"{self.code} ({self.origin.code}->{self.destination.code})"
+        return f"{self.code} ({self.recipient or 'sin destinatario'})"
 
 
 class Trip(TimestampedModel):
@@ -219,7 +237,7 @@ class Trip(TimestampedModel):
 
     def save(self, *args, **kwargs):
         if not self.code:
-            stamp = timezone.now().strftime("%Y%m%d")
+            stamp = timezone.localtime().strftime("%Y%m%d")  # fecha de Guatemala, no UTC
             self.code = f"VIA-{stamp}-{_random_suffix()}"
         super().save(*args, **kwargs)
 
@@ -434,3 +452,20 @@ class RouteSample(models.Model):
     def __str__(self) -> str:
         profile = f"{self.band}/{self.day_type}" if self.band else "sin tráfico"
         return f"{self.origin.code} -> {self.destination.code} [{profile}]"
+
+
+class Depot(TimestampedModel):
+    """Bodega desde donde salen las rutas."""
+
+    name = models.CharField(max_length=120, unique=True)
+    address = models.CharField(max_length=255, blank=True)
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    node = models.ForeignKey(Node, on_delete=models.SET_NULL, null=True, blank=True, related_name="depots")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name

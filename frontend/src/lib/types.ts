@@ -57,3 +57,39 @@ export interface Meta {
   band_label?: string;
   day_type?: DayType;
 }
+
+export type OrderStatus = "pending" | "assigned" | "in_transit" | "delivered" | "failed" | "canceled";
+export type Priority = "low" | "normal" | "high";
+
+export interface NodeRef {
+  code: string;
+  name: string;
+}
+
+export interface Order {
+  id: number;
+  code: string;
+  recipient: string;
+  phone: string;
+  address: string;
+  reference: string;
+  latitude: number;
+  longitude: number;
+  node: NodeRef | null;
+  weight_kg: number;
+  package_count: number;
+  priority: Priority;
+  status: OrderStatus;
+  status_label: string;
+  is_demo: boolean;
+  created_at: string;
+}
+
+export interface Depot {
+  id: number;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  node: NodeRef | null;
+}

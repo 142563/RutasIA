@@ -8,6 +8,7 @@ import { UserContext, homeFor, useSession } from "@/lib/auth";
 import type { Role } from "@/lib/types";
 import { HomePage } from "@/pages/Home";
 import { LoginPage } from "@/pages/Login";
+import { OrdersPage } from "@/pages/orders/OrdersPage";
 import { ComingSoonPage, NotFoundPage } from "@/pages/Placeholder";
 
 const queryClient = new QueryClient({
@@ -40,7 +41,7 @@ const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <HomePage /> },
-          { path: "pedidos", element: soon("Pedidos", "Semana 2 · Día 7", "Registro de pedidos con dirección y ubicación.") },
+          { path: "pedidos", element: <OrdersPage /> },
           { path: "planificar", element: soon("Planificar", "Semana 2 · Día 8", "La ruta más rápida con el tráfico de la hora de salida.") },
           { path: "rutas", element: soon("Rutas", "Semana 3", "Lista y detalle de las rutas asignadas.") },
           { path: "monitoreo", element: soon("Monitoreo", "Semana 3", "Rutas en curso, incidentes y recálculos.") },
