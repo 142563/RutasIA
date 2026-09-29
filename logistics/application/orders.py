@@ -11,6 +11,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 
 from logistics.domain.exceptions import PlanningError
+from logistics.domain.regions import region_of
 from logistics.models import GT_LAT_MAX, GT_LAT_MIN, GT_LON_MAX, GT_LON_MIN, Depot, Node, Order
 from logistics.routing.graph import load_graph
 
@@ -51,6 +52,8 @@ def order_payload(order: Order) -> dict:
         "latitude": order.latitude,
         "longitude": order.longitude,
         "node": node_ref(order.node),
+        # Región de Guatemala del punto de entrega: agrupa pedidos cercanos para planificar
+        "region": region_of(order.node.department) if order.node else None,
         "weight_kg": float(order.weight_kg),
         "package_count": order.package_count,
         "priority": order.priority,

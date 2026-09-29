@@ -1,10 +1,10 @@
-import { CheckIcon, LogOutIcon, TruckIcon, XIcon } from "lucide-react";
+import { CheckIcon, LogOutIcon, NavigationIcon, TruckIcon, XIcon } from "lucide-react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorNote, Spinner } from "@/components/ui/misc";
 import { useLogout, useUser } from "@/lib/auth";
-import { nextStop, routeProgress, useDriverToday, useStartRoute, type DriverRoute, type DriverStop } from "@/lib/driver";
+import { navigationUrl, nextStop, routeProgress, useDriverToday, useStartRoute, type DriverRoute, type DriverStop } from "@/lib/driver";
 import { formatClock, formatDateLong, formatKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AlternativeRouteNotice } from "./AlternativeRouteNotice";
@@ -117,6 +117,7 @@ function RouteSection({ route }: { route: DriverRoute }) {
 
 function StopRow({ stop, highlighted }: { stop: DriverStop; highlighted: boolean }) {
   if (highlighted) {
+    const nav = navigationUrl(stop);
     return (
       <li className="flex flex-col gap-3.5 border-b border-line py-[18px]">
         <div className="flex items-start gap-3.5">
@@ -131,9 +132,17 @@ function StopRow({ stop, highlighted }: { stop: DriverStop; highlighted: boolean
             <span className="text-sm text-ink-3">{stop.address}</span>
           </span>
         </div>
-        <Button asChild className="ml-[38px] h-12 rounded-xl text-[15px]">
-          <Link to={`/conductor/paradas/${stop.id}`}>Abrir parada</Link>
-        </Button>
+        <div className="ml-[38px] grid grid-cols-2 gap-2">
+          {/* Un toque para salir manejando: abre Google Maps con el destino */}
+          {nav ? (
+            <Button asChild variant="outline" className="h-12 rounded-xl text-[15px]">
+              <a href={nav} target="_blank" rel="noreferrer"><NavigationIcon /> Navegar</a>
+            </Button>
+          ) : null}
+          <Button asChild className={cn("h-12 rounded-xl text-[15px]", !nav && "col-span-2")}>
+            <Link to={`/conductor/paradas/${stop.id}`}>Entregar</Link>
+          </Button>
+        </div>
       </li>
     );
   }

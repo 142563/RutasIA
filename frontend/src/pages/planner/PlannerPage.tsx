@@ -1,4 +1,4 @@
-import { ClockIcon, PackageIcon, PencilIcon } from "lucide-react";
+import { ArrowRightIcon, ClockIcon, PackageIcon, PencilIcon } from "lucide-react";
 import * as React from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import { useNetwork } from "@/lib/queries";
 import { bandLabel } from "@/lib/traffic";
 import type { GraphEdge, GraphNode } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { groupByZone, placesLabel } from "@/lib/zones";
 
 const ROUTE_COLOR = "#2f4bd8";
 const OTHER_COLOR = "#9a9ca1";
@@ -34,6 +35,7 @@ export function PlannerPage() {
   const navigate = useNavigate();
   const ids = React.useMemo(() => parseIds(params.get("pedidos")), [params]);
   const [editing, setEditing] = React.useState(ids.length === 0);
+  const [pickMode, setPickMode] = React.useState<"zones" | "list">("zones");
   const [departure, setDeparture] = React.useState(defaultDeparture);
   const [returnToDepot, setReturnToDepot] = React.useState(true);
   const [serviceMin, setServiceMin] = React.useState(10);
@@ -63,6 +65,24 @@ export function PlannerPage() {
   const other = data ? (criterion === "time" ? data.shortest : data.fastest) : null;
   const vehicle = fleet.vehicles.find((v) => String(v.id) === vehicleId);
   const overCapacity = !!(vehicle && data && data.total_weight_kg > vehicle.capacity_kg);
+  const showPicker = editing || ids.length === 0;
+
+  // Sugerencia: el vehículo más pequeño donde cabe la carga, con su conductor.
+  // Se recalcula con cada carga nueva, salvo que el despachador ya haya elegido a mano.
+  const manualPick = React.useRef(false);
+  const idsKey = ids.join(",");
+  React.useEffect(() => { manualPick.current = false; }, [idsKey]);
+  const weight = data?.total_weight_kg;
+  React.useEffect(() => {
+    if (weight === undefined || manualPick.current) return;
+    const fits = fleet.vehicles
+      .filter((v) => v.is_active && v.capacity_kg >= weight)
+      .sort((a, b) => a.capacity_kg - b.capacity_kg)[0];
+    setVehicleId(fits ? String(fits.id) : "");
+    setDriverId(fits?.driver_id ? String(fits.driver_id) : "");
+    // fleet.vehicles es un arreglo nuevo en cada render: basta con saber cuándo llegan
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weight, fleet.vehicles.length]);
 
   function confirm() {
     if (!request) return;
@@ -70,8 +90,8 @@ export function PlannerPage() {
       { ...request, criterion, driver_id: driverId ? Number(driverId) : undefined, vehicle_id: vehicleId ? Number(vehicleId) : undefined },
       {
         onSuccess: ({ route }) => {
-          toast.success(`Ruta ${route.code} asignada`, { description: `${formatMinutes(route.driving_minutes)} de manejo con tráfico` });
-          navigate("/pedidos");
+          toast.success(`Ruta ${route.code} asignada`, { description: `${formatMinutes(route.driving_minutes)} de manejo con tráfico. Sigue su avance aquí.` });
+          navigate("/");
         },
       },
     );
@@ -92,51 +112,52 @@ export function PlannerPage() {
       />
       <div className="grid flex-1 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
         <section className="flex flex-col gap-6 border-line px-6 py-6 lg:border-r lg:px-8">
-          {/* Parámetros */}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Hora de salida" htmlFor="departure" className="col-span-2 sm:col-span-1">
-              <Input id="departure" type="datetime-local" className="num" value={departure} onChange={(e) => setDeparture(e.target.value)} />
-            </Field>
-            <Field label="Servicio por parada (min)" htmlFor="service">
-              <Input id="service" type="number" min={0} max={120} className="num" value={serviceMin}
-                onChange={(e) => setServiceMin(Math.max(0, Math.min(120, Number(e.target.value) || 0)))} />
-            </Field>
-            <label className="col-span-2 flex items-center gap-2 text-[13px] text-ink-3">
-              <input type="checkbox" className="size-4 accent-ink" checked={returnToDepot} onChange={(e) => setReturnToDepot(e.target.checked)} />
-              Regresar a la bodega al terminar
-            </label>
-          </div>
+          {/* La hora de salida importa: el tráfico cambia según la franja */}
+          <Field label="Hora de salida" htmlFor="departure" hint="El tráfico cambia según la hora: prueba distintas.">
+            <Input id="departure" type="datetime-local" className="num" value={departure} onChange={(e) => setDeparture(e.target.value)} />
+          </Field>
 
-          {editing ? <OrderPicker selected={ids} onChange={setIds} onDone={() => setEditing(false)} /> : null}
-
-          {!editing && ids.length === 0 ? (
-            <EmptyState icon={<PackageIcon />} title="Elige pedidos para planificar"
-              action={<Button variant="outline" onClick={() => setEditing(true)}>Elegir pedidos</Button>}>
-              También puedes seleccionarlos en <Link to="/pedidos" className="underline">Pedidos</Link>.
-            </EmptyState>
+          {showPicker ? (
+            pickMode === "zones"
+              ? <ZonePicker onPick={(zoneIds) => { setIds(zoneIds); setEditing(false); }} onList={() => setPickMode("list")} />
+              : <OrderPicker selected={ids} onChange={setIds} onDone={() => setEditing(false)} onZones={() => setPickMode("zones")} />
           ) : null}
+
+          <details className="group text-[13px]">
+            <summary className="cursor-pointer list-none text-ink-2 hover:text-ink">Más opciones</summary>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Field label="Minutos por entrega" htmlFor="service">
+                <Input id="service" type="number" min={0} max={120} className="num" value={serviceMin}
+                  onChange={(e) => setServiceMin(Math.max(0, Math.min(120, Number(e.target.value) || 0)))} />
+              </Field>
+              <label className="col-span-2 flex items-center gap-2 text-ink-3">
+                <input type="checkbox" className="size-4 accent-ink" checked={returnToDepot} onChange={(e) => setReturnToDepot(e.target.checked)} />
+                Regresar a la bodega al terminar
+              </label>
+            </div>
+          </details>
 
           {plan.isFetching && !data ? <Spinner label="Calculando rutas…" /> : null}
           {plan.error ? <ErrorNote error={plan.error} /> : null}
 
-          {data && variant && other && !editing ? (
+          {data && variant && other && !showPicker ? (
             <>
               <PlanSummary data={data} variant={variant} criterion={criterion} fetching={plan.isFetching} />
               <DepartureOptions data={data} current={data.fastest.driving_minutes} onPick={(iso) => setDeparture(iso.slice(0, 16))} />
               <StopList variant={variant} returnToDepot={data.return_to_depot} depotName={data.depot.name}
-                onEdit={() => setEditing(true)} />
+                onEdit={() => { setPickMode("zones"); setEditing(true); }} />
 
               <div className="flex flex-col gap-3 border-t border-line pt-5">
-                <h2 className="text-sm font-semibold">Asignar</h2>
+                <h2 className="text-sm font-semibold">Asignar <span className="font-normal text-ink-2">· sugerido según la carga</span></h2>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Conductor" htmlFor="driver">
-                    <Select id="driver" value={driverId} onChange={(e) => setDriverId(e.target.value)}>
+                    <Select id="driver" value={driverId} onChange={(e) => { manualPick.current = true; setDriverId(e.target.value); }}>
                       <option value="">Sin asignar</option>
                       {fleet.drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </Select>
                   </Field>
                   <Field label="Vehículo" htmlFor="vehicle" error={overCapacity ? `La carga (${data.total_weight_kg} kg) excede la capacidad.` : null}>
-                    <Select id="vehicle" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+                    <Select id="vehicle" value={vehicleId} onChange={(e) => { manualPick.current = true; setVehicleId(e.target.value); }}>
                       <option value="">Sin asignar</option>
                       {fleet.vehicles.map((v) => <option key={v.id} value={v.id}>{v.plate} · {v.capacity_kg.toLocaleString("es-GT")} kg</option>)}
                     </Select>
@@ -147,7 +168,7 @@ export function PlannerPage() {
                   <Button size="lg" className="flex-1" disabled={create.isPending || overCapacity || plan.isFetching} onClick={confirm}>
                     {create.isPending ? "Asignando…" : "Confirmar y asignar"}
                   </Button>
-                  <Button size="lg" variant="outline" onClick={() => setEditing(true)}>Ajustar paradas</Button>
+                  <Button size="lg" variant="outline" onClick={() => { setPickMode("list"); setEditing(true); }}>Ajustar</Button>
                 </div>
               </div>
               <DataSourceNote source={data.data_source} />
@@ -219,10 +240,14 @@ function PlanSummary({ data, variant, criterion, fetching }: { data: PlanRespons
         <Metric label="Paradas" value={variant.stops.length} className="[&>span:nth-child(2)]:text-lg" />
         <Metric label={data.return_to_depot ? "Regreso" : "Termina"} value={formatClock(variant.finish_at)} className="[&>span:nth-child(2)]:text-lg" />
       </div>
-      <p className="text-xs text-ink-2">
-        Motor: matriz con Dijkstra, orden con vecino más cercano + 2-opt y tramos con A* ·{" "}
-        <span className="num">{variant.expanded.toLocaleString("es-GT")}</span> nodos expandidos
-      </p>
+      <details className="text-xs text-ink-2">
+        <summary className="cursor-pointer list-none hover:text-ink">¿Cómo lo calculó?</summary>
+        <p className="mt-2 leading-relaxed">
+          Primero Dijkstra mide el tiempo entre todas las paradas con el tráfico de la hora de salida. Luego se
+          ordenan las entregas (vecino más cercano + 2-opt) y A* busca el camino de cada tramo ·{" "}
+          <span className="num">{variant.expanded.toLocaleString("es-GT")}</span> nodos revisados.
+        </p>
+      </details>
     </div>
   );
 }
@@ -305,7 +330,52 @@ function StopList({ variant, returnToDepot, depotName, onEdit }: { variant: Plan
   );
 }
 
-function OrderPicker({ selected, onChange, onDone }: { selected: number[]; onChange: (ids: number[]) => void; onDone: () => void }) {
+function ZonePicker({ onPick, onList }: { onPick: (ids: number[]) => void; onList: () => void }) {
+  const pending = useOrders({ status: "pending" });
+  const zones = groupByZone(pending.data?.orders ?? []);
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <h2 className="text-sm font-semibold">¿Qué zona vas a entregar?</h2>
+        <p className="text-[13px] text-ink-2">Los pedidos pendientes, agrupados por región. Elige una y la ruta sale sola.</p>
+      </div>
+      {pending.isPending ? <Spinner /> : null}
+      {pending.data && zones.length === 0 ? (
+        <EmptyState icon={<PackageIcon />} title="No hay pedidos pendientes"
+          action={<Button asChild variant="outline"><Link to="/pedidos">Ir a Pedidos</Link></Button>}>
+          Registra un pedido y vuelve aquí para planificar su ruta.
+        </EmptyState>
+      ) : null}
+      <ul className="flex flex-col gap-2">
+        {zones.map((z) => (
+          <li key={z.code}>
+            <button type="button" onClick={() => onPick(z.orderIds)}
+              className="group flex w-full items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3 text-left transition-colors hover:border-ink">
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{z.name}</span>
+                <span className="block truncate text-xs text-ink-2">{placesLabel(z.places)}</span>
+              </span>
+              <span className="num shrink-0 text-right text-xs text-ink-2">
+                <span className="block text-sm font-medium text-ink">{z.orderIds.length} {z.orderIds.length === 1 ? "pedido" : "pedidos"}</span>
+                {z.weightKg.toLocaleString("es-GT", { maximumFractionDigits: 1 })} kg
+              </span>
+              <ArrowRightIcon className="size-4 shrink-0 text-ink-2 transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
+            </button>
+          </li>
+        ))}
+      </ul>
+      {zones.length > 0 ? (
+        <button type="button" onClick={onList} className="self-start text-[13px] text-ink-2 underline hover:text-ink">
+          Prefiero elegir los pedidos uno por uno
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function OrderPicker({ selected, onChange, onDone, onZones }: {
+  selected: number[]; onChange: (ids: number[]) => void; onDone: () => void; onZones: () => void;
+}) {
   const pending = useOrders({ status: "pending" });
   const set = new Set(selected);
   const orders = pending.data?.orders ?? [];
@@ -313,7 +383,10 @@ function OrderPicker({ selected, onChange, onDone }: { selected: number[]; onCha
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">Pedidos pendientes <span className="num font-normal text-ink-2">{set.size}/{orders.length}</span></h2>
-        <Button size="sm" onClick={onDone} disabled={set.size === 0}>Listo</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="ghost" onClick={onZones}>Por zonas</Button>
+          <Button size="sm" onClick={onDone} disabled={set.size === 0}>Calcular ruta</Button>
+        </div>
       </div>
       {pending.isPending ? <Spinner /> : null}
       {pending.data && orders.length === 0 ? <p className="text-[13px] text-ink-2">No hay pedidos pendientes.</p> : null}

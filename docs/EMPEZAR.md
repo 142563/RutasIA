@@ -13,7 +13,9 @@ python manage.py preparar       # base de datos, grafo, tráfico, usuarios y app
 python manage.py runserver
 ```
 
-Abre http://127.0.0.1:8000 y entra con `despachador` (o `conductor`). La contraseña te la muestra `preparar` y queda guardada en `.env` como `DEMO_PASSWORD`.
+Abre http://127.0.0.1:8000 y toca **Despachador** o **Conductor**: entras sin contraseña, porque en tu compu está el modo demo. Ya hay una ruta de ejemplo en curso. Si quieres entrar escribiendo el usuario, la contraseña te la muestra `preparar` y queda en `.env` como `DEMO_PASSWORD`.
+
+Para la defensa en Render, los botones de demo se activan con la variable `DEMO_LOGIN=True`. Solo existen para el despachador y el conductor, nunca para el administrador.
 
 **Las siguientes veces solo necesitas:** `.venv\Scripts\activate` y `python manage.py runserver`. Si bajas cambios de GitHub (`git pull`), vuelve a correr `python manage.py preparar`: no borra nada.
 

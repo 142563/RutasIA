@@ -1,10 +1,10 @@
 import {
-  ActivityIcon, BarChart3Icon, FlaskConicalIcon, HouseIcon, LogOutIcon, MapIcon, MenuIcon, PackageIcon,
-  RouteIcon, TruckIcon, XIcon,
+  FlaskConicalIcon, HouseIcon, LogOutIcon, MenuIcon, PackageIcon, RouteIcon, TruckIcon, XIcon,
 } from "lucide-react";
 import * as React from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useLogout, useUser } from "@/lib/auth";
+import { isRealData, useNetwork } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -14,20 +14,16 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
+// Cuatro pasos del día a día y un solo lugar para lo de la tesis
 const MAIN: NavItem[] = [
-  { to: "/", label: "Inicio", icon: HouseIcon },
+  { to: "/", label: "Hoy", icon: HouseIcon },
   { to: "/pedidos", label: "Pedidos", icon: PackageIcon },
   { to: "/planificar", label: "Planificar", icon: RouteIcon },
   { to: "/rutas", label: "Rutas", icon: TruckIcon },
-  { to: "/monitoreo", label: "Monitoreo", icon: MapIcon },
 ];
 const ANALYSIS: NavItem[] = [
-  { to: "/trafico", label: "Tráfico", icon: ActivityIcon },
-  { to: "/laboratorio", label: "Laboratorio", icon: FlaskConicalIcon },
-  { to: "/reportes", label: "Reportes", icon: BarChart3Icon },
+  { to: "/analisis", label: "Análisis", icon: FlaskConicalIcon },
 ];
-// Configuración todavía es una página "próximamente": no se muestra en el menú para no confundir
-const ADMIN: NavItem[] = [];
 
 export function Logo() {
   return (
@@ -74,16 +70,23 @@ export function AppShell() {
 
   const initials = user.full_name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   const visible = (items: NavItem[]) => items.filter((i) => !i.adminOnly || user.role === "admin");
+  const network = useNetwork();
+  const sampleData = network.data ? !isRealData(network.data.data_source) : false;
 
   const sidebar = (
     <nav aria-label="Principal" className="flex h-full flex-col gap-0.5 px-3 pb-4 pt-6">
       <div className="px-2.5 pb-6"><Logo /></div>
       {visible(MAIN).map((item) => <NavItemLink key={item.to} item={item} onNavigate={() => setOpen(false)} />)}
-      <span className="px-2.5 pb-1.5 pt-5 text-xs text-ink-2">Análisis</span>
+      <span className="mt-5" />
       {visible(ANALYSIS).map((item) => <NavItemLink key={item.to} item={item} onNavigate={() => setOpen(false)} />)}
-      {visible(ADMIN).length ? <span className="mt-4" /> : null}
-      {visible(ADMIN).map((item) => <NavItemLink key={item.to} item={item} onNavigate={() => setOpen(false)} />)}
       <div className="flex-1" />
+      {sampleData ? (
+        <p className="mx-1 mb-3 flex items-start gap-2 rounded-lg bg-hover px-2.5 py-2 text-xs text-ink-3"
+          title="Tramos estimados y tráfico sintético: sirven para probar, no son resultados de la tesis.">
+          <span className="mt-1 size-1.5 shrink-0 rounded-full bg-warn" aria-hidden />
+          Datos de ejemplo. Para datos reales: preparar --google
+        </p>
+      ) : null}
       <div className="flex items-center gap-2.5 border-t border-line px-1 pt-4">
         <span className="grid size-8 shrink-0 place-items-center rounded-full bg-hover text-xs font-semibold">{initials}</span>
         <div className="min-w-0 flex-1">

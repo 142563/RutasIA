@@ -9,9 +9,9 @@ import type { Role } from "@/lib/types";
 import { DriverStopPage } from "@/pages/driver/DriverStopPage";
 import { DriverTodayPage } from "@/pages/driver/DriverTodayPage";
 import { HomePage } from "@/pages/Home";
+import { AnalysisLayout } from "@/pages/analysis/AnalysisLayout";
 import { LabPage } from "@/pages/lab/LabPage";
 import { LoginPage } from "@/pages/Login";
-import { MonitoringPage } from "@/pages/monitoring/MonitoringPage";
 import { OrdersPage } from "@/pages/orders/OrdersPage";
 import { PlannerPage } from "@/pages/planner/PlannerPage";
 import { ReportsPage } from "@/pages/reports/ReportsPage";
@@ -54,10 +54,21 @@ const router = createBrowserRouter([
           { path: "planificar", element: <PlannerPage /> },
           { path: "rutas", element: <RoutesPage /> },
           { path: "rutas/:routeId", element: <RouteDetailPage /> },
-          { path: "monitoreo", element: <MonitoringPage /> },
-          { path: "trafico", element: <TrafficPage /> },
-          { path: "laboratorio", element: <LabPage /> },
-          { path: "reportes", element: <ReportsPage /> },
+          {
+            path: "analisis",
+            element: <AnalysisLayout />,
+            children: [
+              { index: true, element: <Navigate to="laboratorio" replace /> },
+              { path: "laboratorio", element: <LabPage /> },
+              { path: "trafico", element: <TrafficPage /> },
+              { path: "reportes", element: <ReportsPage /> },
+            ],
+          },
+          // Direcciones anteriores: Monitoreo vive ahora en Hoy, y lo de la tesis en Análisis
+          { path: "monitoreo", element: <Navigate to="/" replace /> },
+          { path: "laboratorio", element: <Navigate to="/analisis/laboratorio" replace /> },
+          { path: "trafico", element: <Navigate to="/analisis/trafico" replace /> },
+          { path: "reportes", element: <Navigate to="/analisis/reportes" replace /> },
           { path: "configuracion", element: soon("Configuración", "Semana 3", "Usuarios, bodegas, nodos y calibración.") },
           { path: "*", element: <NotFoundPage /> },
         ],

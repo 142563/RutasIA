@@ -76,6 +76,8 @@ export interface Order {
   latitude: number;
   longitude: number;
   node: NodeRef | null;
+  /** Región de Guatemala del punto de entrega (agrupa pedidos cercanos al planificar). */
+  region: { code: string; name: string } | null;
   weight_kg: number;
   package_count: number;
   priority: Priority;

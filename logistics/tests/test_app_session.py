@@ -70,11 +70,35 @@ class SessionApiTests(TestCase):
         data = self.client.get(reverse("api-config")).json()
         self.assertIn("google_maps_api_key", data)
 
-    def test_config_hints_demo_users_only_in_debug(self):
-        with self.settings(DEBUG=False):
-            self.assertFalse(self.client.get(reverse("api-config")).json()["demo_users"])
-        with self.settings(DEBUG=True):
-            self.assertTrue(self.client.get(reverse("api-config")).json()["demo_users"])
+    def test_config_reports_demo_login_flag(self):
+        with self.settings(DEMO_LOGIN=False):
+            self.assertFalse(self.client.get(reverse("api-config")).json()["demo_login"])
+        with self.settings(DEMO_LOGIN=True):
+            self.assertTrue(self.client.get(reverse("api-config")).json()["demo_login"])
+
+
+class DemoLoginTests(TestCase):
+    def setUp(self):
+        call_command("seed_demo_users", "--password", "una-clave-larga-1", stdout=StringIO())
+
+    def post(self, role):
+        return self.client.post(reverse("api-auth-demo"), data=json.dumps({"role": role}),
+                                content_type="application/json")
+
+    def test_demo_login_as_driver(self):
+        with self.settings(DEMO_LOGIN=True):
+            response = self.post("driver")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["user"]["username"], "conductor")
+        self.assertEqual(self.client.get(reverse("api-auth-session")).json()["user"]["role"], "driver")
+
+    def test_demo_login_disabled_is_forbidden(self):
+        with self.settings(DEMO_LOGIN=False):
+            self.assertEqual(self.post("dispatcher").status_code, 403)
+
+    def test_demo_login_never_allows_admin(self):
+        with self.settings(DEMO_LOGIN=True):
+            self.assertEqual(self.post("admin").status_code, 400)
 
 
 class RoleTests(TestCase):

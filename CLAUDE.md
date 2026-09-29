@@ -28,6 +28,12 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
   - **App React** en `frontend/` (Vite + React 19 + TS + Tailwind v4 + componentes estilo shadcn en `src/components/ui`, React Router, TanStack Query). Mapa en `src/components/map/NetworkMap.tsx`: con `GOOGLE_MAPS_API_KEY` usa **Google Maps de fondo** (cargado en `src/lib/googleMaps.ts` con la key de `/api/config/`) y dibuja encima, en SVG, las capas del motor. Las rutas con `followRoads` se trazan por carretera real con Directions, pasando por los nodos que eligió nuestro algoritmo. Sin key, o si Google la rechaza, cae al mapa esquemático propio. Django la sirve desde `frontend/dist/app/` en `/` (vista `spa`); sesión por `/api/auth/*`.
   - Interfaz anterior (JS sin framework) en `/clasico/`: `templates/logistics/index.html` + `static/logistics/app.js`.
   - Roles: `admin`, `dispatcher`, `driver` (`UserProfile.Role`); usuarios de demo con `seed_demo_users` (exige `DEMO_PASSWORD`).
+  - **UX simple (prioridad del proyecto):**
+    - Menú de 5 secciones: **Hoy** (inicio + monitoreo en vivo + "siguiente paso", `src/lib/today.ts`), **Pedidos**, **Planificar**, **Rutas** y **Análisis** (Laboratorio, Tráfico y Reportes en pestañas bajo `/analisis/*`; las rutas viejas redirigen).
+    - Planificar por **zona**: los pedidos traen `region` (8 regiones oficiales, `logistics/domain/regions.py`) y `src/lib/zones.ts` los agrupa. El vehículo y el conductor se sugieren según la carga.
+    - Login de un clic como despachador o conductor (`/api/auth/demo/`, activo con `DEMO_LOGIN`; por defecto igual a `DEBUG`; nunca para admin).
+    - `preparar` crea una ruta de ejemplo en curso (`logistics/application/demo.py`).
+    - La jerga técnica (nodos, multiplicadores, fuentes de datos) va en Análisis o en `<details>` plegados, no en las pantallas operativas.
 - **Datos:** mientras no haya `GOOGLE_ROUTES_API_KEY`, el grafo usa aristas `estimate` y tráfico `synthetic`. Toda respuesta y todo CSV indica la fuente (`data_source`). **Nunca** presentar esos números como resultados de tesis.
 - BD: PostgreSQL (Neon) vía `DATABASE_URL`; sin esa variable usa SQLite local.
 - Deploy: Render (`render.yaml`, `Procfile`), archivos estáticos con WhiteNoise. `matplotlib` solo en `requirements-dev.txt`.

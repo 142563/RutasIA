@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
@@ -71,9 +72,32 @@ def api_config(request: HttpRequest):
     return _ok({
         "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY,
         "google_maps_map_id": settings.GOOGLE_MAPS_MAP_ID,
-        # Solo en desarrollo: el login recuerda qué usuarios de demo existen (nunca la contraseña)
-        "demo_users": settings.DEBUG,
+        # Login de un clic con los usuarios de demostración (desarrollo o DEMO_LOGIN=True)
+        "demo_login": settings.DEMO_LOGIN,
     })
+
+
+# Solo estos dos: el administrador nunca entra sin contraseña
+DEMO_ACCOUNTS = {"dispatcher": "despachador", "driver": "conductor"}
+
+
+@require_POST
+def api_demo_login(request: HttpRequest):
+    """Entra como el despachador o el conductor de demostración sin escribir contraseña."""
+    if not settings.DEMO_LOGIN:
+        return _error("El acceso de demostración está desactivado.", 403)
+    try:
+        payload = _parse_json(request)
+    except PlanningError as exc:
+        return _error(str(exc))
+    username = DEMO_ACCOUNTS.get(str(payload.get("role", "")))
+    if username is None:
+        return _error("Rol de demostración inválido.")
+    user = User.objects.filter(username=username, is_active=True).first()
+    if user is None:
+        return _error("No existen los usuarios de demostración: corre python manage.py preparar.", 404)
+    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+    return _ok({"user": user_payload(user)})
 
 
 BUILD_MISSING_HTML = """<!doctype html><html lang="es"><meta charset="utf-8">

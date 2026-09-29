@@ -102,7 +102,7 @@ export function OrdersPage() {
             </EmptyState>
           ) : null}
           {rows.length > 0 ? (
-            <table className="w-full min-w-[820px] text-sm">
+            <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-ink-2">
                   <th className="w-12 py-2.5 pl-6 pr-3 lg:pl-8">
@@ -110,7 +110,6 @@ export function OrdersPage() {
                       checked={allChecked} disabled={allSelectable.length === 0}
                       onChange={() => setSelected(allChecked ? new Set() : new Set(allSelectable.map((o) => o.id)))} />
                   </th>
-                  <th className="py-2.5 font-normal">Código</th>
                   <th className="py-2.5 font-normal">Destinatario</th>
                   <th className="py-2.5 font-normal">Dirección</th>
                   <th className="py-2.5 text-right font-normal">Peso</th>
@@ -125,15 +124,14 @@ export function OrdersPage() {
                       <input type="checkbox" className="size-4 accent-ink" aria-label={`Seleccionar ${o.code}`}
                         checked={selected.has(o.id)} disabled={!selectable(o)} onChange={() => toggle(o.id)} />
                     </td>
-                    <td className="num whitespace-nowrap py-3 pr-4 text-[13px] text-ink-3">{o.code}</td>
-                    <td className="py-3">
+                    <td className="py-3 pr-4">
                       <span className="font-medium">{o.recipient}</span>
-                      {o.priority === "high" ? <span className="ml-2 text-xs font-medium text-err">Alta</span> : null}
-                      {o.is_demo ? <span className="ml-2 text-xs text-ink-2">demo</span> : null}
+                      {o.priority === "high" ? <span className="ml-2 text-xs font-medium text-err">Prioridad alta</span> : null}
+                      <span className="num block text-xs text-ink-2">{o.code}</span>
                     </td>
-                    <td className="max-w-[320px] py-3">
+                    <td className="max-w-[340px] py-3">
                       <span className="block truncate text-ink-3">{o.address}</span>
-                      <span className="text-xs text-ink-2">Nodo: {o.node?.name ?? "—"}</span>
+                      <span className="text-xs text-ink-2">{o.region?.name ?? ""}</span>
                     </td>
                     <td className="num whitespace-nowrap py-3 text-right">{o.weight_kg.toLocaleString("es-GT")} kg</td>
                     <td className="whitespace-nowrap py-3 pl-6"><StatusDot color={STATUS[o.status].color}>{o.status_label}</StatusDot></td>

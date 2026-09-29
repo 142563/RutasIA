@@ -28,6 +28,15 @@ export function useLogin() {
   });
 }
 
+/** Entrar sin contraseña como el despachador o el conductor de demostración (si el servidor lo permite). */
+export function useDemoLogin() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (role: "dispatcher" | "driver") => api<{ user: User }>("/api/auth/demo/", { method: "POST", body: { role } }),
+    onSuccess: (data) => client.setQueryData(SESSION_KEY, data.user),
+  });
+}
+
 export function useLogout() {
   const client = useQueryClient();
   return useMutation({

@@ -33,7 +33,8 @@ export interface MapNodeMark {
 
 export interface MapMarker extends LatLng {
   id: string;
-  kind: "depot" | "stop" | "pick";
+  /** depot: bodega · stop: parada numerada · pick: punto elegido · dot: pedido pendiente */
+  kind: "depot" | "stop" | "pick" | "dot";
   label?: string;
 }
 
@@ -170,6 +171,14 @@ function MapLayers({ props, toXY, opts }: { props: NetworkMapProps; toXY: ToXY; 
               <g key={m.id}>
                 <rect x={x - 8} y={y - 8} width={16} height={16} rx={3} fill="#111113" stroke="#fff" strokeWidth={2} />
                 <title>{m.label ?? "Bodega"}</title>
+              </g>
+            );
+          }
+          if (m.kind === "dot") {
+            return (
+              <g key={m.id}>
+                <circle cx={x} cy={y} r={5.5} fill="#2f4bd8" stroke="#fff" strokeWidth={2} />
+                {m.label ? <title>{m.label}</title> : null}
               </g>
             );
           }

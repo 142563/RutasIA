@@ -91,6 +91,10 @@ SECRET_KEY = os.getenv(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = _env_bool("DEBUG", default=True)
 
+# Botones "Entrar como despachador / conductor" en el login (usuarios de seed_demo_users).
+# Encendido en desarrollo; en producción solo si se pide a propósito (p. ej. para la defensa).
+DEMO_LOGIN = _env_bool("DEMO_LOGIN", default=DEBUG)
+
 ALLOWED_HOSTS = _env_list(
     "ALLOWED_HOSTS",
     default="127.0.0.1,localhost,testserver,.onrender.com",

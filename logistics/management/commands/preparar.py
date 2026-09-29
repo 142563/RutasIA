@@ -16,6 +16,7 @@ from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 
+from logistics.application.demo import create_demo_story
 from logistics.models import Edge, TrafficProfile
 
 
@@ -64,6 +65,10 @@ class Command(BaseCommand):
         call_command("seed_demo_data")
         password, generated = self.demo_password(options["password"])
         call_command("seed_demo_users", password=password)
+        story = create_demo_story()
+        if story:
+            self.stdout.write(f"Ruta de ejemplo en curso para el conductor: {story.code} "
+                              f"({story.stops.count()} paradas, la primera ya entregada).")
 
         self.step(6, "App React")
         built = False if options["sin_frontend"] else self.build_frontend()

@@ -6,17 +6,21 @@ Le das al sistema **los paquetes que hay que entregar** y **a qué hora sale el 
 
 ## Cómo se usa (3 pasos)
 
+Al entrar, la pantalla **Hoy** te dice cuál es el **siguiente paso** (por ejemplo, "Tienes 16 pedidos sin ruta → Planificar ahora"). Muestra en el mapa los pedidos que esperan y el avance en vivo de las rutas del día.
+
 1. **Pedidos:** registras cada paquete con su dirección. Aparece como un punto en el mapa.
-2. **Planificar:** eliges los pedidos y la hora de salida. El sistema calcula la ruta y te muestra:
+2. **Planificar:** eliges una **zona** (los pedidos ya vienen agrupados por región de Guatemala) y la hora de salida. El sistema calcula la ruta al instante y te muestra:
    - el tiempo total de manejo y la hora de regreso;
    - la comparación **"Más rápida" (con tráfico) vs "Más corta" (en km)**;
    - si te conviene salir a otra hora ("si sales a las 15:30 ahorras 25 min").
-3. **Asignar:** confirmas con un conductor y un vehículo. El conductor entra con su usuario en el celular, ve sus paradas en orden y marca cada entrega. Tú ves el avance en **Monitoreo**.
+3. **Asignar:** el sistema ya sugiere el vehículo donde cabe la carga y su conductor; tú solo confirmas. El conductor ve sus paradas en orden en el celular y marca cada entrega. Tú ves el avance en **Hoy**.
 
-Extras para la tesis:
-- **Laboratorio:** Dijkstra y A\* lado a lado sobre el mapa, contando cuántos nodos explora cada uno.
-- **Tráfico:** qué tramos se ponen lentos en cada franja del día.
-- **Reportes:** resultados de los experimentos.
+Para probar rápido, el login tiene botones **Despachador** y **Conductor**: entran sin contraseña, solo en modo demostración. Ya hay una ruta de ejemplo en curso.
+
+**Análisis**, lo de la tesis, en un solo lugar:
+- **Dijkstra vs A\*:** los dos algoritmos lado a lado sobre el mapa, contando cuántos nodos explora cada uno.
+- **Tráfico por hora:** qué tramos se ponen lentos en cada franja del día.
+- **Resultados:** los experimentos.
 
 ## Qué pasa por dentro
 

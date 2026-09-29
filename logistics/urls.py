@@ -11,6 +11,7 @@ urlpatterns = [
     path("api/auth/login/", app_views.api_login, name="api-auth-login"),
     path("api/auth/logout/", app_views.api_logout, name="api-auth-logout"),
     path("api/auth/session/", app_views.api_session, name="api-auth-session"),
+    path("api/auth/demo/", app_views.api_demo_login, name="api-auth-demo"),
     path("api/config/", app_views.api_config, name="api-config"),
     path("api/me/", views.api_me, name="api-me"),
     path("api/users/", views.api_users, name="api-users"),
