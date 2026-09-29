@@ -1,475 +1,323 @@
-# JaironRoute — Sistema de Optimización de Rutas
+# RutasIA — Sistema de Optimización de Rutas Inteligente
 
-Sistema web de gestión y optimización de rutas logísticas para Guatemala. Permite planificar viajes entre departamentos usando algoritmos de camino más corto, gestionar pedidos, conductores y vehículos, y visualizar rutas en un mapa interactivo.
-
----
-
-## Descripción del proyecto
-
-JaironRoute resuelve el problema de encontrar la ruta más corta entre cualquier par de departamentos de Guatemala, considerando las conexiones viales reales y sus distancias en kilómetros. El sistema:
-
-- Calcula rutas óptimas usando el algoritmo de **Dijkstra** (grafo de distancias viales) o **A\*** (con heurística Haversine).
-- Visualiza la ruta sobre **Google Maps** y traza el recorrido real por carreteras via **Google Directions API**.
-- Gestiona el ciclo de vida completo de un viaje: planificación → en progreso → completado / cancelado.
-- Calcula costos estimados de combustible (GTQ/galón) y costo por kilómetro del vehículo.
-- Controla acceso por roles: Administrador, Supervisor y Operador.
+Sistema web de **optimización de rutas para empresas de paquetería en Guatemala**, considerando el tráfico en tiempo real. Propone la **ruta más rápida** usando **Dijkstra y A\*** implementados desde cero, sobre una **red vial nacional** cuyos tramos pesan **minutos** (no kilómetros), con datos de tráfico de **Google Maps**.
 
 ---
 
-## Tecnologías utilizadas
+## Características principales
 
-| Capa | Tecnología |
-|------|-----------|
-| Backend | Python 3.13, Django 6.0 |
-| Servidor WSGI | Gunicorn 22 |
-| Archivos estáticos | WhiteNoise 6.7 |
-| Base de datos | PostgreSQL (Neon serverless) |
-| ORM | Django ORM + Django Cache Framework |
-| Frontend | Vanilla JavaScript ES2022 |
-| Mapa | Google Maps JavaScript API (marcadores avanzados + capa de trafico) |
-| Ruteo por carreteras | Google Directions API (`DirectionsService`) |
-| Ruteo fallback | Linea recta entre waypoints si Directions falla |
-| Algoritmos | Dijkstra (camino más corto), A* con heurística Haversine |
-| Deploy | Render.com (web service) |
+- **Motor de rutas nacional** (~100–150 nodos: cabeceras, municipios, cruces de carreteras)
+  - Dijkstra y A\* con heurística Haversine (garantía de optimalidad)
+  - Tráfico en 7 franjas horarias × 2 tipos de día (14 perfiles por arista)
+  - Varias paradas: matriz de tiempos, vecino más cercano + 2-opt
+  - Experimentos con métricas: nodos expandidos, tiempo, distancia, precisión
 
----
+- **Aplicación React** moderna
+  - Autenticación por roles: Administrador, Despachador, Conductor
+  - Planificador de rutas: elegir criterio (tiempo o distancia)
+  - Laboratorio visual: Dijkstra vs A\* lado a lado con animación
+  - Pantalla de tráfico: franjas horarias y mejor hora para salir
+  - Mapa esquemático de la red vial nacional (SVG)
 
-## Cómo se consume cada tecnología
+- **API REST** en Django
+  - Puntos de inicio: `/api/routing/route/`, `/api/routes/optimize/`, `/api/routing/compare/`
+  - Trafico por franja: `/api/traffic/profile/`, `/api/routing/best_departure/`
+  - Gestión de roles y autorización
 
-### 🐍 Django 6.0 — Framework web
-
-Maneja el servidor HTTP, autenticación, base de datos y caché. Cada endpoint de la API es una función Django decorada:
-
-```python
-# logistics/urls.py
-path("api/trips/plan/", views.api_plan_trip, name="api-plan-trip")
-
-# logistics/presentation/views.py
-@login_required               # redirige si no hay sesión activa
-@require_http_methods(["POST"])
-def api_plan_trip(request: HttpRequest):
-    ...
-```
+- **Datos auditables**
+  - Cada respuesta trae `data_source` (google, estimate, synthetic)
+  - RouteSample: caché de consultas a Google Routes API
+  - Permite auditar de dónde sale cada peso del grafo
 
 ---
 
-### 🐘 PostgreSQL en Neon — Base de datos
+## Arquitectura
 
-Almacena departamentos, vehículos, viajes, precios de gasolina y toda la información operativa. Se accede exclusivamente a través del ORM de Django:
+### Django (backend)
 
-```python
-# logistics/domain/services.py — consulta para construir el grafo de Dijkstra
-RouteConnection.objects.only("origin_id", "destination_id", "distance_km", "is_bidirectional")
-
-# logistics/application/services.py — guarda un viaje nuevo
-Trip.objects.create(vehicle=vehicle, route_nodes=route_nodes, ...)
-
-# .env — cadena de conexión
-DATABASE_URL=postgresql://neondb_owner:...@neon.tech/neondb?sslmode=require
 ```
+logistics/
+├── routing/              # Motor nuevo (docs/PLAN.md §2 y §5)
+│   ├── graph.py          # RoadGraph: carga nodos y aristas en memoria
+│   ├── dijkstra.py       # Algoritmo punto-a-punto y uno-a-todos
+│   ├── astar.py          # A* con heurística Haversine
+│   ├── traffic.py        # Franjas horarias y multiplicadores
+│   ├── multistop.py      # Matriz + vecino cercano + 2-opt
+│   ├── build.py          # Construir grafo (Google Routes API)
+│   ├── calibration.py    # Calibrar tráfico (Google Routes API)
+│   ├── experiments.py    # E1–E7: algoritmos, escalabilidad, precisión
+│   ├── google.py         # Consultas a Routes API, con caché
+│   ├── geo.py            # Haversine, coordenadas
+│   ├── synthetic.py      # Generar datos sintéticos para desarrollar
+│   ├── instrument.py     # Instrumentación: nodos, tiempo, distancia
+│   └── charts.py         # Gráficas para los experimentos
+├── domain/
+│   ├── services.py       # RouteOptimizer, AStarOptimizer (legado para interfaz clásica)
+│   └── exceptions.py     # PlanningError
+├── application/
+│   ├── routing.py        # Orquestación del motor nuevo (casos de uso)
+│   ├── planning.py       # Planificador de rutas
+│   ├── orders.py         # Gestión de pedidos
+│   └── services.py       # TripPlanner (legado)
+├── presentation/
+│   ├── routing_views.py  # Endpoints del motor nuevo (/api/routing/*, /api/routes/*)
+│   ├── views.py          # Endpoints legacy
+│   ├── app_views.py      # Vista SPA de React
+│   └── serializers.py    # JSON (auth, roles, helpers)
+└── models.py             # ORM: Node, Edge, TrafficProfile, Route, Order, Depot, ...
+```
+
+### React (frontend)
+
+```
+frontend/
+├── src/
+│   ├── pages/
+│   │   ├── Home.tsx              # Resumen, accesos rápidos, mapa
+│   │   ├── Login.tsx             # Autenticación
+│   │   ├── planning/             # Planificador de rutas
+│   │   ├── lab/                  # Laboratorio Dijkstra vs A*
+│   │   ├── traffic/              # Tráfico por franja
+│   │   └── driver/               # Vista del conductor (en desarrollo)
+│   ├── components/
+│   │   ├── map/NetworkMap.tsx    # Mapa SVG de la red vial
+│   │   ├── ui/                   # shadcn/ui: botones, campos, etc.
+│   │   └── layout/               # Shell de la aplicación
+│   └── lib/
+│       ├── api.ts                # Cliente HTTP a Django
+│       ├── auth.tsx              # Context de autenticación
+│       ├── queries.ts            # TanStack Query
+│       ├── traffic.ts            # Cálculo de franjas horarias
+│       └── planning.ts           # Lógica de planificación
+```
+
+### Base de datos
+
+- PostgreSQL (Neon en producción, SQLite en desarrollo)
+- Modelos nuevos: `Node`, `Edge` (dirigida), `TrafficProfile`, `RouteSample`, `Route`, `Depot`
+- Modelos legacy: `Department`, `RouteConnection` (sigue funcionando)
+- Auditoría: `data_source` en cada consulta
 
 ---
 
-### ⚡ Django Cache Framework — Caché en memoria
+## Cómo levantarlo en tu compu
 
-Guarda el grafo de Dijkstra 2 minutos para no consultar la base de datos en cada cálculo de ruta:
+### Requisitos
 
-```python
-# logistics/domain/services.py
-def _build_graph():
-    cached = cache.get("dijkstra_graph_v1")    # busca en memoria primero
-    if cached is not None:
-        return cached                           # responde sin tocar la BD
-    # ... construye grafo desde RouteConnection en BD ...
-    cache.set("dijkstra_graph_v1", result, 120)  # guarda 120 segundos
-    return result
-```
+- **Python** 3.12 o superior
+- **Node.js** 20 o superior
+- **Git**
 
----
-
-### 🗺️ Google Maps JavaScript API — Motor del mapa
-
-Renderiza el mapa, los marcadores de departamento y la capa de trafico en vivo.
-El loader es asincrono (`loading=async` + `callback`), asi que `app.js` espera la
-promesa `window.googleMapsReady` antes de tocar `google.maps`:
-
-```javascript
-// templates/logistics/index.html — se define ANTES de cargar la API
-window.googleMapsReady = new Promise(function (resolve, reject) { ... });
-window.initGoogleMaps = function () { resolve(); };   // lo llama Google al cargar
-window.gm_authFailure = function () { reject(...); }; // API key rechazada
-
-// static/logistics/app.js
-map = new google.maps.Map(document.getElementById("route-map"), {
-    center: { lat: 15.45, lng: -90.3 },
-    zoom: 7,
-    mapId: window.GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID"   // requerido por AdvancedMarker
-});
-new google.maps.TrafficLayer().setMap(map);
-```
-
-Cada departamento es un `AdvancedMarkerElement` con contenido HTML propio. La
-opcion `gmpClickable: true` es obligatoria: sin ella el marcador nunca emite el
-evento `gmp-click` y el InfoWindow no abre.
-
-```javascript
-const marker = new google.maps.marker.AdvancedMarkerElement({
-    position: { lat, lng }, map, content: el, gmpClickable: true
-});
-marker.addListener("gmp-click", () => { /* abre InfoWindow */ });
-```
-
----
-
-### 🛣️ Google Directions API — Geometria de carreteras reales
-
-Dado el origen, el destino y los departamentos intermedios que eligio Dijkstra,
-devuelve la geometria de la carretera real para dibujarla sobre el mapa:
-
-```javascript
-// static/logistics/app.js — fetchRoadGeometryGoogleMaps()
-new google.maps.DirectionsService().route({
-    origin, destination,
-    waypoints,                                  // departamentos intermedios
-    travelMode: google.maps.TravelMode.DRIVING
-}, (result, status) => { ... });
-```
-
-Si Directions falla (cuota, red, sin ruta terrestre), el mapa cae a marcadores y
-encuadre directo sobre los waypoints, sin romper la vista:
-
-```javascript
-} catch (err) {
-    console.warn("Directions API no disponible, usando linea directa:", err.message);
-    addWaypointMarkers();
-}
-```
-
-El resultado tambien alimenta la simulacion GPS: `overview_path` da los ~300
-puntos por los que se mueve el marcador del vehiculo.
-
----
-
-### 📐 Dijkstra — Algoritmo de ruta óptima
-
-Decide qué departamentos atravesar (ej: Guatemala → Escuintla → Quetzaltenango) operando sobre las distancias reales de carretera almacenadas en `RouteConnection`:
-
-```python
-# logistics/domain/services.py — clase RouteOptimizer
-while queue:
-    g, node = heapq.heappop(queue)        # saca el nodo más cercano (min-heap)
-    for neighbor, weight in graph.get(node, []):
-        candidate = g + weight            # distancia acumulada candidata
-        if candidate < distances.get(neighbor, INF):
-            distances[neighbor] = candidate
-            heapq.heappush(queue, (candidate, neighbor))
-```
-
----
-
-### 🔢 Haversine — Heurística geográfica para A*
-
-Calcula la distancia en línea recta entre dos coordenadas GPS. La usa internamente A* para descartar rutas que van en dirección equivocada:
-
-```python
-# logistics/domain/services.py
-def haversine_km(lat1, lon1, lat2, lon2):
-    R = 6371.0                            # radio de la Tierra en km
-    a = math.sin(dphi/2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda/2)**2
-    return 2 * R * math.asin(math.sqrt(a))   # distancia en km
-
-# Usada en A* como:  f(n) = g(n) + haversine_km(n, destino)
-```
-
----
-
-### 🔄 Flujo completo de un viaje planificado
-
-```
-Usuario hace click "Planificar"
-        │
-        ▼
-app.js  →  POST /api/trips/plan/              (JavaScript en el navegador)
-        │
-        ▼
-presentation/views.py  →  api_plan_trip()     (Django recibe la petición HTTP)
-        │
-        ▼
-application/services.py  →  TripPlanner       (orquesta el caso de uso)
-        │
-        ▼
-domain/services.py  →  RouteOptimizer         (Dijkstra calcula la ruta)
-        │
-        ▼
-RouteConnection en PostgreSQL/Neon            (distancias reales desde BD)
-        │
-        ▼
-Trip guardado con precio de gasolina actual   (FuelPrice.current())
-        │
-        ▼
-app.js recibe la respuesta JSON
-        │
-        ▼
-fetchRoadGeometryGoogleMaps()  →  Directions API  (geometria de carretera real)
-        │
-        ▼
-DirectionsRenderer dibuja la ruta sobre Google Maps  (mapa en pantalla)
-```
-
----
-
-## Arquitectura DDD (Domain-Driven Design)
-
-El código dentro de `logistics/` está organizado en cuatro capas con responsabilidades separadas:
-
-```
-+----------------------------------------------------------+
-|  Presentation Layer   (logistics/presentation/)          |
-|  HTTP handlers, JSON serializers, decoradores de vista   |
-+----------------------------------------------------------+
-|  Application Layer    (logistics/application/)           |
-|  Casos de uso: TripPlanner, TripLifecycleService         |
-+----------------------------------------------------------+
-|  Domain Layer         (logistics/domain/)                |
-|  Logica de negocio pura: RouteOptimizer, AStarOptimizer  |
-|  Entidades de dominio, excepciones (PlanningError)       |
-+----------------------------------------------------------+
-|  Infrastructure       (logistics/models.py + cache)      |
-|  Django ORM, Django Cache Framework, APIs externas       |
-|  (Google Maps JavaScript API / Directions API)           |
-+----------------------------------------------------------+
-```
-
-### Descripcion de capas
-
-**Presentation Layer** (`logistics/presentation/`)
-- `views.py` — Funciones de vista Django con decoradores de autenticacion y metodo HTTP.
-- `serializers.py` — Helpers `_serialize_*()` que convierten instancias de modelo a dicts JSON, mas utilidades `_ok()`, `_error()`, `_parse_json()` y control de roles.
-
-**Application Layer** (`logistics/application/`)
-- `services.py` — Orquesta los casos de uso de negocio. `TripPlanner.plan_trip()` coordina la validacion, el algoritmo de ruteo, el calculo de costos y la persistencia. `TripLifecycleService` controla las transiciones de estado del viaje.
-
-**Domain Layer** (`logistics/domain/`)
-- `services.py` — Algoritmos puros de grafos (`RouteOptimizer`, `AStarOptimizer`), funcion `haversine_km()`, construccion y cacheo del grafo, constantes de dominio.
-- `exceptions.py` — `PlanningError`, excepcion base para todos los errores de logica de negocio.
-
-**Infrastructure**
-- `logistics/models.py` — Modelos Django (no se mueven; las migraciones dependen de su ubicacion).
-- Cache de Django — El grafo de conexiones y las coordenadas de departamentos se cachean 120 segundos.
-- APIs externas — Google Maps y Directions se consumen desde el frontend JavaScript, no desde el backend Python.
-
----
-
-## Modelos de datos
-
-| Modelo | Descripcion |
-|--------|-------------|
-| `Department` | Departamento de Guatemala con codigo, nombre y coordenadas GPS. |
-| `RouteConnection` | Conexion vial entre dos departamentos con distancia en km (puede ser bidireccional). |
-| `Vehicle` | Vehiculo con placa, modelo, capacidad, eficiencia de combustible y costo por km. |
-| `Driver` | Conductor con nombre, telefono y numero de licencia. |
-| `Order` | Pedido de envio con origen, destino, peso, prioridad y estado. |
-| `Trip` | Viaje planificado que agrupa pedidos, calcula ruta y registra costos. |
-| `FuelPrice` | Singleton con precios de combustible (regular, super, diesel) en GTQ/galón. |
-| `TripEvent` | Bitacora de eventos asociados a un viaje (inicio, completado, notas). |
-| `UserProfile` | Extension de `User` con rol (admin / supervisor / operador). |
-
----
-
-## Algoritmos de ruteo
-
-### Grafo interno — Dijkstra vs A*
-
-Ambos algoritmos operan sobre un grafo en memoria construido a partir de los registros `RouteConnection` de la base de datos.
-
-**Dijkstra** (`RouteOptimizer`)
-
-Explora nodos en orden de distancia acumulada desde el origen. Garantiza el camino mas corto en grafos con pesos no negativos. Complejidad O((V + E) log V).
-
-**A\*** (`AStarOptimizer`)
-
-Guia la busqueda hacia el destino con una heuristica admisible que nunca sobreestima el costo real:
-
-```
-f(n) = g(n) + h(n)
-
-donde:
-  g(n) = distancia acumulada desde el origen hasta n  (coste real)
-  h(n) = haversine_km(n, destino)                     (distancia en linea recta — heuristica admisible)
-```
-
-Al ser `h(n)` admisible (linea recta <= distancia vial), A* garantiza optimalidad y suele expandir menos nodos que Dijkstra.
-
-**Por que Dijkstra es el predeterminado**
-
-El grafo de Guatemala tiene pocos nodos (~22 departamentos) y pocas aristas, por lo que la diferencia de rendimiento es irrelevante en produccion. Dijkstra se usa por defecto por su simplicidad; A* esta disponible como opcion avanzada.
-
-### Visualizacion en mapa — Google Directions API
-
-El grafo interno solo contiene distancias en km. Para dibujar la ruta sobre el mapa con curvas de carretera reales, el frontend llama a **Google Directions API** (`travelMode: DRIVING`, con los departamentos intermedios como waypoints). Si Directions falla, el mapa cae a marcadores y encuadre directo sobre los waypoints.
-
----
-
-## Instalacion local
-
-### Requisitos previos
-
-- Python 3.13+
-- PostgreSQL (o acceder a una base de datos Neon con `DATABASE_URL`)
-
-### Pasos
+### 1. Clonar y configurar entorno
 
 ```bash
-# 1. Clonar el repositorio
-git clone <repo-url>
+git clone https://github.com/142563/RutasIA.git
 cd RutasIA
+git checkout dev
 
-# 2. Crear y activar entorno virtual
 python -m venv .venv
-source .venv/bin/activate      # Linux/macOS
-.venv\Scripts\activate         # Windows
+# En Windows:
+.venv\Scripts\activate
+# En Linux/macOS:
+source .venv/bin/activate
 
-# 3. Instalar dependencias
 pip install -r requirements.txt
+cp .env.example .env
+```
 
-# 4. Configurar variables de entorno (ver seccion siguiente)
-# Crear .env en la raiz del proyecto
+### 2. Variables de entorno (`.env`)
 
-# 5. Aplicar migraciones
+Mínimo para empezar:
+```bash
+GOOGLE_MAPS_API_KEY=<tu-key-del-navegador>
+DEBUG=true
+SECRET_KEY=<generada-por-django>
+```
+
+Si dejas `DATABASE_URL` vacía, se usa SQLite local.
+
+### 3. Base de datos y datos semilla
+
+```bash
 python manage.py migrate
+python manage.py seed_graph_nodes        # Nodos del grafo nacional
+python manage.py seed_demo_data          # Departamentos, conexiones (legacy)
+python manage.py createsuperuser         # Usuario admin
+```
 
-# 6. Cargar datos de demostracion (departamentos, conexiones, usuario admin)
-python manage.py seed_demo_data
+### 4. Motor de rutas (aristas y tráfico)
 
-# 7. Iniciar servidor de desarrollo
+**Sin Google API key** (desarrollo rápido con datos estimados):
+```bash
+python manage.py build_graph --estimate
+python manage.py calibrate_traffic --synthetic
+```
+
+**Con `GOOGLE_ROUTES_API_KEY`** (datos reales, para la tesis):
+```bash
+python manage.py build_graph              # ~10 min, ~200 consultas a Google
+python manage.py calibrate_traffic        # ~5 min, ~4200 consultas a Google
+```
+
+### 5. Levantar Django
+
+```bash
 python manage.py runserver
 ```
 
-Abrir http://127.0.0.1:8000/ en el navegador. Credenciales por defecto: `admin` / `admin123`.
+Abre http://127.0.0.1:8000
 
----
+### 6. Levantar React (desarrollo)
 
-## Variables de entorno
-
-Crear un archivo `.env` en la raiz del proyecto:
-
-| Variable | Descripcion | Ejemplo |
-|----------|-------------|---------|
-| `DATABASE_URL` | URL de conexion PostgreSQL (Neon o local) | `postgresql://user:pass@host/db` |
-| `SECRET_KEY` | Clave secreta de Django | `django-insecure-...` |
-| `DEBUG` | Modo depuracion (`true` / `false`) | `false` |
-| `ALLOWED_HOSTS` | Hosts permitidos, separados por coma | `localhost,mi-app.onrender.com` |
-| `ORS_API_KEY` | API key de OpenRouteService (heredada, ya no se usa) | `5b3ce3597851...` |
-| `GOOGLE_MAPS_API_KEY` | **Obligatoria.** API key de Google Maps JavaScript API | `AIzaSy...` |
-| `GOOGLE_MAPS_MAP_ID` | Map ID para marcadores avanzados (por defecto `DEMO_MAP_ID`) | `8f2a1c...` |
-
-### Requisitos de la API key de Google Maps
-
-1. Habilitar **Maps JavaScript API** y **Directions API** en Google Cloud Console.
-2. Tener facturacion activa en el proyecto de Cloud.
-3. Si la key usa restriccion por referente HTTP, incluir todos los origenes:
-   `http://localhost:8000/*`, `http://127.0.0.1:8000/*` y `https://<tu-app>.onrender.com/*`.
-4. Definir `GOOGLE_MAPS_API_KEY` en Render (Environment -> Add Environment Variable).
-   Sin esta variable la pestana Mapa muestra un aviso y el resto del sistema
-   sigue funcionando con normalidad.
-
-La key **nunca** debe escribirse dentro de `templates/logistics/index.html`: el
-repositorio es publico y quedaria expuesta.
-
----
-
-## Estructura del proyecto
-
+```bash
+cd frontend
+npm install
+npm run dev
 ```
-RutasIA/
-|-- manage.py
-|-- requirements.txt
-|-- README.md
-|
-|-- rutasia/                        # Configuracion del proyecto Django
-|   |-- settings.py
-|   |-- urls.py
-|   `-- wsgi.py
-|
-`-- logistics/                      # Aplicacion principal
-    |-- models.py                   # Modelos Django (Infrastructure)
-    |-- admin.py
-    |-- apps.py
-    |-- tests.py
-    |-- urls.py                     # Enrutamiento URL
-    |-- views.py                    # Re-export de compatibilidad hacia atras
-    |-- services.py                 # Re-export de compatibilidad hacia atras
-    |
-    |-- domain/                     # Domain Layer — logica de negocio pura
-    |   |-- __init__.py
-    |   |-- exceptions.py           # PlanningError
-    |   `-- services.py             # RouteOptimizer, AStarOptimizer, haversine_km, constantes
-    |
-    |-- application/                # Application Layer — casos de uso
-    |   |-- __init__.py
-    |   `-- services.py             # TripPlanner, TripLifecycleService
-    |
-    |-- presentation/               # Presentation Layer — HTTP / JSON
-    |   |-- __init__.py
-    |   |-- serializers.py          # _serialize_*, _ok, _error, _parse_json, helpers de rol
-    |   `-- views.py                # Todas las funciones de vista Django
-    |
-    |-- migrations/                 # Migraciones de base de datos (no modificar)
-    |   |-- 0001_initial.py
-    |   |-- 0002_driver_trip_driver_vehicle_driver_userprofile.py
-    |   `-- 0003_fuelprice_trip_estimated_fuel_cost_gtq_and_more.py
-    |
-    |-- templates/
-    |   `-- logistics/
-    |       `-- index.html
-    |
-    `-- static/
-        `-- logistics/
-            |-- app.js
-            `-- styles.css
+
+Abre http://localhost:5173 — Vite reenvía `/api` a Django en puerto 8000.
+
+### 7. Correr pruebas
+
+```bash
+python manage.py test logistics      # Backend (Django)
+cd frontend && npm test               # Frontend (Vitest)
 ```
 
 ---
 
-## API REST
+## Usuarios de demo
 
-Todos los endpoints requieren sesion autenticada. Base URL: `/`
+Con `DEMO_PASSWORD` en `.env`:
+```bash
+python manage.py seed_demo_users
+```
 
-| Metodo | Endpoint | Descripcion |
-|--------|----------|-------------|
-| GET | `/api/me/` | Datos del usuario autenticado |
-| GET/POST | `/api/users/` | Listar / crear usuarios (admin) |
-| GET | `/api/dashboard/` | Metricas y estadisticas |
-| GET | `/api/departments/` | Listar departamentos |
-| GET | `/api/connections/` | Listar conexiones viales |
-| GET/POST | `/api/drivers/` | Listar / crear conductores |
-| GET/POST | `/api/vehicles/` | Listar / crear vehiculos |
-| GET/POST | `/api/orders/` | Listar / crear pedidos |
-| GET | `/api/trips/` | Listar viajes |
-| POST | `/api/trips/plan/` | Planificar nuevo viaje |
-| POST | `/api/trips/<id>/action/` | Cambiar estado (start / complete / cancel) |
-| POST | `/api/trips/<id>/events/` | Agregar evento a un viaje |
-| GET/POST | `/api/fuel-price/` | Consultar / actualizar precio de combustible |
+Se crean:
+- **admin** / `<DEMO_PASSWORD>` — Administrador
+- **despachador** / `<DEMO_PASSWORD>` — Planificador de rutas
+- **conductor** / `<DEMO_PASSWORD>` — Entrega
+
+---
+
+## Experimentos (E1–E7)
+
+Requiere `matplotlib` (en `requirements-dev.txt`):
+```bash
+pip install -r requirements-dev.txt
+python manage.py run_experiments [--max-nodes 10000]
+```
+
+Genera CSV + PNG en `experiments/output/`:
+
+| Experimento | Métrica | Resultado esperado |
+|---|---|---|
+| E1 | Correctitud | `costo(A*) == costo(Dijkstra)` en 100% de pares |
+| E2 | Eficiencia | A\* expande ≤ nodos que Dijkstra, ganancia en viajes largos |
+| E3 | Impacto tráfico | Ruta "rápida" vs "corta" por franja, cambios de carretera |
+| E4 | Precisión (Should) | MAPE < 20% vs. Google en rutas completas |
+| E5 | Varias paradas | 2-opt mejora vecino cercano |
+| E6 | Hora salida (Should) | Curva de tiempo en 7 franjas |
+| E7 | Escalabilidad | A\* en grafos de 1k–100k nodos |
+
+---
+
+## API REST (resumen)
+
+Todos los endpoints requieren sesión autenticada.
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| GET | `/api/routing/nodes/` | Nodos del grafo |
+| POST | `/api/routing/route/` | Ruta entre dos nodos (Dijkstra o A\*) |
+| POST | `/api/routing/compare/` | Comparar Dijkstra vs A* |
+| POST | `/api/routes/optimize/` | Optimizar múltiples paradas |
+| GET | `/api/routing/best_departure/` | Mejor hora para salir (7 franjas) |
+| GET | `/api/traffic/profile/` | Multiplicadores de tráfico por franja |
+
+Ver `logistics/urls.py` y `logistics/presentation/routing_views.py` para detalles.
+
+---
+
+## Flujo de trabajo (desarrollo)
+
+### Rama y commits
+
+- Rama principal: `dev` (se trabaja directamente en `dev` sin PR hasta producción)
+- Antes de commit: `python manage.py test` en verde
+- Mensaje de commit en español
+
+### Reglas del motor (no negociables)
+
+- Pesos **siempre ≥ 0** (tráfico multiplica, no resta)
+- Costo y heurística en **misma unidad** (minutos)
+- `v_max` **derivado de los datos**, no inventado
+- Grafo **dirigido** y **en memoria** (sin consultas a BD dentro del bucle)
+- Implementación propia con `heapq` (sin networkx, OR-Tools, OSMnx)
+- Toda búsqueda devuelve instrumentación (nodos, ms, ruta)
+- Prueba: `costo(A*) == costo(Dijkstra)` en todos los pares y franjas
+
+Ver `CLAUDE.md` para arquitectura y convenciones completas.
+
+---
+
+## Diseño
+
+- **Interfaz** y mensajes en **español**
+- **Minimalista**: Geist + Geist Mono, neutros, negro `#111113` para acción principal
+- **Color** solo para rutas, tráfico y estados
+- Mapa esquemático (SVG), sin depender de Google Maps visual
 
 ---
 
 ## Deploy en Render
 
-1. Sube este repositorio a GitHub.
-2. Crea un Web Service en Render conectado al repo.
-3. Usa estos comandos:
-   - Build Command:
-     ```bash
-     pip install -r requirements.txt && python manage.py collectstatic --noinput
-     ```
-   - Start Command:
-     ```bash
-     python manage.py migrate && gunicorn rutasia.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --timeout 120
-     ```
-4. Configura las variables de entorno listadas en la seccion anterior.
+1. Crear Web Service en Render conectado al repositorio
+2. **Build Command:**
+   ```bash
+   pip install -r requirements.txt && python manage.py collectstatic --noinput
+   ```
+3. **Start Command:**
+   ```bash
+   python manage.py migrate && gunicorn rutasia.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --timeout 120
+   ```
+4. **Variables de entorno:** `GOOGLE_MAPS_API_KEY`, `DATABASE_URL` (Neon), `SECRET_KEY`
+
+---
+
+## Recursos
+
+- **Plan completo:** [`docs/PLAN.md`](docs/PLAN.md)
+- **Cómo empezar:** [`docs/EMPEZAR.md`](docs/EMPEZAR.md)
+- **Keys de Google:** [`docs/GOOGLE_KEYS.md`](docs/GOOGLE_KEYS.md)
+- **Trazabilidad protocolo:** [`docs/trazabilidad-objetivos.md`](docs/trazabilidad-objetivos.md)
+- **Kanban de trabajo:** RUT en Kanban MCP (ver `/kanban`)
+
+---
+
+## Tecnologías
+
+| Capa | Tecnología |
+|---|---|
+| Backend | Django 6, Python 3.12+, PostgreSQL (Neon) |
+| Frontend | React 19, TypeScript, Vite, Tailwind v4, TanStack Query |
+| Motor | Dijkstra, A*, Haversine, heapq (sin librerías de ruteo) |
+| Datos viales | Google Routes API (construction), Google Maps API (dibujo) |
+| Deploy | Render, WhiteNoise |
+
+---
+
+## Nota sobre datos
+
+Mientras no se disponga de `GOOGLE_ROUTES_API_KEY`:
+- Aristas: `source=estimate` (km y minutos estimados)
+- Tráfico: `source=synthetic` (multiplicadores generados)
+
+**Nunca presentar estos números como resultados de tesis.** La columna `data_source`
+en cada respuesta audita el origen.
 
 ---
 
 ## Licencia
 
-Proyecto academico — Universidad Mesoamericana de Guatemala.
+Proyecto académico — Universidad Mesoamericana de Guatemala.
