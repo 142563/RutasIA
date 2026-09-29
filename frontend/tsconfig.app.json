@@ -13,7 +13,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "isolatedModules": true,
-    "types": ["vite/client"],
+    "types": ["vite/client", "google.maps"],
     "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src"]

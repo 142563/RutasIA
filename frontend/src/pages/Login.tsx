@@ -1,5 +1,7 @@
+import { useQuery } from "@tanstack/react-query";
 import * as React from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
+import { api } from "@/lib/api";
 import { Logo } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
@@ -12,6 +14,11 @@ export function LoginPage() {
   const location = useLocation();
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const config = useQuery({
+    queryKey: ["config"],
+    queryFn: () => api<{ demo_users: boolean }>("/api/config/"),
+    staleTime: Infinity,
+  });
 
   if (session.data) return <Navigate to={homeFor(session.data.role)} replace />;
 
@@ -46,6 +53,12 @@ export function LoginPage() {
             {login.isPending ? "Entrando…" : "Entrar"}
           </Button>
         </form>
+        {config.data?.demo_users ? (
+          <p className="mt-6 border-t border-line pt-4 text-[13px] text-ink-2">
+            Usuarios de prueba: <b className="text-ink">despachador</b> (planifica), <b className="text-ink">conductor</b> (entrega)
+            y <b className="text-ink">admin</b>. La contraseña es <span className="num">DEMO_PASSWORD</span> de tu archivo <span className="num">.env</span>.
+          </p>
+        ) : null}
       </div>
     </div>
   );

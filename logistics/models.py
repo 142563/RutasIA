@@ -12,6 +12,20 @@ def _random_suffix(length: int = 4) -> str:
     return "".join(random.choices(string.digits, k=length))
 
 
+def _unique_code(model: type[models.Model], prefix: str) -> str:
+    """Código legible PREFIJO-AAAAMMDD-NNNN que no choque con uno existente.
+
+    Con 4 dígitos al azar, crear decenas de registros el mismo día puede repetir un
+    código (paradoja del cumpleaños), así que se verifica antes de usarlo.
+    """
+    stamp = timezone.localtime().strftime("%Y%m%d")  # fecha de Guatemala, no UTC
+    for _ in range(20):
+        code = f"{prefix}-{stamp}-{_random_suffix()}"
+        if not model.objects.filter(code=code).exists():
+            return code
+    return f"{prefix}-{stamp}-{_random_suffix(8)}"
+
+
 class TimestampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -189,8 +203,7 @@ class Order(TimestampedModel):
 
     def save(self, *args, **kwargs):
         if not self.code:
-            stamp = timezone.localtime().strftime("%Y%m%d")  # fecha de Guatemala, no UTC
-            self.code = f"PED-{stamp}-{_random_suffix()}"
+            self.code = _unique_code(type(self), "PED")
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -237,8 +250,7 @@ class Trip(TimestampedModel):
 
     def save(self, *args, **kwargs):
         if not self.code:
-            stamp = timezone.localtime().strftime("%Y%m%d")  # fecha de Guatemala, no UTC
-            self.code = f"VIA-{stamp}-{_random_suffix()}"
+            self.code = _unique_code(type(self), "VIA")
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -511,8 +523,7 @@ class Route(TimestampedModel):
 
     def save(self, *args, **kwargs):
         if not self.code:
-            stamp = timezone.localtime().strftime("%Y%m%d")  # fecha de Guatemala, no UTC
-            self.code = f"RUT-{stamp}-{_random_suffix()}"
+            self.code = _unique_code(type(self), "RUT")
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
