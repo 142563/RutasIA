@@ -66,5 +66,5 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
   - Geist + Geist Mono.
   - Neutros; negro `#111113` para la acción principal; el color solo para rutas, tráfico y estados.
 - Nunca commitear `.env`, keys ni la `DATABASE_URL`. Usa `.env.example` como plantilla.
-- Rama de trabajo: `dev`. Cada funcionalidad en su propia rama desde `dev` y PR hacia `dev`. `main` = lo que está en producción.
+- Rama de trabajo: `dev`. **Mientras no haya deploy a producción, se trabaja directo en `dev`, sin pull requests**: pruebas en verde → commit → push a `dev`. Cuando el proyecto esté en producción, cada funcionalidad irá en su rama desde `dev` con PR hacia `dev`. `main` = lo que está en producción.
 - Antes de hacer commit: `python manage.py test` en verde.

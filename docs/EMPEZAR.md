@@ -93,13 +93,12 @@ Claude Code lee `CLAUDE.md` automáticamente, así que ya conoce el plan, las re
 
 ```
 main  ← producción (Render)
- └── dev  ← integración
-      ├── feature/motor-grafo
-      ├── feature/dijkstra-astar
-      └── feature/frontend-react …
+ └── dev  ← aquí se trabaja
 ```
 
-Cada funcionalidad va en su rama desde `dev`, con un PR hacia `dev`. Cuando `dev` esté estable, se hace el PR de `dev` a `main`.
+**Mientras el proyecto no esté en producción, se trabaja directo en `dev`, sin pull requests:** pruebas en verde (`python manage.py test`) → commit → `git push origin dev`. Cuando `dev` esté estable, se lleva a `main` para el deploy. A partir de ahí, cada funcionalidad nueva irá en su propia rama con PR hacia `dev`.
+
+La rama `archivo/Dev-2026-07` guarda el prototipo de julio (no está en `dev`); no se borra.
 
 ## Enlaces útiles
 
