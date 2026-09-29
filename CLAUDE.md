@@ -21,16 +21,17 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
     - `google.py` (Routes API, solo en comandos), `build.py`, `calibration.py`.
     - `experiments.py`, `synthetic.py`, `charts.py`, y los datos semilla en `seed_data.py`.
   - Modelos del grafo: `Node`, `Edge` (dirigida), `TrafficProfile` (m ≥ 1) y `RouteSample` (caché/bitácora de Google).
-  - Comandos: `seed_graph_nodes` → `build_graph [--estimate]` → `calibrate_traffic [--synthetic]` → `run_experiments`.
+  - **Arranque en un paso:** `python manage.py preparar [--google]` (migra, nodos, tramos, tráfico, datos y usuarios de demo, compila React). Es idempotente y nunca reemplaza datos de Google por estimados. Explicación para humanos: `docs/COMO_FUNCIONA.md`.
+  - Comandos sueltos: `seed_graph_nodes` → `build_graph [--estimate]` → `calibrate_traffic [--synthetic]` → `run_experiments`.
   - `logistics/application/routing.py` + `logistics/presentation/routing_views.py`: `/api/routing/*`, `/api/routes/optimize/`, `/api/traffic/profile/`.
   - **Motor viejo** (sigue funcionando hasta que llegue React): `logistics/domain/services.py` (`RouteOptimizer`, `AStarOptimizer` sobre `Department`/`RouteConnection`), `logistics/application/services.py` (`TripPlanner`), `logistics/presentation/views.py`.
-  - **App React** en `frontend/` (Vite + React 19 + TS + Tailwind v4 + componentes estilo shadcn en `src/components/ui`, React Router, TanStack Query). Mapa esquemático propio en SVG (`src/components/map/NetworkMap.tsx`), sin depender de Google. Django la sirve desde `frontend/dist/app/` en `/` (vista `spa`); sesión por `/api/auth/*`.
+  - **App React** en `frontend/` (Vite + React 19 + TS + Tailwind v4 + componentes estilo shadcn en `src/components/ui`, React Router, TanStack Query). Mapa en `src/components/map/NetworkMap.tsx`: con `GOOGLE_MAPS_API_KEY` usa **Google Maps de fondo** (cargado en `src/lib/googleMaps.ts` con la key de `/api/config/`) y dibuja encima, en SVG, las capas del motor. Las rutas con `followRoads` se trazan por carretera real con Directions, pasando por los nodos que eligió nuestro algoritmo. Sin key, o si Google la rechaza, cae al mapa esquemático propio. Django la sirve desde `frontend/dist/app/` en `/` (vista `spa`); sesión por `/api/auth/*`.
   - Interfaz anterior (JS sin framework) en `/clasico/`: `templates/logistics/index.html` + `static/logistics/app.js`.
   - Roles: `admin`, `dispatcher`, `driver` (`UserProfile.Role`); usuarios de demo con `seed_demo_users` (exige `DEMO_PASSWORD`).
 - **Datos:** mientras no haya `GOOGLE_ROUTES_API_KEY`, el grafo usa aristas `estimate` y tráfico `synthetic`. Toda respuesta y todo CSV indica la fuente (`data_source`). **Nunca** presentar esos números como resultados de tesis.
 - BD: PostgreSQL (Neon) vía `DATABASE_URL`; sin esa variable usa SQLite local.
 - Deploy: Render (`render.yaml`, `Procfile`), archivos estáticos con WhiteNoise. `matplotlib` solo en `requirements-dev.txt`.
-- Pruebas: `python manage.py test` (86 pruebas, ~30 s; incluye E1 completa en `logistics/tests/test_search.py`).
+- Pruebas: `python manage.py test` (169 pruebas, ~70 s; `matplotlib` de requirements-dev.txt para las de gráficas; incluye E1 completa en `logistics/tests/test_search.py`).
 
 ## Hacia dónde vamos (resumen de docs/PLAN.md)
 

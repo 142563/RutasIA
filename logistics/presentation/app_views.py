@@ -71,6 +71,8 @@ def api_config(request: HttpRequest):
     return _ok({
         "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY,
         "google_maps_map_id": settings.GOOGLE_MAPS_MAP_ID,
+        # Solo en desarrollo: el login recuerda qué usuarios de demo existen (nunca la contraseña)
+        "demo_users": settings.DEBUG,
     })
 
 

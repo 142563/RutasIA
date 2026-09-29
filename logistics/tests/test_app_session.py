@@ -70,6 +70,12 @@ class SessionApiTests(TestCase):
         data = self.client.get(reverse("api-config")).json()
         self.assertIn("google_maps_api_key", data)
 
+    def test_config_hints_demo_users_only_in_debug(self):
+        with self.settings(DEBUG=False):
+            self.assertFalse(self.client.get(reverse("api-config")).json()["demo_users"])
+        with self.settings(DEBUG=True):
+            self.assertTrue(self.client.get(reverse("api-config")).json()["demo_users"])
+
 
 class RoleTests(TestCase):
     def test_user_without_profile_gets_least_privilege(self):

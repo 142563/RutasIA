@@ -181,16 +181,16 @@ other: PlanVariant | null;
     variant?.stops.forEach((s) => markers.push({ id: `s${s.order_id}`, kind: "stop", lat: s.lat, lng: s.lng, label: String(s.sequence) }));
   }
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-[70vh] flex-col lg:h-full">
       <NetworkMap
         nodes={nodes}
         edges={edges}
         fitTo={markers.length ? [...markers, ...(variant ? routeNodes(variant) : []).map((c) => nodes.find((n) => n.code === c)!).filter(Boolean)] : undefined}
-        className="max-h-full"
+        fill
         paths={[
           ...(other && variant && routeNodes(other).join() !== routeNodes(variant).join()
             ? [{ codes: routeNodes(other), color: OTHER_COLOR, width: 2.5, dashed: true }] : []),
-          ...(variant ? [{ codes: routeNodes(variant), color: ROUTE_COLOR, width: 4 }] : []),
+          ...(variant ? [{ codes: routeNodes(variant), color: ROUTE_COLOR, width: 4, followRoads: true }] : []),
         ]}
         markers={markers}
       />

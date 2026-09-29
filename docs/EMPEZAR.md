@@ -1,5 +1,26 @@
 # Empezar a programar en tu compu (Windows)
 
+## Versión corta (lo único que necesitas para usar la app)
+
+Necesitas **Python 3.12+** y **Node.js 20+**. En la carpeta del proyecto:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env          # pon tu GOOGLE_MAPS_API_KEY para ver Google Maps
+python manage.py preparar       # base de datos, grafo, tráfico, usuarios y app React: todo en uno
+python manage.py runserver
+```
+
+Abre http://127.0.0.1:8000 y entra con `despachador` (o `conductor`). La contraseña te la muestra `preparar` y queda guardada en `.env` como `DEMO_PASSWORD`.
+
+**Las siguientes veces solo necesitas:** `.venv\Scripts\activate` y `python manage.py runserver`. Si bajas cambios de GitHub (`git pull`), vuelve a correr `python manage.py preparar`: no borra nada.
+
+Cómo funciona todo, explicado simple: [`COMO_FUNCIONA.md`](COMO_FUNCIONA.md).
+
+---
+
 ## 1. Traer la rama `dev`
 
 Si ya tienes el repo clonado:

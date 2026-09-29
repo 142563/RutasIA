@@ -114,7 +114,7 @@ export function TrafficPage() {
                       const oy = ((x2 - x1) / len) * off;
                       return (
                         <line key={`${e.from}>${e.to}`} x1={x1 - ox} y1={y1 - oy} x2={x2 - ox} y2={y2 - oy}
-                          stroke={congestionColor(e.multiplier)} strokeWidth={view === "metro" ? 5 : 3}>
+                          stroke={congestionColor(e.multiplier)} strokeWidth={view === "metro" ? 5 : 3} pointerEvents="visibleStroke">
                           <title>{`${names.get(e.from)} → ${names.get(e.to)} · ×${e.multiplier.toFixed(2)} · ${formatMinutes(e.t0_min)} sin tráfico → ${formatMinutes(e.t0_min * e.multiplier)}`}</title>
                         </line>
                       );

@@ -48,20 +48,24 @@ export function HomePage() {
           </div>
           <DataSourceNote source={network.data?.data_source} />
           <div className="flex flex-col gap-2">
-            <h2 className="text-sm font-semibold">Accesos rápidos</h2>
+            <h2 className="text-sm font-semibold">Cómo se usa</h2>
             {[
-              { to: "/pedidos", title: "Pedidos", text: "Registra entregas y elige cuáles planificar." },
-              { to: "/planificar", title: "Planificar", text: "La ruta más rápida con el tráfico de la hora de salida." },
-              { to: "/laboratorio", title: "Laboratorio", text: "Dijkstra y A* lado a lado sobre el mapa de Guatemala." },
-            ].map((item) => (
-              <Link key={item.to} to={item.to} className="group flex items-center justify-between border-b border-line py-3 last:border-b-0">
-                <span>
+              { to: "/pedidos", title: "Pedidos", text: "Registra los paquetes con su dirección y marca cuáles salen hoy." },
+              { to: "/planificar", title: "Planificar", text: "Eliges la hora de salida y el sistema propone la ruta más rápida con el tráfico de esa hora." },
+              { to: "/rutas", title: "Asignar y seguir", text: "Confirmas con un conductor: él ve la ruta en su celular y tú el avance en Monitoreo." },
+            ].map((item, i) => (
+              <Link key={item.to} to={item.to} className="group flex items-center gap-4 border-b border-line py-3 last:border-b-0">
+                <span className="num grid size-7 shrink-0 place-items-center rounded-full bg-ink text-xs font-semibold text-white">{i + 1}</span>
+                <span className="flex-1">
                   <span className="block text-sm font-medium">{item.title}</span>
                   <span className="block text-[13px] text-ink-2">{item.text}</span>
                 </span>
                 <ArrowRightIcon className="size-4 text-ink-2 transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
               </Link>
             ))}
+            <p className="pt-1 text-[13px] text-ink-2">
+              Para la defensa: en <Link to="/laboratorio" className="underline">Laboratorio</Link> se ven Dijkstra y A* lado a lado.
+            </p>
           </div>
           <Button asChild variant="outline" className="self-start">
             <Link to="/planificar">Planificar rutas de hoy</Link>

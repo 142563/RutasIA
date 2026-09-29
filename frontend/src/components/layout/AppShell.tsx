@@ -1,6 +1,6 @@
 import {
   ActivityIcon, BarChart3Icon, FlaskConicalIcon, HouseIcon, LogOutIcon, MapIcon, MenuIcon, PackageIcon,
-  RouteIcon, SettingsIcon, TruckIcon, XIcon,
+  RouteIcon, TruckIcon, XIcon,
 } from "lucide-react";
 import * as React from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
@@ -26,7 +26,8 @@ const ANALYSIS: NavItem[] = [
   { to: "/laboratorio", label: "Laboratorio", icon: FlaskConicalIcon },
   { to: "/reportes", label: "Reportes", icon: BarChart3Icon },
 ];
-const ADMIN: NavItem[] = [{ to: "/configuracion", label: "Configuración", icon: SettingsIcon, adminOnly: true }];
+// Configuración todavía es una página "próximamente": no se muestra en el menú para no confundir
+const ADMIN: NavItem[] = [];
 
 export function Logo() {
   return (
