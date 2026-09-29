@@ -72,7 +72,8 @@ def parse_choice(value: Any, allowed, label: str, default: str) -> str:
 # --- serialización -----------------------------------------------------------
 
 def node_payload(graph: RoadGraph, i: int) -> dict:
-    return {"code": graph.codes[i], "name": graph.names[i], "lat": graph.lat[i], "lng": graph.lon[i]}
+    return {"code": graph.codes[i], "name": graph.names[i], "kind": graph.kinds[i],
+            "lat": graph.lat[i], "lng": graph.lon[i]}
 
 
 def roads_along(graph: RoadGraph, edges: list[int]) -> list[str]:
@@ -290,5 +291,13 @@ def traffic_profile(params) -> dict:
 
 
 def nodes() -> dict:
+    """Nodos y tramos (sin dirección) del grafo, para dibujar el mapa esquemático."""
     graph = get_graph()
-    return {"nodes": [node_payload(graph, i) for i in range(graph.node_count)], **meta(graph)}
+    seen, edges = set(), []
+    for e in range(graph.edge_count):
+        a, b = graph.codes[graph.edge_from[e]], graph.codes[graph.edge_to[e]]
+        key = frozenset((a, b))
+        if key not in seen:
+            seen.add(key)
+            edges.append({"from": a, "to": b, "road": graph.roads[e]})
+    return {"nodes": [node_payload(graph, i) for i in range(graph.node_count)], "edges": edges, **meta(graph)}

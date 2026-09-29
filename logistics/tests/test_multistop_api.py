@@ -89,12 +89,14 @@ class RoutingApiTests(TestCase):
 
     def test_requires_login(self):
         self.client.logout()
-        self.assertEqual(self.client.get(reverse("api-routing-nodes")).status_code, 302)
-        self.assertEqual(self.post("api-routing-compare", {}).status_code, 302)
+        # En /api/ la redirección al login se convierte en 401 JSON (la usa la app React)
+        self.assertEqual(self.client.get(reverse("api-routing-nodes")).status_code, 401)
+        self.assertEqual(self.post("api-routing-compare", {}).status_code, 401)
 
     def test_nodes(self):
         data = self.client.get(reverse("api-routing-nodes")).json()
         self.assertEqual(len(data["nodes"]), 108)
+        self.assertEqual(len(data["edges"]), 130)  # tramos sin dirección, para el mapa
         self.assertEqual(data["data_source"], {"edges": "estimate", "traffic": "synthetic"})
 
     def test_route_by_code_and_by_coordinates(self):

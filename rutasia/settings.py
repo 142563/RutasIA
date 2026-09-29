@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+import re
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -126,6 +127,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "rutasia.middleware.ApiLoginRequiredMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -193,9 +195,28 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "/static/"
+# Build de la aplicación React (npm run build en frontend/ → frontend/dist/app/).
+# Se publica tal cual, así que queda en /static/app/.
+FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+if FRONTEND_DIST.exists():
+    STATICFILES_DIRS.append(FRONTEND_DIST)
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+
+def _immutable_static_file(path: str, url: str) -> bool:
+    """Caché de un año para archivos con hash en el nombre: los de Django (manifiesto)
+    y los que genera Vite en /static/app/assets/ (index-CAxl6tZc.js)."""
+    return bool(re.search(r"\.[0-9a-f]{12}\.\w+$", url) or re.search(r"/static/app/assets/.+-[\w-]{8}\.\w+$", url))
+
+
+WHITENOISE_IMMUTABLE_FILE_TEST = _immutable_static_file
+
+# Django 6 ya no lee STATICFILES_STORAGE: se configura con STORAGES.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "rutasia.storage.StaticStorage"},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

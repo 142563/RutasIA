@@ -33,6 +33,7 @@ class RoadGraph:
     edge_db_ids: list[int | None] = field(default_factory=list)
     multipliers: dict[Profile, list[float]] = field(default_factory=dict)
     sources: dict[str, str] = field(default_factory=dict)  # de dónde salen los datos
+    kinds: list[str] = field(default_factory=list)  # cabecera | municipio | cruce (para el mapa)
 
     def __post_init__(self) -> None:
         self.index = {code: i for i, code in enumerate(self.codes)}
@@ -43,6 +44,8 @@ class RoadGraph:
             self.roads = [""] * len(self.t0)
         if not self.edge_db_ids:
             self.edge_db_ids = [None] * len(self.t0)
+        if not self.kinds:
+            self.kinds = [""] * len(self.codes)
         self._weights_cache: dict[tuple, list[float]] = {}
 
     # --- construcción -----------------------------------------------------
@@ -142,6 +145,7 @@ def build_graph_from_db() -> RoadGraph:
     return RoadGraph(
         codes=[n.code for n in nodes],
         names=[n.name for n in nodes],
+        kinds=[n.kind for n in nodes],
         lat=[n.latitude for n in nodes],
         lon=[n.longitude for n in nodes],
         edge_from=[index[e.origin_id] for e in edges],

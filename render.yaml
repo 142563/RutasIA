@@ -3,7 +3,8 @@ services:
   - type: web
     name: rutasia
     runtime: python
-    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    # Primero se compila la aplicación React (frontend/dist) y luego collectstatic la publica.
+    buildCommand: cd frontend && npm ci && npm run build && cd .. && pip install -r requirements.txt && python manage.py collectstatic --noinput
     startCommand: gunicorn rutasia.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --timeout 120
     envVars:
       - key: DATABASE_URL
@@ -15,6 +16,8 @@ services:
       # Sin esta variable el template renderiza el mapa sin API key y
       # Google responde InvalidKeyMapError.
       - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: GOOGLE_ROUTES_API_KEY
         sync: false
       - key: DEBUG
         value: "False"

@@ -24,7 +24,9 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
   - Comandos: `seed_graph_nodes` → `build_graph [--estimate]` → `calibrate_traffic [--synthetic]` → `run_experiments`.
   - `logistics/application/routing.py` + `logistics/presentation/routing_views.py`: `/api/routing/*`, `/api/routes/optimize/`, `/api/traffic/profile/`.
   - **Motor viejo** (sigue funcionando hasta que llegue React): `logistics/domain/services.py` (`RouteOptimizer`, `AStarOptimizer` sobre `Department`/`RouteConnection`), `logistics/application/services.py` (`TripPlanner`), `logistics/presentation/views.py`.
-  - `templates/logistics/index.html` + `static/logistics/app.js` — frontend actual en JS sin framework (se reemplazará por React).
+  - **App React** en `frontend/` (Vite + React 19 + TS + Tailwind v4 + componentes estilo shadcn en `src/components/ui`, React Router, TanStack Query). Mapa esquemático propio en SVG (`src/components/map/NetworkMap.tsx`), sin depender de Google. Django la sirve desde `frontend/dist/app/` en `/` (vista `spa`); sesión por `/api/auth/*`.
+  - Interfaz anterior (JS sin framework) en `/clasico/`: `templates/logistics/index.html` + `static/logistics/app.js`.
+  - Roles: `admin`, `dispatcher`, `driver` (`UserProfile.Role`); usuarios de demo con `seed_demo_users` (exige `DEMO_PASSWORD`).
 - **Datos:** mientras no haya `GOOGLE_ROUTES_API_KEY`, el grafo usa aristas `estimate` y tráfico `synthetic`. Toda respuesta y todo CSV indica la fuente (`data_source`). **Nunca** presentar esos números como resultados de tesis.
 - BD: PostgreSQL (Neon) vía `DATABASE_URL`; sin esa variable usa SQLite local.
 - Deploy: Render (`render.yaml`, `Procfile`), archivos estáticos con WhiteNoise. `matplotlib` solo en `requirements-dev.txt`.

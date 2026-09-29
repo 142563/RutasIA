@@ -67,7 +67,7 @@ def api_users(request: HttpRequest):
         users = User.objects.select_related("profile").all().order_by("username")
         result = []
         for u in users:
-            role = UserProfile.Role.OPERATOR
+            role = UserProfile.Role.DISPATCHER
             try:
                 role = u.profile.role
             except Exception:
@@ -86,7 +86,7 @@ def api_users(request: HttpRequest):
         payload = _parse_json(request)
         username = str(payload["username"]).strip()
         password = str(payload["password"])
-        role = payload.get("role", UserProfile.Role.OPERATOR)
+        role = payload.get("role", UserProfile.Role.DISPATCHER)
         first_name = str(payload.get("first_name", "")).strip()
         last_name = str(payload.get("last_name", "")).strip()
         email = str(payload.get("email", "")).strip()
@@ -135,7 +135,7 @@ def api_departments(request: HttpRequest):
         departments = Department.objects.all()
         return _ok({"departments": [_serialize_department(d) for d in departments]})
 
-    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.SUPERVISOR)
+    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.DISPATCHER)
     if perm_error:
         return perm_error
 
@@ -192,7 +192,7 @@ def api_drivers(request: HttpRequest):
         drivers = Driver.objects.all()
         return _ok({"drivers": [_serialize_driver(d) for d in drivers]})
 
-    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.SUPERVISOR)
+    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.DISPATCHER)
     if perm_error:
         return perm_error
 
@@ -218,7 +218,7 @@ def api_vehicles(request: HttpRequest):
         vehicles = Vehicle.objects.select_related("current_department", "driver").all()
         return _ok({"vehicles": [_serialize_vehicle(v) for v in vehicles]})
 
-    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.SUPERVISOR)
+    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.DISPATCHER)
     if perm_error:
         return perm_error
 
@@ -271,7 +271,7 @@ def api_orders(request: HttpRequest):
             orders = orders.filter(destination_id=destination_filter)
         return _ok({"orders": [_serialize_order(o) for o in orders]})
 
-    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.SUPERVISOR)
+    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.DISPATCHER)
     if perm_error:
         return perm_error
 
@@ -325,7 +325,7 @@ def api_trips(request: HttpRequest):
 @login_required
 @require_http_methods(["POST"])
 def api_plan_trip(request: HttpRequest):
-    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.SUPERVISOR)
+    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.DISPATCHER)
     if perm_error:
         return perm_error
 
@@ -378,7 +378,7 @@ def api_trip_action(request: HttpRequest, trip_id: int):
         ),
         pk=trip_id,
     )
-    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.SUPERVISOR)
+    perm_error = _require_role(request, UserProfile.Role.ADMIN, UserProfile.Role.DISPATCHER)
     if perm_error:
         return perm_error
 

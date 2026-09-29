@@ -42,11 +42,11 @@ class FuelPrice(TimestampedModel):
 class UserProfile(models.Model):
     class Role(models.TextChoices):
         ADMIN = "admin", "Administrador"
-        SUPERVISOR = "supervisor", "Supervisor"
-        OPERATOR = "operator", "Operador"
+        DISPATCHER = "dispatcher", "Despachador"
+        DRIVER = "driver", "Conductor"
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    role = models.CharField(max_length=20, choices=Role.choices, default=Role.OPERATOR)
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.DISPATCHER)
 
     def __str__(self) -> str:
         return f"{self.user.username} ({self.get_role_display()})"
@@ -97,6 +97,10 @@ class RouteConnection(TimestampedModel):
 
 
 class Driver(TimestampedModel):
+    user = models.OneToOneField(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="driver",
+        help_text="Cuenta con la que el conductor entra a su vista móvil.",
+    )
     name = models.CharField(max_length=120)
     phone = models.CharField(max_length=20, blank=True)
     license_number = models.CharField(max_length=30, unique=True)

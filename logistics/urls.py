@@ -1,8 +1,15 @@
 from django.urls import path
-from logistics.presentation import routing_views, views
+from logistics.presentation import app_views, routing_views, views
 
 urlpatterns = [
-    path("", views.index, name="index"),
+    # Interfaz anterior (JS sin framework), mientras se retira
+    path("clasico/", views.index, name="index"),
+    # Sesión y configuración de la aplicación React
+    path("api/auth/csrf/", app_views.api_csrf, name="api-auth-csrf"),
+    path("api/auth/login/", app_views.api_login, name="api-auth-login"),
+    path("api/auth/logout/", app_views.api_logout, name="api-auth-logout"),
+    path("api/auth/session/", app_views.api_session, name="api-auth-session"),
+    path("api/config/", app_views.api_config, name="api-config"),
     path("api/me/", views.api_me, name="api-me"),
     path("api/users/", views.api_users, name="api-users"),
     path("api/dashboard/", views.api_dashboard, name="api-dashboard"),

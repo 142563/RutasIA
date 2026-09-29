@@ -32,10 +32,15 @@ def _error(message: str, status: int = 400) -> JsonResponse:
 
 
 def _get_role(request: HttpRequest) -> str:
+    return role_for(request.user)
+
+
+def role_for(user) -> str:
+    """Rol del usuario. Sin perfil: admin si es superusuario; si no, el rol con menos permisos."""
     try:
-        return request.user.profile.role
+        return user.profile.role
     except Exception:
-        return UserProfile.Role.OPERATOR
+        return UserProfile.Role.ADMIN if user.is_superuser else UserProfile.Role.DRIVER
 
 
 def _require_role(request: HttpRequest, *allowed_roles: str) -> JsonResponse | None:

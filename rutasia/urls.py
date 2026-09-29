@@ -16,10 +16,15 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
+
+from logistics.presentation.app_views import spa
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("django.contrib.auth.urls")),
     path("", include("logistics.urls")),
+    # Aplicación React: cualquier otra ruta la resuelve el router del cliente
+    path("", spa, name="spa"),
+    re_path(r"^(?!api/|admin/|accounts/|static/|clasico/)(?P<path>.+)$", spa),
 ]

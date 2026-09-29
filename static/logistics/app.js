@@ -315,12 +315,12 @@ function renderUserInfo() {
     if (!user) return;
     document.getElementById("user-name").textContent = user.full_name || user.username;
     const badge = document.getElementById("user-badge");
-    const roleLabels = { admin: "Admin", supervisor: "Supervisor", operator: "Operador" };
+    const roleLabels = { admin: "Admin", dispatcher: "Despachador", driver: "Conductor" };
     badge.textContent = roleLabels[user.role] || user.role;
     badge.className = `role-badge role-${user.role}`;
 
     const isAdmin = user.role === "admin";
-    const isSupervisor = user.role === "supervisor" || isAdmin;
+    const isSupervisor = user.role === "dispatcher" || isAdmin;
 
     document.getElementById("tab-users-btn").style.display = isAdmin ? "" : "none";
     document.getElementById("tab-departments-btn").style.display = isSupervisor ? "" : "none";
@@ -614,7 +614,7 @@ function renderUsers() {
         body.innerHTML = `<tr><td colspan="5">No hay usuarios registrados.</td></tr>`;
         return;
     }
-    const roleLabels = { admin: "Administrador", supervisor: "Supervisor", operator: "Operador" };
+    const roleLabels = { admin: "Administrador", dispatcher: "Despachador", driver: "Conductor" };
     state.users.forEach((u) => {
         body.insertAdjacentHTML(
             "beforeend",
@@ -1168,8 +1168,8 @@ function showPlannerResult(trip) {
 }
 
 function buildTripActions(trip) {
-    const role = state.currentUser ? state.currentUser.role : "operator";
-    if (role === "operator") return "—";
+    const role = state.currentUser ? state.currentUser.role : "driver";
+    if (role === "driver") return "—";
     if (trip.status === "completed" || trip.status === "canceled") return "Sin acciones";
     if (trip.status === "planned") {
         return `

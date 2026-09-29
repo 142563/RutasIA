@@ -1,0 +1,57 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+/* Sistema de diseño minimalista (docs/PLAN.md §9).
+   Interfaz en neutros; negro para la acción principal; el color se reserva
+   para rutas, tráfico, algoritmos y estados. */
+@theme {
+  --font-sans: "Geist Variable", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+
+  --color-bg: #fafaf9;
+  --color-surface: #ffffff;
+  --color-ink: #111113;
+  --color-ink-2: #6b6f76;
+  --color-ink-3: #56595f;
+  --color-line: #ecece9;
+  --color-line-strong: #d9d9d5;
+  --color-hover: #efefed;
+  --color-accent: #2f4bd8;
+  --color-ok: #1a7f4b;
+  --color-err: #b42318;
+  --color-warn: #b45309;
+  --color-traffic: #f3c4ae;
+
+  /* Algoritmos: paleta categórica validada para daltonismo (mismos tonos que las gráficas) */
+  --color-dijkstra: #2a78d6;
+  --color-astar: #eb6834;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  button {
+    cursor: pointer;
+  }
+}
+
+/* Cifras, horas y códigos siempre en Geist Mono con dígitos tabulares */
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
