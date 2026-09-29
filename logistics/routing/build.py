@@ -21,8 +21,8 @@ from django.utils import timezone
 from logistics.models import Edge, Node, RouteSample
 from logistics.routing.geo import haversine_km
 from logistics.routing.google import TRAFFIC_UNAWARE, RoutesClient
-from logistics.routing.graph import invalidate_graph
-from logistics.routing.seed_data import ROAD_SEGMENTS, RoadSegment
+from logistics.routing.graph import RoadGraph, invalidate_graph
+from logistics.routing.seed_data import NODES, ROAD_SEGMENTS, RoadSegment
 
 # Supuestos PROVISIONALES del modo sin conexión (se reemplazan con Google):
 ESTIMATE_DETOUR_FACTOR = 1.3  # km por carretera ≈ 1.3 × km en línea recta
@@ -145,6 +145,21 @@ def estimate_segment(a: Node, b: Node) -> tuple[float, float]:
     """(km, minutos) estimados desde la línea recta. NO son datos reales."""
     km = haversine_km(a.latitude, a.longitude, b.latitude, b.longitude) * ESTIMATE_DETOUR_FACTOR
     return km, km / ESTIMATE_SPEED_KMH * 60
+
+
+def estimated_graph_from_seed(multipliers=None) -> RoadGraph:
+    """Grafo semilla con aristas estimadas, SIN BD (pruebas y experimentos sin conexión)."""
+    coords = {n.code: (n.latitude, n.longitude) for n in NODES}
+    edges = []
+    for (a, b) in _directed_pairs(ROAD_SEGMENTS):
+        km = haversine_km(*coords[a], *coords[b]) * ESTIMATE_DETOUR_FACTOR
+        edges.append((a, b, km, km / ESTIMATE_SPEED_KMH * 60))
+    return RoadGraph.from_lists(
+        nodes=[(n.code, n.name, n.latitude, n.longitude) for n in NODES],
+        edges=edges,
+        multipliers=multipliers,
+        sources={"edges": "estimate", "traffic": "synthetic" if multipliers else "none"},
+    )
 
 
 @transaction.atomic
