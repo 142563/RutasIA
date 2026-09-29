@@ -5,8 +5,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Department, Order, RouteConnection, Trip, UserProfile, Vehicle
-from .services import PlanningError, RouteOptimizer, TripPlanner
+from logistics.models import Department, Order, RouteConnection, Trip, UserProfile, Vehicle
+from logistics.services import PlanningError, RouteOptimizer, TripPlanner
 
 
 class RouteOptimizerTests(TestCase):
@@ -108,5 +108,3 @@ class TripPlanningApiTests(TestCase):
         self.vehicle.save(update_fields=["capacity_kg"])
         with self.assertRaisesMessage(PlanningError, "excede la capacidad"):
             TripPlanner.plan_trip(self.vehicle, Order.objects.filter(id__in=[self.order_1.id, self.order_2.id]))
-
-# Create your tests here.
