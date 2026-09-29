@@ -503,6 +503,8 @@ class Route(TimestampedModel):
     legs = models.JSONField(default=list, help_text="Tramos: nodos, minutos, km, franja.")
     data_source = models.CharField(max_length=80, blank=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PLANNED)
+    started_at = models.DateTimeField(null=True, blank=True, help_text="Cuándo el conductor inició la ruta.")
+    completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-departure_at", "-id"]
@@ -540,3 +542,76 @@ class RouteStop(models.Model):
 
     def __str__(self) -> str:
         return f"{self.route.code} #{self.sequence} {self.order.code}"
+
+
+class Incident(TimestampedModel):
+    """Incidente en la red vial (docs/PLAN.md §8, flujo C).
+
+    Mientras está vigente, cada arista afectada se PENALIZA (multiplier ≥ 1 sobre
+    el costo con tráfico) o se BLOQUEA (costo infinito). Nunca resta minutos: así
+    los pesos siguen ≥ 0 y la heurística de A* (con v_max del grafo sin
+    incidentes) sigue siendo admisible.
+    """
+
+    class Kind(models.TextChoices):
+        TRAFFIC = "traffic", "Tránsito pesado"
+        ACCIDENT = "accident", "Accidente"
+        LANDSLIDE = "landslide", "Derrumbe"
+        CLOSURE = "closure", "Carretera cerrada"
+
+    kind = models.CharField(max_length=12, choices=Kind.choices)
+    edges = models.ManyToManyField(Edge, related_name="incidents")
+    blocked = models.BooleanField(default=False, help_text="True = el tramo no se puede usar (costo infinito).")
+    multiplier = models.FloatField(default=1.0, help_text="Penalización extra ≥ 1 si no está bloqueado.")
+    starts_at = models.DateTimeField(default=timezone.now)
+    ends_at = models.DateTimeField(null=True, blank=True, help_text="Vacío = vigente hasta que se resuelva.")
+    note = models.CharField(max_length=255, blank=True)
+    reported_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    route = models.ForeignKey(
+        "Route", on_delete=models.SET_NULL, null=True, blank=True, related_name="incidents",
+        help_text="Ruta desde la que lo reportó el conductor, si aplica.",
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-starts_at", "-id"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(multiplier__gte=1.0), name="incident_multiplier_gte_1"),
+        ]
+
+    def __str__(self) -> str:
+        effect = "bloqueo" if self.blocked else f"×{self.multiplier:.2f}"
+        return f"{self.get_kind_display()} ({effect})"
+
+
+class RerouteProposal(TimestampedModel):
+    """Ruta alternativa que A* propone a un conductor por un incidente.
+
+    El conductor (o el despachador) la acepta o mantiene la ruta actual.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pendiente"
+        ACCEPTED = "accepted", "Aceptada"
+        KEPT = "kept", "Mantuvo la ruta"
+        EXPIRED = "expired", "Vencida"
+
+    route = models.ForeignKey(Route, on_delete=models.CASCADE, related_name="reroutes")
+    incident = models.ForeignKey(Incident, on_delete=models.SET_NULL, null=True, blank=True, related_name="reroutes")
+    current_minutes = models.FloatField(help_text="Minutos restantes por la ruta actual, con el incidente.")
+    proposed_minutes = models.FloatField(help_text="Minutos restantes por la ruta nueva.")
+    proposed_legs = models.JSONField(default=list, help_text="Tramos pendientes recalculados con A*.")
+    summary = models.CharField(max_length=200, blank=True, help_text='Ej.: "Nueva ruta por Palín: −18 min".')
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    decided_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    @property
+    def minutes_saved(self) -> float:
+        return self.current_minutes - self.proposed_minutes
+
+    def __str__(self) -> str:
+        return f"{self.route.code}: {self.summary or self.get_status_display()}"

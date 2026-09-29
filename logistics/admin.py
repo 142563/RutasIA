@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Department, Depot, Edge, Route, RouteStop, Node, Order, RouteConnection, TrafficProfile, Trip, TripEvent, TripOrder, Vehicle
+from .models import Department, Depot, Edge, Incident, RerouteProposal, Route, RouteStop, Node, Order, RouteConnection, TrafficProfile, Trip, TripEvent, TripOrder, Vehicle
 
 
 @admin.register(Department)
@@ -93,3 +93,16 @@ class RouteAdmin(admin.ModelAdmin):
     list_display = ("code", "depot", "driver", "departure_at", "criterion", "driving_minutes", "total_km", "status")
     list_filter = ("status", "criterion")
     inlines = [RouteStopInline]
+
+
+@admin.register(Incident)
+class IncidentAdmin(admin.ModelAdmin):
+    list_display = ("kind", "blocked", "multiplier", "starts_at", "ends_at", "resolved_at")
+    list_filter = ("kind", "blocked")
+    filter_horizontal = ("edges",)
+
+
+@admin.register(RerouteProposal)
+class RerouteProposalAdmin(admin.ModelAdmin):
+    list_display = ("route", "summary", "current_minutes", "proposed_minutes", "status", "created_at")
+    list_filter = ("status",)

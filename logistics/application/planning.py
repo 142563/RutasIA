@@ -238,18 +238,30 @@ def route_payload(route: Route) -> dict:
         "criterion": route.criterion,
         "depot": route.depot.name,
         "driver": route.driver.name if route.driver else None,
+        "driver_id": route.driver_id,
         "vehicle": route.vehicle.plate if route.vehicle else None,
         "departure_at": timezone.localtime(route.departure_at).isoformat(),
         "finish_at": timezone.localtime(route.finish_at).isoformat(),
+        "started_at": _local_iso(route.started_at),
+        "completed_at": _local_iso(route.completed_at),
         "driving_minutes": round(route.driving_minutes, 2),
         "total_km": round(route.total_km, 2),
         "minutes_saved": round(route.shortest_minutes - route.driving_minutes, 2) if route.shortest_minutes else None,
+        "data_source": route.data_source,
         "stops": [
-            {"sequence": s.sequence, "order_code": s.order.code, "recipient": s.order.recipient,
-             "node": node_ref(s.order.node), "eta": timezone.localtime(s.eta).isoformat(), "status": s.status}
+            {"id": s.id, "sequence": s.sequence, "order_code": s.order.code, "recipient": s.order.recipient,
+             "phone": s.order.phone, "address": s.order.address,
+             "lat": s.order.latitude, "lng": s.order.longitude,
+             "node": node_ref(s.order.node), "eta": timezone.localtime(s.eta).isoformat(),
+             "status": s.status, "status_label": s.get_status_display(), "reason": s.reason,
+             "delivered_at": _local_iso(s.delivered_at)}
             for s in stops
         ],
     }
+
+
+def _local_iso(moment) -> str | None:
+    return timezone.localtime(moment).isoformat() if moment else None
 
 
 def list_routes() -> dict:

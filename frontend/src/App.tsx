@@ -6,11 +6,17 @@ import { ErrorNote, Spinner } from "@/components/ui/misc";
 import { setUnauthorizedHandler } from "@/lib/api";
 import { UserContext, homeFor, useSession } from "@/lib/auth";
 import type { Role } from "@/lib/types";
+import { DriverStopPage } from "@/pages/driver/DriverStopPage";
+import { DriverTodayPage } from "@/pages/driver/DriverTodayPage";
 import { HomePage } from "@/pages/Home";
 import { LabPage } from "@/pages/lab/LabPage";
 import { LoginPage } from "@/pages/Login";
+import { MonitoringPage } from "@/pages/monitoring/MonitoringPage";
 import { OrdersPage } from "@/pages/orders/OrdersPage";
 import { PlannerPage } from "@/pages/planner/PlannerPage";
+import { ReportsPage } from "@/pages/reports/ReportsPage";
+import { RouteDetailPage } from "@/pages/routes/RouteDetailPage";
+import { RoutesPage } from "@/pages/routes/RoutesPage";
 import { TrafficPage } from "@/pages/traffic/TrafficPage";
 import { ComingSoonPage, NotFoundPage } from "@/pages/Placeholder";
 
@@ -46,11 +52,12 @@ const router = createBrowserRouter([
           { index: true, element: <HomePage /> },
           { path: "pedidos", element: <OrdersPage /> },
           { path: "planificar", element: <PlannerPage /> },
-          { path: "rutas", element: soon("Rutas", "Semana 3", "Lista y detalle de las rutas asignadas.") },
-          { path: "monitoreo", element: soon("Monitoreo", "Semana 3", "Rutas en curso, incidentes y recálculos.") },
+          { path: "rutas", element: <RoutesPage /> },
+          { path: "rutas/:routeId", element: <RouteDetailPage /> },
+          { path: "monitoreo", element: <MonitoringPage /> },
           { path: "trafico", element: <TrafficPage /> },
           { path: "laboratorio", element: <LabPage /> },
-          { path: "reportes", element: soon("Reportes", "Semana 3", "Minutos ahorrados, puntualidad y experimentos.") },
+          { path: "reportes", element: <ReportsPage /> },
           { path: "configuracion", element: soon("Configuración", "Semana 3", "Usuarios, bodegas, nodos y calibración.") },
           { path: "*", element: <NotFoundPage /> },
         ],
@@ -60,7 +67,8 @@ const router = createBrowserRouter([
   {
     element: <RequireSession roles={["driver"]} />,
     children: [
-      { path: "/conductor", element: soon("Mi ruta de hoy", "Semana 3 · Día 11", "Tus paradas en orden con la hora estimada de llegada.") },
+      { path: "/conductor", element: <DriverTodayPage /> },
+      { path: "/conductor/paradas/:stopId", element: <DriverStopPage /> },
     ],
   },
 ]);

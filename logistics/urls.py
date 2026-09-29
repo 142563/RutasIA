@@ -1,5 +1,7 @@
 from django.urls import path
-from logistics.presentation import app_views, orders_views, routing_views, views
+from logistics.presentation import (
+    app_views, dispatch_views, driver_views, incident_views, orders_views, routing_views, views,
+)
 
 urlpatterns = [
     # Interfaz anterior (JS sin framework), mientras se retira
@@ -28,6 +30,15 @@ urlpatterns = [
     path("api/v2/depots/", orders_views.api_v2_depots, name="api-v2-depots"),
     path("api/v2/routes/plan/", orders_views.api_v2_routes_plan, name="api-v2-routes-plan"),
     path("api/v2/routes/", orders_views.api_v2_routes, name="api-v2-routes"),
+    # Pantallas del despachador: Rutas, Monitoreo, Inicio y Reportes
+    path("api/v2/routes/<int:route_id>/", dispatch_views.api_v2_route_detail, name="api-v2-route-detail"),
+    path("api/v2/dashboard/", dispatch_views.api_v2_dashboard, name="api-v2-dashboard"),
+    path("api/v2/monitoring/", dispatch_views.api_v2_monitoring, name="api-v2-monitoring"),
+    path("api/v2/reports/", dispatch_views.api_v2_reports, name="api-v2-reports"),
+    # Vista del conductor (solo sus rutas)
+    path("api/driver/today/", driver_views.api_driver_today, name="api-driver-today"),
+    path("api/driver/routes/<int:route_id>/start/", driver_views.api_driver_route_start, name="api-driver-route-start"),
+    path("api/driver/stops/<int:stop_id>/", driver_views.api_driver_stop_update, name="api-driver-stop-update"),
     # Motor de rutas nuevo (grafo nacional con tráfico)
     path("api/routing/nodes/", routing_views.api_routing_nodes, name="api-routing-nodes"),
     path("api/routing/route/", routing_views.api_routing_route, name="api-routing-route"),
@@ -36,4 +47,10 @@ urlpatterns = [
     path("api/routing/best-departure/", routing_views.api_routing_best_departure, name="api-routing-best-departure"),
     path("api/routes/optimize/", routing_views.api_routes_optimize, name="api-routes-optimize"),
     path("api/traffic/profile/", routing_views.api_traffic_profile, name="api-traffic-profile"),
+    # Incidentes y recálculo en vivo
+    path("api/traffic/incidents/", incident_views.api_incidents, name="api-traffic-incidents"),
+    path("api/traffic/incidents/<int:incident_id>/resolve/", incident_views.api_incident_resolve,
+         name="api-traffic-incident-resolve"),
+    path("api/reroutes/<int:proposal_id>/decision/", incident_views.api_reroute_decision,
+         name="api-reroute-decision"),
 ]
