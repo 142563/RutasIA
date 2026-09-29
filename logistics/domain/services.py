@@ -19,14 +19,18 @@ _COORDS_CACHE_KEY = "dept_coords_v1"
 _CACHE_TTL = 120  # segundos — se invalida si cambian las conexiones
 
 
-def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> Decimal:
-    """Straight-line distance between two GPS points (admissible A* heuristic)."""
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Straight-line distance between two GPS points (admissible A* heuristic).
+
+    Se devuelve sin redondear: redondear hacia arriba puede hacer que h(u) supere
+    el costo de una arista y la heurística deje de ser admisible y consistente.
+    """
     R = 6371.0
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
     dlambda = math.radians(lon2 - lon1)
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    return Decimal(str(2 * R * math.asin(math.sqrt(a)))).quantize(TWO_DP, rounding=ROUND_HALF_UP)
+    return 2 * R * math.asin(math.sqrt(a))
 
 
 def to_decimal(value: Decimal | float | int | str) -> Decimal:
@@ -125,10 +129,11 @@ class AStarOptimizer:
             node = depts.get(node_id)
             if node is None or node.latitude is None or node.longitude is None:
                 return ZERO
-            return haversine_km(
+            # Decimal(float) es una conversión exacta: no redondea la heurística.
+            return Decimal(haversine_km(
                 float(node.latitude), float(node.longitude),
                 float(dest.latitude), float(dest.longitude),
-            )
+            ))
 
         graph = _build_graph()
         g_scores: dict[int, Decimal] = {origin_id: ZERO}
