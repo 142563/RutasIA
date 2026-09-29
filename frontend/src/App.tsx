@@ -7,6 +7,7 @@ import { setUnauthorizedHandler } from "@/lib/api";
 import { UserContext, homeFor, useSession } from "@/lib/auth";
 import type { Role } from "@/lib/types";
 import { HomePage } from "@/pages/Home";
+import { LabPage } from "@/pages/lab/LabPage";
 import { LoginPage } from "@/pages/Login";
 import { OrdersPage } from "@/pages/orders/OrdersPage";
 import { PlannerPage } from "@/pages/planner/PlannerPage";
@@ -47,7 +48,7 @@ const router = createBrowserRouter([
           { path: "rutas", element: soon("Rutas", "Semana 3", "Lista y detalle de las rutas asignadas.") },
           { path: "monitoreo", element: soon("Monitoreo", "Semana 3", "Rutas en curso, incidentes y recálculos.") },
           { path: "trafico", element: soon("Tráfico", "Semana 2 · Día 10", "Red nacional coloreada por franja horaria.") },
-          { path: "laboratorio", element: soon("Laboratorio", "Semana 2 · Día 9", "Dijkstra y A* lado a lado.") },
+          { path: "laboratorio", element: <LabPage /> },
           { path: "reportes", element: soon("Reportes", "Semana 3", "Minutos ahorrados, puntualidad y experimentos.") },
           { path: "configuracion", element: soon("Configuración", "Semana 3", "Usuarios, bodegas, nodos y calibración.") },
           { path: "*", element: <NotFoundPage /> },
