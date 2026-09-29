@@ -245,3 +245,149 @@ class TripEvent(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.trip.code}: {self.note[:50]}"
+
+
+# ---------------------------------------------------------------------------
+# Red vial nacional (motor de rutas nuevo, docs/PLAN.md §2 y §6)
+#
+# Conviven con Department / RouteConnection mientras la app vieja siga en uso.
+# Coordenadas, km y minutos son float: el motor calcula en float y Decimal se
+# reserva para dinero.
+# ---------------------------------------------------------------------------
+
+# Recuadro que contiene a Guatemala, con un margen pequeño.
+GT_LAT_MIN, GT_LAT_MAX = 13.5, 18.0
+GT_LON_MIN, GT_LON_MAX = -92.5, -88.0
+
+
+class GuatemalaDepartment(models.TextChoices):
+    ALTA_VERAPAZ = "AV", "Alta Verapaz"
+    BAJA_VERAPAZ = "BV", "Baja Verapaz"
+    CHIMALTENANGO = "CM", "Chimaltenango"
+    CHIQUIMULA = "CQ", "Chiquimula"
+    EL_PROGRESO = "PR", "El Progreso"
+    ESCUINTLA = "ES", "Escuintla"
+    GUATEMALA = "GU", "Guatemala"
+    HUEHUETENANGO = "HU", "Huehuetenango"
+    IZABAL = "IZ", "Izabal"
+    JALAPA = "JA", "Jalapa"
+    JUTIAPA = "JU", "Jutiapa"
+    PETEN = "PE", "Petén"
+    QUETZALTENANGO = "QZ", "Quetzaltenango"
+    QUICHE = "QC", "Quiché"
+    RETALHULEU = "RE", "Retalhuleu"
+    SACATEPEQUEZ = "SA", "Sacatepéquez"
+    SAN_MARCOS = "SM", "San Marcos"
+    SANTA_ROSA = "SR", "Santa Rosa"
+    SOLOLA = "SO", "Sololá"
+    SUCHITEPEQUEZ = "SU", "Suchitepéquez"
+    TOTONICAPAN = "TO", "Totonicapán"
+    ZACAPA = "ZA", "Zacapa"
+
+
+class Node(models.Model):
+    """Nodo del grafo nacional: cabecera, municipio o cruce de carreteras."""
+
+    class Kind(models.TextChoices):
+        CABECERA = "cabecera", "Cabecera departamental"
+        MUNICIPIO = "municipio", "Municipio"
+        CRUCE = "cruce", "Cruce, salida o frontera"
+
+    code = models.SlugField(max_length=40, unique=True)
+    name = models.CharField(max_length=120)
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    department = models.CharField(max_length=2, choices=GuatemalaDepartment.choices)
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(latitude__gte=GT_LAT_MIN, latitude__lte=GT_LAT_MAX)
+                & models.Q(longitude__gte=GT_LON_MIN, longitude__lte=GT_LON_MAX),
+                name="node_inside_guatemala",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.code})"
+
+
+class Edge(TimestampedModel):
+    """Tramo de carretera DIRIGIDO origin -> destination.
+
+    Cada tramo físico son dos aristas: ida y vuelta pueden tener tráfico distinto.
+    El costo con tráfico es duration_free_min × TrafficProfile.multiplier.
+    """
+
+    class Source(models.TextChoices):
+        GOOGLE = "google", "Google Routes API"
+        MANUAL = "manual", "Manual"
+
+    origin = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="edges_out")
+    destination = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="edges_in")
+    distance_km = models.FloatField()
+    duration_free_min = models.FloatField(help_text="t0: minutos sin tráfico (staticDuration de Google).")
+    road = models.CharField(max_length=20, blank=True, help_text="Carretera principal, p. ej. CA-1.")
+    source = models.CharField(max_length=10, choices=Source.choices, default=Source.GOOGLE)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["origin__name", "destination__name"]
+        constraints = [
+            models.UniqueConstraint(fields=["origin", "destination"], name="uniq_edge_direction"),
+            models.CheckConstraint(
+                condition=~models.Q(origin=models.F("destination")),
+                name="edge_origin_destination_must_differ",
+            ),
+            models.CheckConstraint(condition=models.Q(distance_km__gt=0), name="edge_distance_positive"),
+            models.CheckConstraint(condition=models.Q(duration_free_min__gt=0), name="edge_duration_positive"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.origin.name} -> {self.destination.name} ({self.duration_free_min:.1f} min)"
+
+
+class TrafficBand(models.TextChoices):
+    """Franjas horarias de docs/PLAN.md §2.3."""
+
+    DAWN = "dawn", "Madrugada (05:00–07:00)"
+    PEAK_AM = "peak_am", "Pico mañana (07:00–09:00)"
+    MID_MORNING = "mid_morning", "Media mañana (09:00–12:00)"
+    MIDDAY = "midday", "Mediodía (12:00–14:00)"
+    AFTERNOON = "afternoon", "Tarde (14:00–17:00)"
+    PEAK_PM = "peak_pm", "Pico tarde (17:00–20:00)"
+    NIGHT = "night", "Noche (20:00–05:00)"
+
+
+class DayType(models.TextChoices):
+    WEEKDAY = "weekday", "Laboral"
+    WEEKEND = "weekend", "Fin de semana"
+
+
+class TrafficProfile(models.Model):
+    """Multiplicador de tráfico m ≥ 1 de una arista en una franja y tipo de día.
+
+    m ≥ 1 lo garantiza la BD: así el costo nunca baja de t0, los pesos nunca son
+    negativos (requisito de Dijkstra) y v_max se deriva de un costo mínimo real.
+    """
+
+    edge = models.ForeignKey(Edge, on_delete=models.CASCADE, related_name="traffic_profiles")
+    band = models.CharField(max_length=12, choices=TrafficBand.choices)
+    day_type = models.CharField(max_length=8, choices=DayType.choices)
+    multiplier = models.FloatField()
+    calibrated_at = models.DateTimeField(default=timezone.now)
+    source = models.CharField(max_length=40, default="google_routes")
+
+    class Meta:
+        ordering = ["edge", "day_type", "band"]
+        constraints = [
+            models.UniqueConstraint(fields=["edge", "band", "day_type"], name="uniq_traffic_profile"),
+            models.CheckConstraint(condition=models.Q(multiplier__gte=1.0), name="traffic_multiplier_gte_1"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.edge} · {self.get_band_display()} · {self.get_day_type_display()}: ×{self.multiplier:.2f}"

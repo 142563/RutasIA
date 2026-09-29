@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Department, Order, RouteConnection, Trip, TripEvent, TripOrder, Vehicle
+from .models import Department, Edge, Node, Order, RouteConnection, TrafficProfile, Trip, TripEvent, TripOrder, Vehicle
 
 
 @admin.register(Department)
@@ -55,4 +55,23 @@ class TripEventAdmin(admin.ModelAdmin):
     list_display = ("trip", "note", "created_at")
     search_fields = ("trip__code", "note")
 
-# Register your models here.
+
+@admin.register(Node)
+class NodeAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "kind", "department", "latitude", "longitude", "is_active")
+    list_filter = ("kind", "department", "is_active")
+    search_fields = ("code", "name")
+
+
+@admin.register(Edge)
+class EdgeAdmin(admin.ModelAdmin):
+    list_display = ("origin", "destination", "road", "distance_km", "duration_free_min", "source", "is_active")
+    list_filter = ("road", "source", "is_active")
+    search_fields = ("origin__name", "destination__name", "road")
+
+
+@admin.register(TrafficProfile)
+class TrafficProfileAdmin(admin.ModelAdmin):
+    list_display = ("edge", "band", "day_type", "multiplier", "calibrated_at")
+    list_filter = ("band", "day_type")
+    search_fields = ("edge__origin__name", "edge__destination__name")
