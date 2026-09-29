@@ -39,6 +39,8 @@ export interface NetworkMapProps {
   nodeMarks?: MapNodeMark[];
   markers?: MapMarker[];
   labels?: "cabeceras" | "none";
+  /** Reemplaza la capa de tramos (p. ej. tráfico por sentido). Se dibuja debajo de los nodos. */
+  renderEdges?: (toXY: (p: LatLng) => [number, number]) => React.ReactNode;
   /** Acerca el mapa a estos puntos (p. ej. la ruta). Sin puntos se ve todo el país. */
   fitTo?: LatLng[];
   onPick?: (point: LatLng) => void;
@@ -58,6 +60,7 @@ export function NetworkMap({
   markers = [],
   labels = "cabeceras",
   fitTo,
+  renderEdges,
   onPick,
   className,
   ariaLabel = "Mapa esquemático de la red vial de Guatemala",
@@ -94,7 +97,8 @@ export function NetworkMap({
       onClick={handleClick}
     >
       {/* Tramos de la red (base) */}
-      <g strokeLinecap="round">
+      {renderEdges ? renderEdges(projection.toXY) : null}
+      <g strokeLinecap="round" display={renderEdges ? "none" : undefined}>
         {edges.map((edge) => {
           const a = xy(edge.from);
           const b = xy(edge.to);

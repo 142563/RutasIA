@@ -11,6 +11,7 @@ import { LabPage } from "@/pages/lab/LabPage";
 import { LoginPage } from "@/pages/Login";
 import { OrdersPage } from "@/pages/orders/OrdersPage";
 import { PlannerPage } from "@/pages/planner/PlannerPage";
+import { TrafficPage } from "@/pages/traffic/TrafficPage";
 import { ComingSoonPage, NotFoundPage } from "@/pages/Placeholder";
 
 const queryClient = new QueryClient({
@@ -47,7 +48,7 @@ const router = createBrowserRouter([
           { path: "planificar", element: <PlannerPage /> },
           { path: "rutas", element: soon("Rutas", "Semana 3", "Lista y detalle de las rutas asignadas.") },
           { path: "monitoreo", element: soon("Monitoreo", "Semana 3", "Rutas en curso, incidentes y recálculos.") },
-          { path: "trafico", element: soon("Tráfico", "Semana 2 · Día 10", "Red nacional coloreada por franja horaria.") },
+          { path: "trafico", element: <TrafficPage /> },
           { path: "laboratorio", element: <LabPage /> },
           { path: "reportes", element: soon("Reportes", "Semana 3", "Minutos ahorrados, puntualidad y experimentos.") },
           { path: "configuracion", element: soon("Configuración", "Semana 3", "Usuarios, bodegas, nodos y calibración.") },
