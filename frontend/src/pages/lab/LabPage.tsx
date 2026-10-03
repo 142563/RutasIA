@@ -219,7 +219,7 @@ function AlgoPanel({ algo, result, step, nodes, edges, origin, destination, same
           edges={edges}
           labels="none"
           nodeMarks={visible.map((code) => ({ code, color: algo.color, r: 5.5, opacity: 0.35 }))}
-          paths={finished ? [{ codes: result.nodes.map((n) => n.code), color: algo.color, width: 4.5 }] : []}
+          paths={finished ? [{ codes: result.nodes.map((n) => n.code), color: algo.color, width: 4.5, followRoads: true }] : []}
           markers={[
             { id: "o", kind: "stop", lat: origin.lat, lng: origin.lng, label: "A" },
             { id: "d", kind: "stop", lat: destination.lat, lng: destination.lng, label: "B" },

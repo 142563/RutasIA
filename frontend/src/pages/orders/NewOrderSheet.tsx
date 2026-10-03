@@ -1,6 +1,7 @@
 import { CheckIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { NetworkMap } from "@/components/map/NetworkMap";
 import { NodeSearch } from "@/components/NodeSearch";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ export function NewOrderSheet({ onDone }: { onDone: () => void }) {
   const [form, setForm] = React.useState(EMPTY);
   const [priority, setPriority] = React.useState<Priority>("normal");
   const [location, setLocation] = React.useState<(LatLng & { label: string }) | null>(null);
+  const [placeId, setPlaceId] = React.useState("");
   const [submitted, setSubmitted] = React.useState(false);
 
   const set = (key: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -45,6 +47,7 @@ export function NewOrderSheet({ onDone }: { onDone: () => void }) {
         phone: form.phone.trim(),
         address: form.address.trim(),
         reference: form.reference.trim(),
+        place_id: placeId || undefined,
         latitude: location.lat,
         longitude: location.lng,
         weight_kg: Number(form.weight),
@@ -56,6 +59,7 @@ export function NewOrderSheet({ onDone }: { onDone: () => void }) {
           toast.success(`Pedido ${order.code} guardado`, { description: `Asociado al nodo ${order.node?.name ?? "—"}` });
           setForm(EMPTY);
           setLocation(null);
+          setPlaceId("");
           setPriority("normal");
           setSubmitted(false);
           onDone();
@@ -75,10 +79,17 @@ export function NewOrderSheet({ onDone }: { onDone: () => void }) {
             <Input id="phone" type="tel" inputMode="tel" value={form.phone} onChange={set("phone")} placeholder="5555-1234" />
           </Field>
           <Field label="Dirección de entrega" htmlFor="address" error={show("address")}>
-            <Input id="address" value={form.address} onChange={set("address")} aria-invalid={!!show("address")} placeholder="5a avenida 10-20, zona 1" />
+            <AddressAutocomplete id="address" value={form.address} invalid={!!show("address")} placeholder="5a avenida 10-20, zona 1"
+              onChange={(text) => { setForm((f) => ({ ...f, address: text })); setPlaceId(""); }}
+              onPlace={(place) => {
+                // Google dio dirección, coordenadas y place_id: se llena todo; el mapa y el municipio quedan como respaldo
+                setForm((f) => ({ ...f, address: place.address }));
+                setPlaceId(place.placeId);
+                setLocation({ lat: place.lat, lng: place.lng, label: place.address });
+              }} />
           </Field>
           <Field label="Ubicación" htmlFor="node-search" error={show("location")}
-            hint="Busca el municipio o haz clic en el mapa. Con la key de Google se sumará el autocompletado de direcciones.">
+            hint="Se llena sola al elegir una dirección sugerida. Si no la encuentras, busca el municipio o haz clic en el mapa.">
             {network.data ? (
               <>
                 <NodeSearch id="node-search" nodes={network.data.nodes}
