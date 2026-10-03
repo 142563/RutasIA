@@ -98,11 +98,19 @@ export interface DriverOption { id: number; name: string; is_active: boolean }
 export interface VehicleOption { id: number; plate: string; model: string; capacity_kg: number; is_active: boolean; driver_id: number | null }
 
 export function useFleet() {
-  const drivers = useQuery({ queryKey: ["drivers"], queryFn: () => api<{ drivers: DriverOption[] }>("/api/drivers/") });
-  const vehicles = useQuery({ queryKey: ["vehicles"], queryFn: () => api<{ vehicles: VehicleOption[] }>("/api/vehicles/") });
+  // El despachador puede consultar la flota por /api/v2/fleet/ (solo lectura).
+  const drivers = useQuery({
+    queryKey: ["fleet", "drivers"],
+    queryFn: async () => (await api<{ drivers: { id: number; name: string; is_active: boolean }[] }>("/api/v2/fleet/drivers/")).drivers,
+  });
+  const vehicles = useQuery({
+    queryKey: ["fleet", "vehicles"],
+    queryFn: async () =>
+      (await api<{ vehicles: { id: number; plate: string; model: string; capacity_kg: number; is_active: boolean; driver: { id: number } | null }[] }>("/api/v2/fleet/vehicles/")).vehicles,
+  });
   return {
-    drivers: drivers.data?.drivers.filter((d) => d.is_active) ?? [],
-    vehicles: vehicles.data?.vehicles.filter((v) => v.is_active) ?? [],
+    drivers: (drivers.data ?? []).filter((d) => d.is_active) as DriverOption[],
+    vehicles: (vehicles.data ?? []).filter((v) => v.is_active).map((v): VehicleOption => ({ ...v, driver_id: v.driver?.id ?? null })),
   };
 }
 

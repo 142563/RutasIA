@@ -18,7 +18,6 @@ export default defineConfig(({ command }) => ({
       "/api": { target: django },
       "/admin": { target: django },
       "/accounts": { target: django },
-      "/clasico": { target: django },
       "/static": { target: django },
     },
   },

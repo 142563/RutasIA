@@ -107,7 +107,6 @@ BUILD_MISSING_HTML = """<!doctype html><html lang="es"><meta charset="utf-8">
 <p>Para desarrollo: <code>cd frontend &amp;&amp; npm install &amp;&amp; npm run dev</code> y abre
 <a href="http://localhost:5173">localhost:5173</a>.</p>
 <p>Para servirla desde Django: <code>cd frontend &amp;&amp; npm run build</code>.</p>
-<p>La interfaz anterior sigue en <a href="/clasico/">/clasico/</a>.</p>
 </body></html>"""
 
 

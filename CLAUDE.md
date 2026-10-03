@@ -24,9 +24,8 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
   - **Arranque en un paso:** `python manage.py preparar [--google]` (migra, nodos, tramos, tráfico, datos y usuarios de demo, compila React). Es idempotente y nunca reemplaza datos de Google por estimados. Explicación para humanos: `docs/COMO_FUNCIONA.md`.
   - Comandos sueltos: `seed_graph_nodes` → `build_graph [--estimate]` → `calibrate_traffic [--synthetic]` → `run_experiments`.
   - `logistics/application/routing.py` + `logistics/presentation/routing_views.py`: `/api/routing/*`, `/api/routes/optimize/`, `/api/traffic/profile/`.
-  - **Motor viejo** (sigue funcionando hasta que llegue React): `logistics/domain/services.py` (`RouteOptimizer`, `AStarOptimizer` sobre `Department`/`RouteConnection`), `logistics/application/services.py` (`TripPlanner`), `logistics/presentation/views.py`.
+  - **Motor y interfaz viejos retirados (RUT-40):** ya no existen `/clasico/`, `domain/services.py`, `application/services.py` ni los endpoints `/api/drivers/`, `/api/orders/`, `/api/trips/*`, etc. Los modelos `Department`, `RouteConnection`, `Trip`, `TripOrder`, `TripEvent` y `FuelPrice` se conservan (datos históricos, sin migración que los borre) pero ningún código nuevo los usa. `python manage.py archive_legacy_orders [--apply]` cancela los pedidos abiertos que dejó la interfaz vieja.
   - **App React** en `frontend/` (Vite + React 19 + TS + Tailwind v4 + componentes estilo shadcn en `src/components/ui`, React Router, TanStack Query). Mapa en `src/components/map/NetworkMap.tsx`: con `GOOGLE_MAPS_API_KEY` usa **Google Maps de fondo** (cargado en `src/lib/googleMaps.ts` con la key de `/api/config/`) y dibuja encima, en SVG, las capas del motor. Las rutas con `followRoads` se trazan por carretera real con Directions, pasando por los nodos que eligió nuestro algoritmo. Sin key, o si Google la rechaza, cae al mapa esquemático propio. Django la sirve desde `frontend/dist/app/` en `/` (vista `spa`); sesión por `/api/auth/*`.
-  - Interfaz anterior (JS sin framework) en `/clasico/`: `templates/logistics/index.html` + `static/logistics/app.js`.
   - Roles: `admin`, `dispatcher`, `driver` (`UserProfile.Role`); usuarios de demo con `seed_demo_users` (exige `DEMO_PASSWORD`).
   - **UX simple (prioridad del proyecto):**
     - Menú de 5 secciones: **Hoy** (inicio + monitoreo en vivo + "siguiente paso", `src/lib/today.ts`), **Pedidos**, **Planificar**, **Rutas** y **Análisis** (Laboratorio, Tráfico y Reportes en pestañas bajo `/analisis/*`; las rutas viejas redirigen).
@@ -37,7 +36,7 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
 - **Datos:** mientras no haya `GOOGLE_ROUTES_API_KEY`, el grafo usa aristas `estimate` y tráfico `synthetic`. Toda respuesta y todo CSV indica la fuente (`data_source`). **Nunca** presentar esos números como resultados de tesis.
 - BD: PostgreSQL (Neon) vía `DATABASE_URL`; sin esa variable usa SQLite local.
 - Deploy: Render (`render.yaml`, `Procfile`), archivos estáticos con WhiteNoise. `matplotlib` solo en `requirements-dev.txt`.
-- Pruebas: `python manage.py test` (169 pruebas, ~70 s; `matplotlib` de requirements-dev.txt para las de gráficas; incluye E1 completa en `logistics/tests/test_search.py`).
+- Pruebas: `python manage.py test` (~70 s; `matplotlib` de requirements-dev.txt para las de gráficas; incluye E1 completa en `logistics/tests/test_search.py`).
 
 ## Hacia dónde vamos (resumen de docs/PLAN.md)
 
@@ -55,7 +54,6 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
 - Pesos **siempre ≥ 0**: el tráfico **multiplica** por ≥ 1, nunca resta.
 - Costo y heurística en la **misma unidad** (minutos).
 - `v_max = max_e haversine(u,v) / costo_mínimo(e)`. Así la heurística es admisible y consistente. Nunca uses una velocidad promedio.
-- **No redondear la heurística hacia arriba**. `haversine_km` usa hoy `ROUND_HALF_UP` (`logistics/domain/services.py:29`) y debe corregirse.
 - Grafo **dirigido** y cargado **en memoria**. **Nunca** llamar a Google ni a la BD dentro del bucle de Dijkstra o A\*.
 - Implementación propia con `heapq`. **No** usar librerías de ruteo (networkx, OR-Tools, OSMnx) en el motor.
 - Toda búsqueda devuelve instrumentación: nodos expandidos, ms y la ruta.

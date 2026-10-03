@@ -86,7 +86,7 @@ Abre http://localhost:5173 (Vite reenvía `/api` a Django en el puerto 8000, as�
 
 Usuarios de demo: pon una contraseña en `DEMO_PASSWORD` dentro de `.env` y corre `python manage.py seed_demo_users`. Se crean `admin`, `despachador` y `conductor`.
 
-Para que Django sirva la app como en producción: `npm run build` (queda en `frontend/dist/app/`) y abre http://127.0.0.1:8000. La interfaz anterior sigue en `/clasico/`.
+Para que Django sirva la app como en producción: `npm run build` (queda en `frontend/dist/app/`) y abre http://127.0.0.1:8000.
 
 Pruebas del frontend: `npm test` (Vitest) y `npm run build` (revisa tipos).
 

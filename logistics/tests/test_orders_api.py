@@ -8,7 +8,6 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from logistics.application.services import TripPlanner
 from logistics.domain.exceptions import PlanningError
 from logistics.models import Depot, Order, UserProfile, Vehicle
 from logistics.routing.graph import invalidate_graph
@@ -90,12 +89,3 @@ class OrdersApiTests(TestCase):
         depots = self.client.get(reverse("api-v2-depots")).json()["depots"]
         self.assertEqual(depots[0]["name"], "Bodega Central")
         self.assertEqual(depots[0]["node"]["code"], "el-trebol")
-
-    def test_new_orders_stay_out_of_the_classic_ui(self):
-        created = self.create().json()["order"]
-        classic = self.client.get(reverse("api-orders")).json()["orders"]
-        self.assertNotIn(created["id"], [o["id"] for o in classic])
-        vehicle = Vehicle.objects.create(plate="P-1", model="Panel", capacity_kg=Decimal("900"),
-                                         fuel_efficiency_km_l=Decimal("9"), cost_per_km=Decimal("3"))
-        with self.assertRaisesMessage(PlanningError, "aplicación nueva"):
-            TripPlanner.plan_trip(vehicle, Order.objects.filter(id=created["id"]))
