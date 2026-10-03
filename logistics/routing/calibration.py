@@ -51,8 +51,12 @@ def elements_needed() -> int:
     return len(google_edges()) * len(PROFILES)
 
 
-@transaction.atomic
-def calibrate_from_google(client: RoutesClient, now: datetime | None = None, refresh: bool = False) -> CalibrationReport:
+def calibrate_from_google(
+    client: RoutesClient, now: datetime | None = None, refresh: bool = False, progress=None,
+) -> CalibrationReport:
+    """Las muestras de Google se guardan en cuanto llegan (fuera de transacción): si el
+    proceso se corta, al relanzarlo solo se pide lo que falta y no se paga dos veces.
+    Solo la escritura de los multiplicadores es atómica."""
     now = now or timezone.now()
     report = CalibrationReport()
     edges = google_edges()
@@ -67,8 +71,16 @@ def calibrate_from_google(client: RoutesClient, now: datetime | None = None, ref
             client, nodes, pairs, band=band, day_type=day_type,
             departure_time=representative_departure(band, day_type, now), traffic=True, refresh=refresh,
         )
+        if progress:
+            progress(band, day_type, client.requests_made)
     report.requests, report.elements = client.requests_made, client.elements_requested
+    with transaction.atomic():
+        _write_profiles(edges, samples, report)
+    invalidate_graph()
+    return report
 
+
+def _write_profiles(edges, samples, report: CalibrationReport) -> None:
     calibrated_at = timezone.now()
     for edge in edges:
         pair = (edge.origin.code, edge.destination.code)
@@ -102,9 +114,6 @@ def calibrate_from_google(client: RoutesClient, now: datetime | None = None, ref
             )
             report.profiles_written += 1
         report.edges_calibrated += 1
-
-    invalidate_graph()
-    return report
 
 
 # --- modo sintético (sin conexión) -----------------------------------------

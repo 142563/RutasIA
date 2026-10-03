@@ -41,7 +41,11 @@ class Command(BaseCommand):
             )
             if not options["yes"] and input("¿Continuar? [s/N] ").strip().lower() not in ("s", "si", "sí", "y", "yes"):
                 raise CommandError("Calibración cancelada.")
-            report = calibrate_from_google(client, refresh=options["refresh"])
+            def progress(band, day_type, requests):
+                self.stdout.write(f"  {band}/{day_type} listo · {requests} solicitudes a Google")
+                self.stdout.flush()
+
+            report = calibrate_from_google(client, refresh=options["refresh"], progress=progress)
             self.stdout.write(f"Solicitudes a Google: {report.requests} ({report.elements} elementos).")
 
         self.stdout.write(self.style.SUCCESS(

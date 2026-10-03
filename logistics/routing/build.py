@@ -100,21 +100,24 @@ def fetch_samples(
             traffic=traffic,
         )
         now = timezone.now()
-        for el in elements:
-            destination = destinations[el.destination_index]
-            sample, _ = RouteSample.objects.update_or_create(
-                origin=origin, destination=destination, band=band, day_type=day_type,
-                defaults={
-                    "departure_time": departure_time,
-                    "routing_preference": TRAFFIC_AWARE_OPTIMAL if traffic else TRAFFIC_UNAWARE,
-                    "status": el.status,
-                    "distance_m": el.distance_m,
-                    "duration_s": el.duration_s,
-                    "static_duration_s": el.static_duration_s,
-                    "fetched_at": now,
-                },
+        batch = [
+            RouteSample(
+                origin=origin, destination=destinations[el.destination_index], band=band, day_type=day_type,
+                departure_time=departure_time,
+                routing_preference=TRAFFIC_AWARE_OPTIMAL if traffic else TRAFFIC_UNAWARE,
+                status=el.status, distance_m=el.distance_m, duration_s=el.duration_s,
+                static_duration_s=el.static_duration_s, fetched_at=now,
             )
-            existing[(origin_code, destination.code)] = sample
+            for el in elements
+        ]
+        # Una sola escritura por solicitud (con Neon, una por elemento es muy lenta).
+        RouteSample.objects.bulk_create(
+            batch, update_conflicts=True, unique_fields=["origin", "destination", "band", "day_type"],
+            update_fields=["departure_time", "routing_preference", "status", "distance_m", "duration_s",
+                           "static_duration_s", "fetched_at"],
+        )
+        for sample in batch:
+            existing[(origin_code, sample.destination.code)] = sample
     return {pair: existing[pair] for pair in pairs if pair in existing}
 
 
