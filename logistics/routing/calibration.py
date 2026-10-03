@@ -82,6 +82,7 @@ def calibrate_from_google(
 
 def _write_profiles(edges, samples, report: CalibrationReport) -> None:
     calibrated_at = timezone.now()
+    changed_edges, profiles = [], []
     for edge in edges:
         pair = (edge.origin.code, edge.destination.code)
         observed = {}
@@ -101,19 +102,24 @@ def _write_profiles(edges, samples, report: CalibrationReport) -> None:
 
         t0_s = min(candidates)
         edge.duration_free_min = t0_s / 60
-        edge.save(update_fields=["duration_free_min", "updated_at"])
+        edge.updated_at = calibrated_at
+        changed_edges.append(edge)
         for (band, day_type), duration_s in observed.items():
-            TrafficProfile.objects.update_or_create(
+            profiles.append(TrafficProfile(
                 edge=edge, band=band, day_type=day_type,
-                defaults={
-                    # max() solo protege del redondeo de la división: duration_s ≥ t0_s siempre.
-                    "multiplier": max(1.0, duration_s / t0_s),
-                    "calibrated_at": calibrated_at,
-                    "source": GOOGLE_SOURCE,
-                },
-            )
-            report.profiles_written += 1
+                # max() solo protege del redondeo de la división: duration_s ≥ t0_s siempre.
+                multiplier=max(1.0, duration_s / t0_s),
+                calibrated_at=calibrated_at, source=GOOGLE_SOURCE,
+            ))
         report.edges_calibrated += 1
+
+    # En lote: con Neon, una escritura por perfil (3,640) tarda demasiado.
+    Edge.objects.bulk_update(changed_edges, ["duration_free_min", "updated_at"], batch_size=500)
+    TrafficProfile.objects.bulk_create(
+        profiles, batch_size=500, update_conflicts=True, unique_fields=["edge", "band", "day_type"],
+        update_fields=["multiplier", "calibrated_at", "source"],
+    )
+    report.profiles_written += len(profiles)
 
 
 # --- modo sintético (sin conexión) -----------------------------------------
