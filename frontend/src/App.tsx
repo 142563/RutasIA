@@ -18,7 +18,8 @@ import { ReportsPage } from "@/pages/reports/ReportsPage";
 import { RouteDetailPage } from "@/pages/routes/RouteDetailPage";
 import { RoutesPage } from "@/pages/routes/RoutesPage";
 import { TrafficPage } from "@/pages/traffic/TrafficPage";
-import { ComingSoonPage, NotFoundPage } from "@/pages/Placeholder";
+import { SettingsPage } from "@/pages/settings/SettingsPage";
+import { NotFoundPage } from "@/pages/Placeholder";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -39,7 +40,6 @@ function RequireSession({ roles }: { roles?: Role[] }) {
   );
 }
 
-const soon = (title: string, when: string, description: string) => <ComingSoonPage title={title} when={when} description={description} />;
 
 const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -69,7 +69,7 @@ const router = createBrowserRouter([
           { path: "laboratorio", element: <Navigate to="/analisis/laboratorio" replace /> },
           { path: "trafico", element: <Navigate to="/analisis/trafico" replace /> },
           { path: "reportes", element: <Navigate to="/analisis/reportes" replace /> },
-          { path: "configuracion", element: soon("Configuración", "Semana 3", "Usuarios, bodegas, nodos y calibración.") },
+          { path: "configuracion/*", element: <SettingsPage /> },
           { path: "*", element: <NotFoundPage /> },
         ],
       },
