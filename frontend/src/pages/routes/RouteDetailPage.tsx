@@ -1,10 +1,14 @@
 import { ArrowLeftIcon } from "lucide-react";
+import * as React from "react";
 import { Link, useParams } from "react-router";
+import { NetworkMap, type MapMarker } from "@/components/map/NetworkMap";
 import { DataSourceNote } from "@/components/DataSourceNote";
 import { ErrorNote, Metric, PageHeader, Spinner, StatusDot } from "@/components/ui/misc";
 import {
   formatDiff, parseDataSource, ROUTE_STATUS, TIMING, useRouteDetail, type RouteDetail, type RouteStopRow,
 } from "@/lib/dispatch";
+import { joinLegNodes } from "@/lib/roads";
+import { useNetwork } from "@/lib/queries";
 import { formatClock, formatKm, formatMinutes } from "@/lib/format";
 import { AssignmentSection } from "./AssignmentSection";
 import { LiveCheck } from "./LiveCheck";
@@ -36,6 +40,30 @@ function StopItem({ stop, last }: { stop: RouteStopRow; last: boolean }) {
         </div>
       </div>
     </li>
+  );
+}
+
+/** Mapa de la ruta: el camino lo decidió nuestro A*; Google solo dibuja la carretera entre esos nodos. */
+function RouteMap({ detail }: { detail: RouteDetail }) {
+  const network = useNetwork();
+  const codes = React.useMemo(() => joinLegNodes(detail.legs), [detail.legs]);
+  if (codes.length < 2) return null;
+  if (!network.data) return <div className="p-6"><Spinner label="Cargando mapa…" /></div>;
+  const byCode = new Map(network.data.nodes.map((n) => [n.code, n]));
+  const markers: MapMarker[] = [];
+  detail.route.stops.forEach((s) => {
+    const node = s.node ? byCode.get(s.node.code) : undefined;
+    if (node) markers.push({ id: `s${s.id}`, kind: "stop", lat: node.lat, lng: node.lng, label: String(s.sequence) });
+  });
+  const fitTo = codes.map((c) => byCode.get(c)).filter((n): n is NonNullable<typeof n> => !!n).map((n) => ({ lat: n.lat, lng: n.lng }));
+  return (
+    <section aria-label="Mapa de la ruta">
+      <div className="overflow-hidden rounded-xl border border-line bg-surface p-2">
+        <NetworkMap nodes={network.data.nodes} edges={network.data.edges} labels="none" width={720} height={380}
+          paths={[{ codes, color: "#2f4bd8", width: 4.5, followRoads: true }]} markers={markers} fitTo={fitTo}
+          ariaLabel="Mapa de la ruta con sus paradas" />
+      </div>
+    </section>
   );
 }
 
@@ -83,6 +111,8 @@ export function RouteDetailPage() {
           </div>
           <ProgressBar progress={route.progress} className="max-w-md" />
           <DataSourceNote source={parseDataSource(route.data_source)} />
+
+          <RouteMap detail={detail} />
 
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
             <Timeline detail={detail} />

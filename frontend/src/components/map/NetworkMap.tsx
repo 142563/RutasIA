@@ -1,6 +1,7 @@
 import * as React from "react";
 import { makeProjection, type LatLng } from "@/lib/geo";
 import { useGoogleMaps } from "@/lib/googleMaps";
+import { sampleWaypoints } from "@/lib/roads";
 import type { GraphEdge, GraphNode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -338,29 +339,24 @@ function GoogleNetworkMap(props: NetworkMapProps) {
 
 // Caché por secuencia de nodos: la misma ruta no se vuelve a pedir a Google
 const roadCache = new Map<string, Promise<LatLng[] | null>>();
-// Directions acepta hasta 25 waypoints: se parte la secuencia en tramos de 27 puntos
-const CHUNK = 27;
-
+/*
+ El CAMINO (qué nodos se recorren) lo decidió nuestro Dijkstra / A*. Google Directions solo
+ dibuja por dónde va la carretera entre esos puntos: pasa por cada nodo, sin reordenar.
+ Directions admite máx. 25 intermedios, así que las rutas largas se submuestrean de forma pareja
+ (origen y destino siempre se conservan). Si Directions falla, se dibujan líneas rectas.
+*/
 function requestRoad(points: LatLng[]): Promise<LatLng[] | null> {
-  const service = new google.maps.DirectionsService();
-  const chunks: LatLng[][] = [];
-  for (let i = 0; i < points.length - 1; i += CHUNK - 1) chunks.push(points.slice(i, i + CHUNK));
-  return Promise.all(
-    chunks.map((chunk) =>
-      service
-        .route({
-          origin: chunk[0],
-          destination: chunk[chunk.length - 1],
-          // Paso por cada nodo que eligió nuestro algoritmo, sin reordenar
-          waypoints: chunk.slice(1, -1).map((location) => ({ location, stopover: false })),
-          optimizeWaypoints: false,
-          travelMode: google.maps.TravelMode.DRIVING,
-        })
-        .then((r) => r.routes[0]?.overview_path.map((ll) => ({ lat: ll.lat(), lng: ll.lng() })) ?? null),
-    ),
-  )
-    .then((parts) => (parts.some((p) => !p) ? null : parts.flatMap((p) => p!)))
-    .catch(() => null); // sin Directions API: se dibujan líneas rectas entre nodos
+  const sampled = sampleWaypoints(points);
+  return new google.maps.DirectionsService()
+    .route({
+      origin: sampled[0],
+      destination: sampled[sampled.length - 1],
+      waypoints: sampled.slice(1, -1).map((location) => ({ location, stopover: false })),
+      optimizeWaypoints: false,
+      travelMode: google.maps.TravelMode.DRIVING,
+    })
+    .then((r) => r.routes[0]?.overview_path.map((ll) => ({ lat: ll.lat(), lng: ll.lng() })) ?? null)
+    .catch(() => null);
 }
 
 function useRoadGeometry(paths: MapPath[] | undefined, nodes: GraphNode[]): Map<string, LatLng[]> {

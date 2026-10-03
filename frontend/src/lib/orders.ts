@@ -35,6 +35,8 @@ export interface NewOrder {
   phone: string;
   address: string;
   reference: string;
+  /** Id de Google Places si la dirección se eligió del autocompletado */
+  place_id?: string;
   latitude: number;
   longitude: number;
   weight_kg: number;
