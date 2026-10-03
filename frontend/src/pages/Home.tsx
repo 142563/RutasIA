@@ -1,4 +1,5 @@
-import { ArrowRightIcon, CircleCheckIcon, TriangleAlertIcon } from "lucide-react";
+import { ArrowRightIcon, CircleCheckIcon, MegaphoneIcon, TriangleAlertIcon } from "lucide-react";
+import * as React from "react";
 import { Link } from "react-router";
 import { NetworkMap, type MapMarker } from "@/components/map/NetworkMap";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,8 @@ import { useNetwork } from "@/lib/queries";
 import { nextStep } from "@/lib/today";
 import { BANDS, bandFor } from "@/lib/traffic";
 import { cn } from "@/lib/utils";
-import { IncidentItem, ProposalItem, RouteItem, Section } from "@/pages/monitoring/parts";
+import { useIncidents } from "@/lib/incidents";
+import { IncidentItem, ProposalItem, ReportIncidentForm, RouteItem, Section } from "@/pages/monitoring/parts";
 
 /**
  Hoy: lo que está pasando y qué hacer ahora. Reúne el inicio y el monitoreo en vivo
@@ -21,6 +23,10 @@ export function HomePage() {
   const user = useUser();
   const dashboard = useDashboard();
   const monitoring = useMonitoring();
+  const incidents = useIncidents();
+  const [reporting, setReporting] = React.useState(false);
+  const reroutes = incidents.data?.reroutes ?? [];
+  const vigentes = incidents.data?.incidents ?? [];
   const network = useNetwork();
   const pending = useOrders({ status: "pending" });
   const depots = useDepots();
@@ -35,7 +41,7 @@ export function HomePage() {
         routesInProgress: kpis.routes_in_progress,
         routesPlannedToday: kpis.routes_planned_today,
         delayedStops: kpis.delayed_stops,
-        pendingReroutes: live.proposals.length,
+        pendingReroutes: reroutes.length,
       })
     : null;
 
@@ -89,16 +95,27 @@ export function HomePage() {
                 : <ul>{live.routes.map((r) => <RouteItem key={r.id} route={r} />)}</ul>}
             </Section>
           ) : null}
-          {live && live.proposals.length > 0 ? (
-            <Section title="Rutas alternativas por decidir" count={live.proposals.length}>
-              <ul>{live.proposals.map((p) => <ProposalItem key={p.id} proposal={p} />)}</ul>
-            </Section>
-          ) : null}
-          {live && live.incidents.length > 0 ? (
-            <Section title="Incidentes en carretera" count={live.incidents.length}>
-              <ul>{live.incidents.map((i) => <IncidentItem key={i.id} incident={i} />)}</ul>
-            </Section>
-          ) : null}
+          <Section title="Recálculos pendientes" count={reroutes.length}>
+            {incidents.isError ? <ErrorNote error={incidents.error} />
+              : incidents.isPending ? <p className="py-4"><Spinner /></p>
+              : reroutes.length === 0
+                ? <p className="py-4 text-[13px] text-ink-2">Ninguna ruta necesita cambios por ahora.</p>
+                : <ul>{reroutes.map((r) => (
+                    <ProposalItem key={r.id} reroute={r} driver={live?.routes.find((x) => x.id === r.route_id)?.driver} />
+                  ))}</ul>}
+          </Section>
+          <Section title="Incidentes en la carretera" count={vigentes.length}>
+            {incidents.isError ? null
+              : incidents.isPending ? <p className="py-4"><Spinner /></p>
+              : vigentes.length === 0
+                ? <p className="py-4 text-[13px] text-ink-2">No hay incidentes vigentes.</p>
+                : <ul>{vigentes.map((i) => <IncidentItem key={i.id} incident={i} />)}</ul>}
+            <div className="pt-4">
+              {reporting
+                ? <ReportIncidentForm onDone={() => setReporting(false)} />
+                : <Button variant="outline" onClick={() => setReporting(true)}><MegaphoneIcon /> Reportar incidente</Button>}
+            </div>
+          </Section>
         </section>
 
         <section aria-label="Pedidos pendientes en el mapa" className="flex flex-col gap-2 lg:sticky lg:top-6 lg:self-start">

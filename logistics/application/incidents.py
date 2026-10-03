@@ -149,10 +149,43 @@ def list_incidents(user, role: str, include_resolved: bool = False) -> dict:
     proposals = RerouteProposal.objects.filter(status=RerouteProposal.Status.PENDING).select_related("route")
     if role == UserProfile.Role.DRIVER:
         proposals = proposals.filter(route__driver__user=user)
-    return {
+    result = {
         "incidents": [incident_payload(i, now) for i in incidents.select_related("reported_by")],
         "reroutes": [proposal_payload(p) for p in proposals],
     }
+    if role == UserProfile.Role.DRIVER:
+        result["segments"] = driver_segments(user)
+    return result
+
+
+def driver_segments(user) -> list[dict]:
+    """Tramos del siguiente tramo pendiente de cada ruta en curso del conductor, con nombres de lugares.
+
+    Sirven para que el botón "Reportar" sepa qué carretera está recorriendo el conductor.
+    """
+    routes = Route.objects.filter(status=Route.Status.IN_PROGRESS, driver__user=user)
+    segments: list[dict] = []
+    for route in routes:
+        stops = list(route.stops.order_by("sequence"))
+        pending = _pending_leg_indexes(route, stops)
+        if not pending or pending[0] >= len(route.legs):
+            continue
+        codes = route.legs[pending[0]].get("nodes", [])
+        pairs = list(zip(codes, codes[1:]))
+        edges = {
+            (e.origin.code, e.destination.code): e
+            for e in Edge.objects.filter(is_active=True, origin__code__in=codes, destination__code__in=codes)
+            .select_related("origin", "destination")
+        }
+        for a, b in pairs:
+            edge = edges.get((a, b))
+            if edge is None:
+                continue
+            segments.append({
+                "route_id": route.id, "route_code": route.code, "road": edge.road,
+                "from": {"code": a, "name": edge.origin.name}, "to": {"code": b, "name": edge.destination.name},
+            })
+    return segments
 
 
 # --- crear -------------------------------------------------------------------

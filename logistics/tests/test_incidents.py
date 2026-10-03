@@ -411,6 +411,18 @@ class IncidentApiTests(TestCase):
         self.assertEqual(self.post("api-reroute-decision", {"decision": "quizás"}, proposal_id=proposal_id).status_code, 400)
         self.assertEqual(self.post("api-reroute-decision", {"decision": "accept"}, proposal_id=proposal_id).status_code, 200)
 
+    def test_driver_gets_segments_of_next_pending_leg(self):
+        """El conductor recibe los tramos (con nombres) del siguiente tramo pendiente de su ruta en curso."""
+        self.client.force_login(self.driver_user)
+        self.assertEqual(self.client.get(reverse("api-traffic-incidents")).json()["segments"], [])  # aún planificada
+        Route.objects.filter(pk=self.route.pk).update(status=Route.Status.IN_PROGRESS)
+        segments = self.client.get(reverse("api-traffic-incidents")).json()["segments"]
+        first = self.route.legs[0]["nodes"]
+        self.assertEqual([(s["from"]["code"], s["to"]["code"]) for s in segments], list(zip(first, first[1:])))
+        self.assertTrue(all(s["from"]["name"] and s["route_id"] == self.route.id for s in segments))
+        self.client.force_login(self.dispatcher)
+        self.assertNotIn("segments", self.client.get(reverse("api-traffic-incidents")).json())
+
     def test_completed_or_delivered_legs_are_not_recalculated(self):
         """Solo cuentan los tramos pendientes: si ya se entregaron todas las paradas y se completó, no hay propuesta."""
         Route.objects.filter(pk=self.route.pk).update(status=Route.Status.COMPLETED)
