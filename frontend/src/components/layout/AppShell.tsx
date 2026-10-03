@@ -1,5 +1,5 @@
 import {
-  FlaskConicalIcon, HouseIcon, LogOutIcon, MenuIcon, PackageIcon, RouteIcon, TruckIcon, XIcon,
+  FlaskConicalIcon, HouseIcon, LogOutIcon, MenuIcon, PackageIcon, RouteIcon, SettingsIcon, TruckIcon, XIcon,
 } from "lucide-react";
 import * as React from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
@@ -23,6 +23,8 @@ const MAIN: NavItem[] = [
 ];
 const ANALYSIS: NavItem[] = [
   { to: "/analisis", label: "Análisis", icon: FlaskConicalIcon },
+  // Bodegas, pilotos, camiones y usuarios: solo el administrador
+  { to: "/configuracion", label: "Configuración", icon: SettingsIcon, adminOnly: true },
 ];
 
 export function Logo() {
