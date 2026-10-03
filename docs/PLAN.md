@@ -175,7 +175,7 @@ m_e ≥ 1  →  1.0 = sin tráfico, 2.0 = tarda el doble
 - [ ] Pesos ≥ 0 (el tráfico **multiplica** por ≥ 1, nunca resta).
 - [ ] **Misma unidad** en costo y heurística: minutos con minutos.
 - [ ] `v_max` **calculado desde los datos** (§2.5), no inventado ni el promedio.
-- [ ] No redondear la heurística hacia arriba. *El código actual usa `ROUND_HALF_UP` en `haversine_km` (`logistics/domain/services.py:29`); hay que truncar o usar `float`.*
+- [x] No redondear la heurística hacia arriba. **Resuelto:** `haversine_km` en `logistics/routing/geo.py:9–20` devuelve `float` sin redondeo. El comentario explica por qué: redondear hacia arriba rompe la admisibilidad y consistencia de A\*.
 - [ ] Grafo **dirigido**: los tiempos de ida y vuelta pueden diferir por el tráfico (entrar a la capital en la mañana ≠ salir).
 - [ ] Cola con *lazy deletion* y conjunto de cerrados (ya existe en el código actual).
 - [ ] Grafo **en memoria**; las consultas a Google nunca se hacen dentro del bucle del algoritmo.
