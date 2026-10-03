@@ -38,27 +38,33 @@ Sistema web de **optimización de rutas para empresas de paquetería en Guatemal
 ```
 logistics/
 ├── routing/              # Motor nuevo (docs/PLAN.md §2 y §5)
-│   ├── graph.py          # RoadGraph: carga nodos y aristas en memoria
+│   ├── graph.py          # RoadGraph: carga nodos y aristas en memoria, road_class, UNPAVED_SEGMENTS
 │   ├── dijkstra.py       # Algoritmo punto-a-punto y uno-a-todos
-│   ├── astar.py          # A* con heurística Haversine
-│   ├── traffic.py        # Franjas horarias y multiplicadores
-│   ├── multistop.py      # Matriz + vecino cercano + 2-opt
+│   ├── astar.py          # A* con heurística Haversine, v_max derivado de datos
+│   ├── traffic.py        # Franjas horarias (7 × 2 = 14) y multiplicadores
+│   ├── multistop.py      # Matriz + vecino cercano + 2-opt + ETAs
+│   ├── incidents.py      # Penalización y bloqueo temporal de aristas
 │   ├── build.py          # Construir grafo (Google Routes API)
-│   ├── calibration.py    # Calibrar tráfico (Google Routes API)
-│   ├── experiments.py    # E1–E7: algoritmos, escalabilidad, precisión
-│   ├── google.py         # Consultas a Routes API, con caché
-│   ├── geo.py            # Haversine, coordenadas
+│   ├── calibration.py    # Calibrar tráfico (Google Routes API, ~1 vez/semana)
+│   ├── experiments.py    # E1–E7: correctitud, eficiencia, tráfico, precisión, paradas, hora, escalabilidad
+│   ├── google.py         # Consultas a Routes API, con caché en BD
+│   ├── geo.py            # Haversine sin redondeo, coordenadas
 │   ├── synthetic.py      # Generar datos sintéticos para desarrollar
-│   ├── instrument.py     # Instrumentación: nodos, tiempo, distancia
-│   └── charts.py         # Gráficas para los experimentos
+│   ├── instrument.py     # Instrumentación: nodos expandidos, tiempo, distancia
+│   ├── seed_data.py      # Datos semilla: nodos iniciales de Guatemala
+│   └── charts.py         # Gráficas para los experimentos (matplotlib)
 ├── domain/
-│   ├── services.py       # RouteOptimizer, AStarOptimizer (legado para interfaz clásica)
+│   ├── regions.py        # Regiones administrativas de Guatemala
 │   └── exceptions.py     # PlanningError
 ├── application/
 │   ├── routing.py        # Orquestación del motor nuevo (casos de uso)
 │   ├── planning.py       # Planificador de rutas
 │   ├── orders.py         # Gestión de pedidos
-│   └── services.py       # TripPlanner (legado)
+│   ├── incidents.py      # Reportar, procesar y recalcular con incidentes
+│   ├── live_traffic.py   # Verificación en vivo con tráfico actual de Google
+│   ├── fleet.py          # Configuración de bodegas, vehículos y conductores
+│   ├── assignment.py     # Asignación y reasignación de rutas a conductores
+│   └── demo.py           # Datos y ruta de ejemplo para demostración
 ├── presentation/
 │   ├── routing_views.py  # Endpoints del motor nuevo (/api/routing/*, /api/routes/*)
 │   ├── views.py          # Endpoints legacy
@@ -136,27 +142,50 @@ SECRET_KEY=<generada-por-django>
 
 Si dejas `DATABASE_URL` vacía, se usa SQLite local.
 
-### 3. Base de datos y datos semilla
+### 3. Preparación en un paso (recomendado)
 
+```bash
+python manage.py preparar [--google]
+```
+
+Este comando:
+- Crea/actualiza la base de datos.
+- Carga nodos y aristas del grafo nacional.
+- Calibra tráfico (estimado o con Google Routes API).
+- Compila la app React.
+- Crea usuarios de demo (si `DEMO_PASSWORD` está en `.env`).
+- Crea una ruta de ejemplo en curso.
+
+**Usa `--google` solo si tienes `GOOGLE_ROUTES_API_KEY`** en `.env`. Sin ese flag, usa datos estimados (desarrollo rápido).
+
+### 4. Comandos individuales (alternativa si necesitas control fino)
+
+**Base de datos:**
 ```bash
 python manage.py migrate
-python manage.py seed_graph_nodes        # Nodos del grafo nacional
-python manage.py seed_demo_data          # Departamentos, conexiones (legacy)
-python manage.py createsuperuser         # Usuario admin
+python manage.py seed_graph_nodes         # Nodos del grafo nacional
+python manage.py createsuperuser          # Usuario admin
 ```
 
-### 4. Motor de rutas (aristas y tráfico)
-
-**Sin Google API key** (desarrollo rápido con datos estimados):
+**Grafo y tráfico:**
 ```bash
+# Sin Google (estimado):
 python manage.py build_graph --estimate
 python manage.py calibrate_traffic --synthetic
+
+# Con Google (datos reales):
+python manage.py build_graph
+python manage.py calibrate_traffic
 ```
 
-**Con `GOOGLE_ROUTES_API_KEY`** (datos reales, para la tesis):
+**Recalibración automática (semanal en producción):**
 ```bash
-python manage.py build_graph              # ~10 min, ~200 consultas a Google
-python manage.py calibrate_traffic        # ~5 min, ~4200 consultas a Google
+python manage.py refresh_traffic [--google]
+```
+
+**Archivado de pedidos viejos:**
+```bash
+python manage.py archive_legacy_orders [--apply]
 ```
 
 ### 5. Levantar Django
@@ -224,18 +253,45 @@ Genera CSV + PNG en `experiments/output/`:
 
 ## API REST (resumen)
 
-Todos los endpoints requieren sesión autenticada.
+Todos los endpoints requieren sesión autenticada. Ver `logistics/urls.py` y `logistics/presentation/routing_views.py`.
+
+### Ruteo
 
 | Método | Endpoint | Descripción |
 |---|---|---|
-| GET | `/api/routing/nodes/` | Nodos del grafo |
-| POST | `/api/routing/route/` | Ruta entre dos nodos (Dijkstra o A\*) |
-| POST | `/api/routing/compare/` | Comparar Dijkstra vs A* |
-| POST | `/api/routes/optimize/` | Optimizar múltiples paradas |
-| GET | `/api/routing/best_departure/` | Mejor hora para salir (7 franjas) |
-| GET | `/api/traffic/profile/` | Multiplicadores de tráfico por franja |
+| GET | `/api/routing/nodes/` | Nodos del grafo nacional |
+| POST | `/api/routing/route/` | Ruta: origen, destino, hora, algoritmo (Dijkstra/A*), criterio (tiempo/km) |
+| POST | `/api/routing/compare/` | Comparar algoritmos y criterios en una sola respuesta |
+| POST | `/api/routes/optimize/` | Optimizar múltiples paradas: matriz, vecino cercano + 2-opt, ETAs |
+| GET | `/api/routing/best_departure/` | Tiempo estimado en cada una de las 7 franjas horarias |
+| GET | `/api/traffic/profile/` | Multiplicadores de tráfico (m ≥ 1) por arista, franja y tipo de día |
 
-Ver `logistics/urls.py` y `logistics/presentation/routing_views.py` para detalles.
+### Operaciones en vivo
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| POST | `/api/incidents/` | Reportar incidente: tipo, ubicación, duración, multiplicador o bloqueo |
+| GET | `/api/incidents/` | Listar incidentes activos |
+| POST | `/api/routing/live-verify/` | Verificar ruta con tráfico actual de Google (RUT-39) |
+| POST | `/api/routes/assign/` | Asignar ruta a conductor (RUT-35) |
+| POST | `/api/routes/cancel/` | Cancelar asignación |
+
+### Configuración (admin)
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| GET/POST | `/api/fleet/depots/` | Bodegas |
+| GET/POST | `/api/fleet/vehicles/` | Vehículos (camiones, motos) |
+| GET/POST | `/api/fleet/drivers/` | Conductores con disponibilidad |
+| POST | `/api/traffic/refresh/` | Ejecutar recalibración semanal (RUT-39) |
+
+### Autenticación
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| POST | `/api/auth/demo/` | Login rápido de demo (despachador o conductor) |
+| POST | `/api/auth/logout/` | Cerrar sesión |
+| GET | `/api/auth/me/` | Usuario actual |
 
 ---
 
