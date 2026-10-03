@@ -44,6 +44,7 @@ export interface SearchPayload {
   roads: string[];
   minutes: number | null;
   km: number | null;
+  unpaved_km?: number | null;
   cost: number | null;
   expanded: number;
   pushed: number;

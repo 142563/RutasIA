@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from logistics.models import Node
-from logistics.routing.build import build_estimated, build_from_google
+from logistics.routing.build import apply_road_classes, build_estimated, build_from_google
 from logistics.routing.google import RoutesApiError, RoutesClient
 from logistics.routing.seed_data import ROAD_SEGMENTS
 
@@ -37,6 +37,7 @@ class Command(BaseCommand):
             report = build_from_google(client, refresh=options["refresh"])
             self.stdout.write(f"Solicitudes a Google: {report.requests} ({report.elements} elementos).")
 
+        apply_road_classes()  # también a las aristas protegidas (Google) que el modo estimado no toca
         self.stdout.write(self.style.SUCCESS(
             f"Aristas: {report.edges_created} nuevas, {report.edges_updated} actualizadas, "
             f"{report.edges_skipped} omitidas."

@@ -23,6 +23,7 @@ export interface PlanLeg {
   roads: string[];
   minutes: number;
   km: number;
+  unpaved_km: number;
   band: Band;
   depart_at: string;
   arrive_at: string;
@@ -68,6 +69,7 @@ export interface PlanRequest {
   departure: string;
   service_min: number;
   return_to_depot: boolean;
+  allow_unpaved?: boolean;
 }
 
 export function usePlan(request: PlanRequest | null) {

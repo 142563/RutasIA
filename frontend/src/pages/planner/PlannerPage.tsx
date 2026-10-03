@@ -38,6 +38,7 @@ export function PlannerPage() {
   const [pickMode, setPickMode] = React.useState<"zones" | "list">("zones");
   const [departure, setDeparture] = React.useState(defaultDeparture);
   const [returnToDepot, setReturnToDepot] = React.useState(true);
+  const [allowUnpaved, setAllowUnpaved] = React.useState(false);
   const [serviceMin, setServiceMin] = React.useState(10);
   const [criterion, setCriterion] = React.useState<Criterion>("time");
   const [driverId, setDriverId] = React.useState("");
@@ -47,7 +48,7 @@ export function PlannerPage() {
   const depots = useDepots();
   const depotId = depots.data?.depots[0]?.id;
   const request = depotId && ids.length && departure
-    ? { depot_id: depotId, order_ids: ids, departure, service_min: serviceMin, return_to_depot: returnToDepot }
+    ? { depot_id: depotId, order_ids: ids, departure, service_min: serviceMin, return_to_depot: returnToDepot, allow_unpaved: allowUnpaved }
     : null;
   const plan = usePlan(request);
   const fleet = useFleet();
@@ -133,6 +134,10 @@ export function PlannerPage() {
               <label className="col-span-2 flex items-center gap-2 text-ink-3">
                 <input type="checkbox" className="size-4 accent-ink" checked={returnToDepot} onChange={(e) => setReturnToDepot(e.target.checked)} />
                 Regresar a la bodega al terminar
+              </label>
+              <label className="col-span-2 flex items-center gap-2 text-ink-3">
+                <input type="checkbox" className="size-4 accent-ink" checked={allowUnpaved} onChange={(e) => setAllowUnpaved(e.target.checked)} />
+                Permitir caminos de terracería (por defecto se evitan)
               </label>
             </div>
           </details>
@@ -226,6 +231,10 @@ other: PlanVariant | null;
   );
 }
 
+function unpavedKm(variant: PlanVariant) {
+  return variant.legs.reduce((sum, leg) => sum + (leg.unpaved_km ?? 0), 0);
+}
+
 function PlanSummary({ data, variant, criterion, fetching }: { data: PlanResponse; variant: PlanVariant; criterion: Criterion; fetching: boolean }) {
   const saved = data.minutes_saved;
   const hint = criterion === "time"
@@ -240,6 +249,11 @@ function PlanSummary({ data, variant, criterion, fetching }: { data: PlanRespons
         <Metric label="Paradas" value={variant.stops.length} className="[&>span:nth-child(2)]:text-lg" />
         <Metric label={data.return_to_depot ? "Regreso" : "Termina"} value={formatClock(variant.finish_at)} className="[&>span:nth-child(2)]:text-lg" />
       </div>
+      {unpavedKm(variant) >= 1 ? (
+        <p className="rounded-lg bg-warn/10 px-3 py-2 text-[13px] text-warn">
+          Incluye {formatKm(unpavedKm(variant))} de terracería: no hay otra carretera hacia alguna parada o se permitió usarla.
+        </p>
+      ) : null}
       <details className="text-xs text-ink-2">
         <summary className="cursor-pointer list-none hover:text-ink">¿Cómo lo calculó?</summary>
         <p className="mt-2 leading-relaxed">

@@ -15,7 +15,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from logistics.application.orders import app_orders, node_ref
-from logistics.application.routing import get_graph, parse_departure, roads_along
+from logistics.application.routing import avoid_unpaved, get_graph, parse_departure, roads_along
 from logistics.domain.exceptions import PlanningError
 from logistics.models import Depot, Driver, Order, Route, RouteStop, TrafficBand, Vehicle
 from logistics.routing.graph import TIME, RoadGraph
@@ -64,6 +64,7 @@ def _parse_request(payload: dict):
         "departure": parse_departure(payload.get("departure")),
         "service_min": service_min,
         "return_to_depot": bool(payload.get("return_to_depot", True)),
+        "avoid_unpaved": avoid_unpaved(payload),
     }
 
 
@@ -79,7 +80,7 @@ def _plan(req: dict, criterion: str, departure: datetime | None = None, fixed_or
     stops = [_node_of(graph, o.node.code if o.node else None, o.latitude, o.longitude) for o in req["orders"]]
     try:
         return plan_multistop(graph, depot_node, stops, departure or req["departure"], req["service_min"],
-                              req["return_to_depot"], criterion, fixed_order)
+                              req["return_to_depot"], criterion, fixed_order, req["avoid_unpaved"])
     except UnreachableStopError as exc:
         raise PlanningError(f"No hay ruta hacia {graph.names[exc.node]}.") from None
 
@@ -126,6 +127,7 @@ def _variant_payload(req: dict, plan: MultiStopPlan) -> dict:
             "roads": roads_along(graph, leg.search.edges),
             "minutes": round(leg.minutes, 2),
             "km": round(leg.km, 2),
+            "unpaved_km": round(graph.unpaved_km(leg.search.edges), 2),
             "band": leg.band,
             "depart_at": leg.depart_at.isoformat(),
             "arrive_at": leg.arrive_at.isoformat(),
@@ -176,6 +178,7 @@ def plan_route(payload: dict) -> dict:
         "day_type": day_type,
         "service_min": req["service_min"],
         "return_to_depot": req["return_to_depot"],
+        "avoid_unpaved": req["avoid_unpaved"],
         "total_weight_kg": float(sum(o.weight_kg for o in req["orders"])),
         "fastest": _variant_payload(req, fastest),
         "shortest": _variant_payload(req, shortest),

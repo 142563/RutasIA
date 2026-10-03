@@ -16,6 +16,12 @@ TIME = "time"
 DISTANCE = "distance"
 CRITERIA = (TIME, DISTANCE)
 
+UNPAVED = "unpaved"
+# Al evitar terracería, su costo de BÚSQUEDA se multiplica por este factor (≥ 1):
+# solo se usa si la alternativa asfaltada tarda más de 20 veces. Los minutos que
+# se muestran siguen siendo los reales (los de `weights`), nunca los penalizados.
+UNPAVED_PENALTY = 20.0
+
 Profile = tuple[str, str]  # (franja, tipo de día)
 
 
@@ -34,6 +40,7 @@ class RoadGraph:
     multipliers: dict[Profile, list[float]] = field(default_factory=dict)
     sources: dict[str, str] = field(default_factory=dict)  # de dónde salen los datos
     kinds: list[str] = field(default_factory=list)  # cabecera | municipio | cruce (para el mapa)
+    road_classes: list[str] = field(default_factory=list)  # primary | secondary | unpaved, por arista
 
     def __post_init__(self) -> None:
         self.index = {code: i for i, code in enumerate(self.codes)}
@@ -46,6 +53,8 @@ class RoadGraph:
             self.edge_db_ids = [None] * len(self.t0)
         if not self.kinds:
             self.kinds = [""] * len(self.codes)
+        if not self.road_classes:
+            self.road_classes = [""] * len(self.t0)
         self._weights_cache: dict[tuple, list[float]] = {}
 
     # --- construcción -----------------------------------------------------
@@ -57,6 +66,7 @@ class RoadGraph:
         edges: Iterable[tuple[str, str, float, float]],
         multipliers: dict[Profile, Sequence[float]] | None = None,
         sources: dict[str, str] | None = None,
+        road_classes: Sequence[str] | None = None,
     ) -> "RoadGraph":
         """Grafo sin BD. nodes = (code, name, lat, lon); edges = (origen, destino, km, t0_min)."""
         nodes = list(nodes)
@@ -73,6 +83,7 @@ class RoadGraph:
             t0=[float(e[3]) for e in edges],
             multipliers={k: list(v) for k, v in (multipliers or {}).items()},
             sources=sources or {},
+            road_classes=list(road_classes or []),
         )
 
     # --- consultas --------------------------------------------------------
@@ -103,6 +114,29 @@ class RoadGraph:
             result = self.t0 if m is None else [t * factor for t, factor in zip(self.t0, m)]
         self._weights_cache[key] = result
         return result
+
+    def search_weights(
+        self, criterion: str = TIME, band: str | None = None, day_type: str | None = None,
+        avoid_unpaved: bool = False,
+    ) -> list[float]:
+        """Pesos para BUSCAR la ruta. Con avoid_unpaved, la terracería cuesta ×UNPAVED_PENALTY.
+
+        Solo multiplica por un factor ≥ 1: los pesos siguen ≥ 0 y A* (que deriva
+        v_max de estos mismos pesos) sigue siendo exacto. Para mostrar minutos o
+        km se usa siempre `weights`, no esta lista.
+        """
+        base = self.weights(criterion, band, day_type)
+        if not avoid_unpaved or UNPAVED not in self.road_classes:
+            return base
+        key = ("avoid_unpaved", criterion, band, day_type)
+        cached = self._weights_cache.get(key)
+        if cached is None:
+            cached = [w * UNPAVED_PENALTY if c == UNPAVED else w for w, c in zip(base, self.road_classes)]
+            self._weights_cache[key] = cached
+        return cached
+
+    def unpaved_km(self, edges: Iterable[int]) -> float:
+        return sum(self.km[e] for e in edges if self.road_classes[e] == UNPAVED)
 
     def straight_km(self, u: int, v: int) -> float:
         return haversine_km(self.lat[u], self.lon[u], self.lat[v], self.lon[v])
@@ -153,6 +187,7 @@ def build_graph_from_db() -> RoadGraph:
         t0=[e.duration_free_min for e in edges],
         km=[e.distance_km for e in edges],
         roads=[e.road for e in edges],
+        road_classes=[e.road_class for e in edges],
         edge_db_ids=[e.id for e in edges],
         multipliers=multipliers,
         sources={

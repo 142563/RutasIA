@@ -138,6 +138,7 @@ def build_from_google(client: RoutesClient, refresh: bool = False, segments=ROAD
             "distance_km": sample.distance_m / 1000,
             "duration_free_min": t0_s / 60,
             "road": segment.road,
+            "road_class": segment.road_class,
             "source": Edge.Source.GOOGLE,
             "verified_at": sample.fetched_at,
             "is_active": True,
@@ -163,11 +164,13 @@ def estimated_graph_from_seed(multipliers=None) -> RoadGraph:
     for (a, b) in _directed_pairs(ROAD_SEGMENTS):
         km = haversine_km(*coords[a], *coords[b]) * ESTIMATE_DETOUR_FACTOR
         edges.append((a, b, km, km / ESTIMATE_SPEED_KMH * 60))
+    classes = {pair: segment.road_class for pair, segment in _directed_pairs(ROAD_SEGMENTS).items()}
     return RoadGraph.from_lists(
         nodes=[(n.code, n.name, n.latitude, n.longitude) for n in NODES],
         edges=edges,
         multipliers=multipliers,
         sources={"edges": "estimate", "traffic": "synthetic" if multipliers else "none"},
+        road_classes=[classes[(a, b)] for (a, b, *_rest) in edges],
     )
 
 
@@ -188,12 +191,23 @@ def build_estimated(segments=ROAD_SEGMENTS) -> BuildReport:
             "distance_km": km,
             "duration_free_min": minutes,
             "road": segment.road,
+            "road_class": segment.road_class,
             "source": Edge.Source.ESTIMATE,
             "verified_at": None,
             "is_active": True,
         }, report)
     invalidate_graph()
     return report
+
+
+def apply_road_classes(segments=ROAD_SEGMENTS) -> int:
+    """Copia la clase de carretera de la semilla a las aristas existentes (no consulta Google)."""
+    updated = 0
+    for (a, b), segment in _directed_pairs(segments).items():
+        updated += Edge.objects.filter(origin__code=a, destination__code=b).exclude(
+            road_class=segment.road_class).update(road_class=segment.road_class)
+    invalidate_graph()
+    return updated
 
 
 # --- verificación ----------------------------------------------------------

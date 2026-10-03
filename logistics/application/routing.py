@@ -62,6 +62,11 @@ def parse_departure(value: Any) -> datetime:
     return to_local(moment)
 
 
+def avoid_unpaved(payload) -> bool:
+    """Por defecto se evita la terracería; allow_unpaved=true la permite."""
+    return str(payload.get("allow_unpaved", "")).lower() not in ("1", "true", "si", "sí", "yes")
+
+
 def parse_choice(value: Any, allowed, label: str, default: str) -> str:
     value = value or default
     if value not in allowed:
@@ -93,6 +98,7 @@ def search_payload(graph: RoadGraph, result: SearchResult, time_weights: list[fl
         "roads": roads_along(graph, result.edges),
         "minutes": round(result.total(time_weights), 2) if result.found else None,
         "km": round(result.total(graph.km), 2) if result.found else None,
+        "unpaved_km": round(graph.unpaved_km(result.edges), 2) if result.found else None,
         "cost": round(result.cost, 4) if result.found else None,
         "expanded": result.expanded,
         "pushed": result.pushed,
@@ -100,8 +106,10 @@ def search_payload(graph: RoadGraph, result: SearchResult, time_weights: list[fl
     }
 
 
-def meta(graph: RoadGraph, departure: datetime | None = None) -> dict:
+def meta(graph: RoadGraph, departure: datetime | None = None, avoid: bool | None = None) -> dict:
     payload = {"data_source": graph.sources}
+    if avoid is not None:
+        payload["avoid_unpaved"] = avoid
     if departure is not None:
         band, day_type = profile_for(departure)
         payload.update({
@@ -130,13 +138,14 @@ def route(payload: dict) -> dict:
     algorithm = parse_choice(payload.get("algorithm"), ALGORITHMS, "Algoritmo", "astar")
     criterion = parse_choice(payload.get("criterion"), CRITERIA, "Criterio", TIME)
     band, day_type = profile_for(departure)
+    avoid = avoid_unpaved(payload)
     time_weights = graph.weights(TIME, band, day_type)
-    weights = time_weights if criterion == TIME else graph.weights(DISTANCE)
+    weights = graph.search_weights(criterion, band, day_type, avoid)
 
     result = ALGORITHMS[algorithm](graph, weights, origin, destination)
     _require_found(result, graph)
     return {"route": {**search_payload(graph, result, time_weights), "criterion": criterion},
-            **meta(graph, departure)}
+            **meta(graph, departure, avoid)}
 
 
 def compare(payload: dict) -> dict:
@@ -146,12 +155,14 @@ def compare(payload: dict) -> dict:
     destination = resolve_node(graph, payload.get("destination"), "Destino")
     departure = parse_departure(payload.get("departure"))
     band, day_type = profile_for(departure)
+    avoid = avoid_unpaved(payload)
     time_weights = graph.weights(TIME, band, day_type)
+    search = graph.search_weights(TIME, band, day_type, avoid)
 
-    by_dijkstra = dijkstra(graph, time_weights, origin, destination)
-    by_astar = astar(graph, time_weights, origin, destination)
+    by_dijkstra = dijkstra(graph, search, origin, destination)
+    by_astar = astar(graph, search, origin, destination)
     _require_found(by_astar, graph)
-    shortest = astar(graph, graph.weights(DISTANCE), origin, destination)
+    shortest = astar(graph, graph.search_weights(DISTANCE, avoid_unpaved=avoid), origin, destination)
 
     fastest_payload = search_payload(graph, by_astar, time_weights)
     shortest_payload = search_payload(graph, shortest, time_weights)
@@ -166,7 +177,7 @@ def compare(payload: dict) -> dict:
         "shortest": shortest_payload,
         "minutes_saved": round(shortest_payload["minutes"] - fastest_payload["minutes"], 2),
         "same_route": by_astar.path == shortest.path,
-        **meta(graph, departure),
+        **meta(graph, departure, avoid),
     }
 
 
@@ -177,15 +188,17 @@ def explore(payload: dict) -> dict:
     destination = resolve_node(graph, payload.get("destination"), "Destino")
     departure = parse_departure(payload.get("departure"))
     band, day_type = profile_for(departure)
-    weights = graph.weights(TIME, band, day_type)
+    avoid = avoid_unpaved(payload)
+    time_weights = graph.weights(TIME, band, day_type)
+    weights = graph.search_weights(TIME, band, day_type, avoid)
     result = {}
     for name, search in ALGORITHMS.items():
         r = search(graph, weights, origin, destination, record_order=True)
         result[name] = {
-            **search_payload(graph, r, weights),
+            **search_payload(graph, r, time_weights),
             "order": [graph.codes[i] for i in r.order],
         }
-    return {"explore": result, **meta(graph, departure)}
+    return {"explore": result, **meta(graph, departure, avoid)}
 
 
 def optimize(payload: dict) -> dict:
@@ -205,8 +218,10 @@ def optimize(payload: dict) -> dict:
     if service_min < 0:
         raise PlanningError("service_min no puede ser negativo.")
 
+    avoid = avoid_unpaved(payload)
     try:
-        plan = plan_multistop(graph, depot, stops, departure, service_min, bool(payload.get("return_to_depot")))
+        plan = plan_multistop(graph, depot, stops, departure, service_min, bool(payload.get("return_to_depot")),
+                              avoid_unpaved=avoid)
     except UnreachableStopError as exc:
         raise PlanningError(f"No hay ruta hacia {graph.names[exc.node]}.") from None
 
@@ -238,7 +253,7 @@ def optimize(payload: dict) -> dict:
             },
             "matrix_expanded": plan.matrix_expanded,
         },
-        **meta(graph, departure),
+        **meta(graph, departure, avoid),
     }
 
 
@@ -250,16 +265,16 @@ def best_departure(params) -> dict:
     day: date | None = parse_date(params.get("date") or "") if params.get("date") else to_local(timezone.now()).date()
     if day is None:
         raise PlanningError("Fecha inválida. Usa el formato 2026-10-06.")
+    avoid = avoid_unpaved(params)
     rows = []
     for band in TrafficBand.values:
         departure = datetime.combine(day, REPRESENTATIVE_TIME[band], tzinfo=GT_TZ)
         b, d = profile_for(departure)
-        weights = graph.weights(TIME, b, d)
-        r = astar(graph, weights, origin, destination)
+        r = astar(graph, graph.search_weights(TIME, b, d, avoid), origin, destination)
         _require_found(r, graph)
         rows.append({
             "band": band, "band_label": TrafficBand(band).label, "departure": departure.isoformat(),
-            "minutes": round(r.cost, 2), "roads": roads_along(graph, r.edges),
+            "minutes": round(r.total(graph.weights(TIME, b, d)), 2), "roads": roads_along(graph, r.edges),
         })
     best = min(rows, key=lambda row: row["minutes"])
     return {
@@ -268,7 +283,7 @@ def best_departure(params) -> dict:
         "day_type": profile_for(datetime.combine(day, time(12), tzinfo=GT_TZ))[1],
         "bands": rows,
         "best_band": best["band"],
-        **meta(graph),
+        **meta(graph, avoid=avoid),
     }
 
 

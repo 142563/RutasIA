@@ -142,6 +142,7 @@ def plan_multistop(
     return_to_depot: bool = False,
     criterion: str = TIME,
     fixed_order: Sequence[int] | None = None,
+    avoid_unpaved: bool = False,
 ) -> MultiStopPlan:
     """criterion="time": la más rápida con tráfico; "distance": la más corta en km.
 
@@ -152,7 +153,7 @@ def plan_multistop(
     """
     departure = to_local(departure)
     band, day_type = profile_for(departure)
-    weights = graph.weights(TIME, band, day_type) if criterion == TIME else graph.weights(DISTANCE)
+    weights = graph.search_weights(criterion, band, day_type, avoid_unpaved)
     nodes = [depot, *stops]
 
     matrix, matrix_expanded = time_matrix(graph, weights, nodes)
@@ -175,7 +176,7 @@ def plan_multistop(
     for position, target in enumerate(sequence):
         leg_band, leg_day = profile_for(current_time)
         time_weights = graph.weights(TIME, leg_band, leg_day)
-        search_weights = time_weights if criterion == TIME else graph.weights(DISTANCE)
+        search_weights = graph.search_weights(criterion, leg_band, leg_day, avoid_unpaved)
         result = astar(graph, search_weights, current_node, target)
         if not result.found:
             raise UnreachableStopError(target)

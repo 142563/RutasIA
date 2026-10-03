@@ -29,6 +29,23 @@ class RoadSegment(NamedTuple):
     road: str
     needs_check: bool = False
 
+    @property
+    def road_class(self) -> str:
+        """primary (CA-*), unpaved (lista de abajo) o secondary (el resto, asfaltadas)."""
+        if frozenset((self.a, self.b)) in UNPAVED_SEGMENTS:
+            return "unpaved"
+        return "primary" if self.road.startswith("CA") else "secondary"
+
+
+# Tramos con terracería (total o en buena parte). PENDIENTE de verificar en campo
+# o con Street View (RUT-20); se corrigen aquí o en el admin (Edge.road_class).
+UNPAVED_SEGMENTS: set[frozenset[str]] = {
+    frozenset(("uspantan", "san-cristobal-verapaz")),
+    frozenset(("playa-grande", "uspantan")),
+    frozenset(("barillas", "playa-grande")),
+    frozenset(("rabinal", "san-juan-sacatepequez")),
+}
+
 
 NODES: list[SeedNode] = [
     # Guatemala

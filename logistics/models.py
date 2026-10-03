@@ -367,7 +367,16 @@ class Edge(TimestampedModel):
     distance_km = models.FloatField()
     duration_free_min = models.FloatField(help_text="t0: minutos sin tráfico (staticDuration de Google).")
     road = models.CharField(max_length=20, blank=True, help_text="Carretera principal, p. ej. CA-1.")
+    class RoadClass(models.TextChoices):
+        PRIMARY = "primary", "Primaria (CA)"
+        SECONDARY = "secondary", "Secundaria asfaltada"
+        UNPAVED = "unpaved", "Terracería"
+
     source = models.CharField(max_length=10, choices=Source.choices, default=Source.GOOGLE)
+    road_class = models.CharField(
+        max_length=10, choices=RoadClass.choices, default=RoadClass.SECONDARY,
+        help_text="Terracería: el planificador la evita salvo que no haya otra opción.",
+    )
     verified_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
