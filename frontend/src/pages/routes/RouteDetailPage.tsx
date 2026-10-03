@@ -6,6 +6,7 @@ import {
   formatDiff, parseDataSource, ROUTE_STATUS, TIMING, useRouteDetail, type RouteDetail, type RouteStopRow,
 } from "@/lib/dispatch";
 import { formatClock, formatKm, formatMinutes } from "@/lib/format";
+import { AssignmentSection } from "./AssignmentSection";
 import { formatWhen, ProgressBar } from "./shared";
 
 function StopItem({ stop, last }: { stop: RouteStopRow; last: boolean }) {
@@ -73,7 +74,7 @@ export function RouteDetailPage() {
         <div className="flex flex-col gap-8 px-6 py-6 lg:px-8">
           <div className="grid grid-cols-2 gap-6 border-b border-line pb-6 sm:grid-cols-4">
             <Metric label="Estado" value={<StatusDot color={ROUTE_STATUS[route.status].color} className="text-base text-ink">{route.status_label}</StatusDot>}
-              hint={route.driver ? `${route.driver}${route.vehicle ? ` · ${route.vehicle}` : ""}` : "Sin conductor"} />
+              hint={route.driver ? `${route.driver}${route.vehicle ? ` · ${route.vehicle}` : ""}` : "Sin piloto"} />
             <Metric label="Tiempo de manejo" value={formatMinutes(route.driving_minutes)} hint={`Termina ${formatClock(route.finish_at)}`} />
             <Metric label="Distancia" value={formatKm(route.total_km)} />
             <Metric label="Ahorro vs. la más corta" value={route.minutes_saved != null ? formatMinutes(route.minutes_saved) : "—"}
@@ -85,6 +86,7 @@ export function RouteDetailPage() {
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
             <Timeline detail={detail} />
             <div className="flex flex-col gap-8">
+              <AssignmentSection route={route} />
               <section aria-label="Tramos">
                 <h2 className="mb-3 text-sm font-semibold">Tramos</h2>
                 {detail.legs.length === 0 ? <p className="text-sm text-ink-2">Sin tramos guardados.</p> : (

@@ -3,13 +3,17 @@ import * as React from "react";
 import { Link, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorNote, PageHeader, Spinner, StatusDot } from "@/components/ui/misc";
+import { isUnassigned } from "@/lib/assignment";
 import { formatKm, formatMinutes } from "@/lib/format";
 import { progressOf, ROUTE_STATUS, useRoutes, type RouteStatus } from "@/lib/dispatch";
 import { cn } from "@/lib/utils";
 import { formatWhen, ProgressBar } from "./shared";
 
-const TABS: { value: "all" | RouteStatus; label: string }[] = [
+type Tab = "all" | "unassigned" | RouteStatus;
+
+const TABS: { value: Tab; label: string }[] = [
   { value: "all", label: "Todas" },
+  { value: "unassigned", label: "Sin asignar" },
   { value: "planned", label: "Planificadas" },
   { value: "in_progress", label: "En curso" },
   { value: "completed", label: "Completadas" },
@@ -18,11 +22,13 @@ const TABS: { value: "all" | RouteStatus; label: string }[] = [
 
 export function RoutesPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = React.useState<"all" | RouteStatus>("all");
+  const [tab, setTab] = React.useState<Tab>("all");
   const routes = useRoutes();
   const all = routes.data?.routes ?? [];
-  const rows = tab === "all" ? all : all.filter((r) => r.status === tab);
-  const count = (value: "all" | RouteStatus) => (value === "all" ? all.length : all.filter((r) => r.status === value).length);
+  const matches = (r: (typeof all)[number], value: Tab) =>
+    value === "all" ? true : value === "unassigned" ? isUnassigned(r) : r.status === value;
+  const rows = all.filter((r) => matches(r, tab));
+  const count = (value: Tab) => all.filter((r) => matches(r, value)).length;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -45,7 +51,9 @@ export function RoutesPage() {
             )}
           >
             {t.label}
-            <span className="num text-xs text-ink-2">{count(t.value)}</span>
+            <span className={cn("num text-xs", t.value === "unassigned" && count(t.value) > 0 ? "font-medium text-warn" : "text-ink-2")}>
+              {count(t.value)}
+            </span>
           </button>
         ))}
       </div>
@@ -54,7 +62,7 @@ export function RoutesPage() {
         {routes.isPending ? <div className="p-8"><Spinner /></div> : null}
         {routes.error ? <div className="p-6"><ErrorNote error={routes.error} /></div> : null}
         {routes.data && rows.length === 0 ? (
-          <EmptyState icon={<RouteIcon />} title={all.length === 0 ? "Aún no hay rutas" : "No hay rutas en este estado"}
+          <EmptyState icon={<RouteIcon />} title={all.length === 0 ? "Aún no hay rutas" : tab === "unassigned" ? "Todas las rutas tienen piloto" : "No hay rutas en este estado"}
             action={all.length === 0 ? <Button asChild variant="outline"><Link to="/planificar">Planificar ruta</Link></Button> : null}>
             {all.length === 0 ? "Las rutas que confirmes en Planificar aparecen aquí." : "Prueba con otro estado."}
           </EmptyState>
@@ -64,7 +72,7 @@ export function RoutesPage() {
             <thead>
               <tr className="border-b border-line text-left text-xs text-ink-2">
                 <th className="py-2.5 pl-6 pr-4 font-normal lg:pl-8">Código</th>
-                <th className="py-2.5 pr-4 font-normal">Conductor</th>
+                <th className="py-2.5 pr-4 font-normal">Piloto</th>
                 <th className="py-2.5 pr-4 font-normal">Vehículo</th>
                 <th className="py-2.5 pr-4 font-normal">Salida</th>
                 <th className="py-2.5 pr-4 font-normal">Estado</th>
@@ -83,7 +91,9 @@ export function RoutesPage() {
                       {r.code}
                     </Link>
                   </td>
-                  <td className="py-3 pr-4">{r.driver ?? <span className="text-ink-2">Sin asignar</span>}</td>
+                  <td className="py-3 pr-4">{r.driver ?? (isUnassigned(r)
+                    ? <span className="inline-flex items-center rounded-full border border-warn/25 bg-warn/5 px-2 py-0.5 text-xs font-medium text-warn">Sin asignar</span>
+                    : <span className="text-ink-2">—</span>)}</td>
                   <td className="num whitespace-nowrap py-3 pr-4 text-[13px] text-ink-3">{r.vehicle ?? "—"}</td>
                   <td className="num whitespace-nowrap py-3 pr-4 text-[13px] text-ink-3">{formatWhen(r.departure_at)}</td>
                   <td className="whitespace-nowrap py-3 pr-4">
