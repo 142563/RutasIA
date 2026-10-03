@@ -8,6 +8,7 @@ import { navigationUrl, nextStop, routeProgress, useDriverToday, useStartRoute, 
 import { formatClock, formatDateLong, formatKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AlternativeRouteNotice } from "./AlternativeRouteNotice";
+import { ReportIncident } from "./ReportIncident";
 
 /** Conductor · Mi ruta de hoy (docs/prototipo/Conductor-Hoy.dc.html). Móvil primero, sin AppShell. */
 export function DriverTodayPage() {
@@ -97,7 +98,7 @@ function RouteSection({ route }: { route: DriverRoute }) {
         </span>
       </div>
 
-      <AlternativeRouteNotice />
+      <AlternativeRouteNotice route={route} />
 
       {route.status === "planned" ? (
         <Button className="h-12 rounded-xl text-[15px]" onClick={onStart} disabled={start.isPending}>
@@ -111,6 +112,8 @@ function RouteSection({ route }: { route: DriverRoute }) {
           <StopRow key={stop.id} stop={stop} highlighted={next?.id === stop.id} />
         ))}
       </ol>
+
+      {route.status === "in_progress" ? <ReportIncident routeId={route.id} /> : null}
     </section>
   );
 }
