@@ -34,3 +34,20 @@ services:
         sync: false
       - key: DEBUG
         value: "False"
+
+  # Cron Job: recalibra el tráfico con Google cada domingo a las 06:00 GT (UTC-6 → 12:00 UTC)
+  - type: cron
+    name: refresh-traffic
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    schedule: "0 12 * * 0"
+    startCommand: python manage.py refresh_traffic
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: GOOGLE_ROUTES_API_KEY
+        sync: false
+      - key: DEBUG
+        value: "False"

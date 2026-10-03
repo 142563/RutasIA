@@ -7,6 +7,7 @@ import {
 } from "@/lib/dispatch";
 import { formatClock, formatKm, formatMinutes } from "@/lib/format";
 import { AssignmentSection } from "./AssignmentSection";
+import { LiveCheck } from "./LiveCheck";
 import { formatWhen, ProgressBar } from "./shared";
 
 function StopItem({ stop, last }: { stop: RouteStopRow; last: boolean }) {
@@ -87,6 +88,7 @@ export function RouteDetailPage() {
             <Timeline detail={detail} />
             <div className="flex flex-col gap-8">
               <AssignmentSection route={route} />
+              <LiveCheck routeId={route.id} status={route.status} />
               <section aria-label="Tramos">
                 <h2 className="mb-3 text-sm font-semibold">Tramos</h2>
                 {detail.legs.length === 0 ? <p className="text-sm text-ink-2">Sin tramos guardados.</p> : (
