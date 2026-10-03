@@ -1,6 +1,6 @@
 from django.urls import path
 from logistics.presentation import (
-    app_views, assignment_views, dispatch_views, driver_views, fleet_views, incident_views, orders_views, routing_views, views,
+    app_views, assignment_views, dispatch_views, driver_views, fleet_views, incident_views, live_views, orders_views, routing_views, views,
 )
 
 urlpatterns = [
@@ -37,6 +37,7 @@ urlpatterns = [
     path("api/v2/assignment/options/", assignment_views.api_assignment_options, name="api-v2-assignment-options"),
     path("api/v2/routes/<int:route_id>/assign/", assignment_views.api_route_assign, name="api-v2-route-assign"),
     path("api/v2/routes/<int:route_id>/cancel/", assignment_views.api_route_cancel, name="api-v2-route-cancel"),
+    path("api/v2/routes/<int:route_id>/live-check/", live_views.api_route_live_check, name="api-v2-route-live-check"),
     # Configuración (admin): kind = depots | drivers | vehicles | users
     path("api/v2/fleet/<str:kind>/", fleet_views.api_fleet_collection, name="api-v2-fleet"),
     path("api/v2/fleet/<str:kind>/<int:item_id>/", fleet_views.api_fleet_item, name="api-v2-fleet-item"),
