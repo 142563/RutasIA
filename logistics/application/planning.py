@@ -14,6 +14,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 
+from logistics.application import assignment
 from logistics.application.orders import app_orders, node_ref
 from logistics.application.routing import get_graph, parse_departure, roads_along
 from logistics.domain.exceptions import PlanningError
@@ -194,22 +195,12 @@ def create_route(payload: dict, user) -> dict:
     list(Order.objects.select_for_update().filter(id__in=payload.get("order_ids") or []))
     req = _parse_request(payload)
 
-    driver = vehicle = None
-    if payload.get("driver_id"):
-        driver = Driver.objects.filter(pk=payload["driver_id"], is_active=True).first()
-        if driver is None:
-            raise PlanningError("Conductor inválido o inactivo.")
-    if payload.get("vehicle_id"):
-        vehicle = Vehicle.objects.filter(pk=payload["vehicle_id"], is_active=True).first()
-        if vehicle is None:
-            raise PlanningError("Vehículo inválido o inactivo.")
-        total_weight = sum(o.weight_kg for o in req["orders"])
-        if total_weight > Decimal(vehicle.capacity_kg):
-            raise PlanningError(f"La carga ({total_weight} kg) excede la capacidad del vehículo "
-                                f"({vehicle.capacity_kg} kg).")
+    # Activo y capacidad aquí; la disponibilidad por horario, tras calcular la hora de fin
+    driver, vehicle = assignment.validate_for_new_route(payload, sum(o.weight_kg for o in req["orders"]))
 
     shortest = _shortest(req)
     plan = shortest if criterion == Route.Criterion.DISTANCE else _fastest(req, shortest=shortest)
+    assignment.ensure_available(driver, vehicle, req["departure"], plan.finish_at)
     variant = _variant_payload(req, plan)
     route = Route.objects.create(
         depot=req["depot"], driver=driver, vehicle=vehicle, created_by=user,
