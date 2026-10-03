@@ -20,21 +20,6 @@ services:
       - key: DEBUG
         value: "False"
 
-  # Cron Job: sincroniza precios de combustible cada lunes a las 06:00 GT (UTC-6 → 12:00 UTC)
-  - type: cron
-    name: sync-fuel-prices
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    schedule: "0 12 * * 1"
-    startCommand: python manage.py sync_fuel_prices
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: SECRET_KEY
-        sync: false
-      - key: DEBUG
-        value: "False"
-
   # Cron Job: recalibra el tráfico con Google cada domingo a las 06:00 GT (UTC-6 → 12:00 UTC)
   - type: cron
     name: refresh-traffic

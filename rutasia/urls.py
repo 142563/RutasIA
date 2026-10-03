@@ -26,5 +26,5 @@ urlpatterns = [
     path("", include("logistics.urls")),
     # Aplicación React: cualquier otra ruta la resuelve el router del cliente
     path("", spa, name="spa"),
-    re_path(r"^(?!api/|admin/|accounts/|static/|clasico/)(?P<path>.+)$", spa),
+    re_path(r"^(?!api/|admin/|accounts/|static/)(?P<path>.+)$", spa),
 ]

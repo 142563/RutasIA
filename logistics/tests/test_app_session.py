@@ -141,9 +141,3 @@ class SpaTests(TestCase):
                 response = self.client.get(path)
                 self.assertContains(response, "<div id=root></div>", msg_prefix=path)
             self.assertIn("csrftoken", response.cookies)
-
-    def test_classic_ui_moved_to_clasico(self):
-        self.client.force_login(make_user("viejo", UserProfile.Role.ADMIN))
-        response = self.client.get("/clasico/")
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "/static/logistics/app.")  # app.js o app.<hash>.js
