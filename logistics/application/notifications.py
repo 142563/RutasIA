@@ -107,16 +107,21 @@ def notify_delivery(stop_id: int) -> list[str]:
                     len(messages), stop.order.code)
         return []
 
+    # Cada correo por separado: si falla el del cliente, el del despachador igual sale
     sent = []
     for message in messages:
-        response = httpx.post(
-            RESEND_URL,
-            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
-            json={"from": settings.NOTIFY_FROM, "to": [message["to"]], "subject": message["subject"],
-                  "html": message["html"], "text": message["text"]},
-            timeout=TIMEOUT_SECONDS,
-        )
-        response.raise_for_status()
+        try:
+            response = httpx.post(
+                RESEND_URL,
+                headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+                json={"from": settings.NOTIFY_FROM, "to": [message["to"]], "subject": message["subject"],
+                      "html": message["html"], "text": message["text"]},
+                timeout=TIMEOUT_SECONDS,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.warning("No se pudo enviar el correo «%s» a %s: %s", message["subject"], message["to"], exc)
+            continue
         sent.append(message["to"])
     return sent
 

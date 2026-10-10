@@ -116,6 +116,23 @@ class DeliveryEmailTests(TestCase):
             stops[0].refresh_from_db()
             self.assertEqual(stops[0].status, RouteStop.Status.DELIVERED)
 
+    def test_one_failed_email_does_not_block_the_other(self):
+        _, stops = self.make_route()
+
+        def fail_for_client(*args, **kwargs):
+            if kwargs["json"]["to"] == ["cliente@example.com"]:
+                raise httpx.ConnectError("sin red")
+            return ok_response()
+
+        from logistics.application.notifications import notify_delivery
+        with mock.patch(POST, side_effect=fail_for_client) as post:
+            with mock.patch("logistics.application.driver.notify_delivery_safe"):
+                self.mark(stops[0])
+            with self.assertLogs("logistics.application.notifications", level="WARNING"):
+                sent = notify_delivery(stops[0].id)
+        self.assertEqual(post.call_count, 2)
+        self.assertEqual(sent, ["desp@example.com"])
+
     def test_failed_delivery_sends_nothing(self):
         _, stops = self.make_route()
         with mock.patch(POST) as post:
