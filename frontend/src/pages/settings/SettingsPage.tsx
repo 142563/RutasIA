@@ -1,8 +1,10 @@
-import { BuildingIcon, PlusIcon, TruckIcon, UserCogIcon, UsersIcon } from "lucide-react";
+import { BuildingIcon, PencilIcon, PlusIcon, TruckIcon, UserCogIcon, UsersIcon } from "lucide-react";
+import { motion } from "motion/react";
 import * as React from "react";
 import { Navigate, Route, Routes, useNavigate, useLocation } from "react-router";
 import { Button } from "@/components/ui/button";
-import { EmptyState, ErrorNote, PageHeader, Spinner, StatusDot } from "@/components/ui/misc";
+import { EmptyState, ErrorNote, PageHeader, StatusDot } from "@/components/ui/misc";
+import { SPRING, Skeleton, Stagger, StaggerItem } from "@/components/ui/motion";
 import { Sheet } from "@/components/ui/sheet";
 import { useUser } from "@/lib/auth";
 import { useFleet, type FleetKind, type FleetTypes } from "@/lib/fleet";
@@ -77,52 +79,74 @@ function FleetTab<K extends FleetKind>({ config }: { config: TabConfig<K> }) {
   const close = () => setEditing(null);
   const add = <Button onClick={() => setEditing("new")}><PlusIcon /> Agregar {config.singular}</Button>;
   const current = editing === "new" ? null : editing;
+  // Columnas de datos iguales entre sí, luego estado y acciones
+  const cols = { gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr)) 96px 72px` };
 
   return (
     <Sheet open={editing !== null} onOpenChange={(open) => !open && close()}>
-      <div className="flex items-center justify-between gap-3 px-6 py-4 lg:px-8">
-        <p className="text-[13px] text-ink-2">
-          {list.data ? `${items.filter((i) => i.is_active).length} activos de ${items.length}` : ""}
-        </p>
-        {items.length > 0 ? add : null}
-      </div>
-      <div className="overflow-x-auto border-t border-line">
-        {list.isPending ? <div className="p-8"><Spinner /></div> : null}
-        {list.error ? <div className="p-6"><ErrorNote error={list.error} /></div> : null}
-        {list.data && items.length === 0 ? (
-          <EmptyState icon={config.icon} title={config.empty} action={add} />
-        ) : null}
-        {items.length > 0 ? (
-          <table className="w-full min-w-[640px] text-sm">
-            <thead>
-              <tr className="border-b border-line text-left text-xs text-ink-2">
-                {config.columns.map((c, i) => (
-                  <th key={c.header} className={cn("py-2.5 pr-4 font-normal", i === 0 && "pl-6 lg:pl-8", c.className)}>{c.header}</th>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-3 pb-3">
+          <h2 className="text-base font-semibold">
+            {config.label}
+            {list.data ? <span className="num ml-2 text-[13px] font-normal text-ink-2">{items.filter((i) => i.is_active).length} activos de {items.length}</span> : null}
+          </h2>
+          {items.length > 0 ? add : null}
+        </div>
+        <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-card">
+          <div className="min-w-[620px]">
+            {list.isPending ? (
+              <div aria-busy="true" aria-label="Cargando">
+                {Array.from({ length: 4 }, (_, i) => (
+                  <div key={i} className="flex h-14 items-center gap-6 border-b border-line px-5 last:border-0">
+                    <Skeleton className="h-3.5 w-40" /><Skeleton className="h-3.5 w-28" /><Skeleton className="ml-auto h-3.5 w-16" />
+                  </div>
                 ))}
-                <th className="py-2.5 pr-4 font-normal">Estado</th>
-                <th className="w-24 py-2.5 pr-6 lg:pr-8"><span className="sr-only">Acciones</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className={cn("border-b border-line transition-colors hover:bg-hover/50", !item.is_active && "text-ink-2")}>
-                  {config.columns.map((c, i) => (
-                    <td key={c.header} className={cn("py-3 pr-4", i === 0 && "pl-6 lg:pl-8", c.className)}>{c.cell(item)}</td>
+              </div>
+            ) : null}
+            {list.error ? <div className="p-5"><ErrorNote error={list.error} /></div> : null}
+            {list.data && items.length === 0 ? (
+              <EmptyState icon={config.icon} title={config.empty} action={add} />
+            ) : null}
+            {items.length > 0 ? (
+              <>
+                <div className="grid items-center gap-x-4 border-b border-line px-5 py-2.5 text-xs text-ink-2" style={cols}>
+                  {config.columns.map((c) => <span key={c.header} className={c.className}>{c.header}</span>)}
+                  <span>Estado</span><span className="sr-only">Acciones</span>
+                </div>
+                <Stagger key={config.kind}>
+                  {items.map((item) => (
+                    <StaggerItem key={item.id}
+                      className={cn("group grid min-h-14 items-center gap-x-4 border-b border-line px-5 py-2.5 text-sm transition-colors last:border-0 hover:bg-hover/50", !item.is_active && "text-ink-2")}
+                      style={cols}>
+                      {config.columns.map((c) => <span key={c.header} className={cn("min-w-0 truncate", c.className)}>{c.cell(item)}</span>)}
+                      <StatusDot color={item.is_active ? COLORS.on : COLORS.off}>{item.is_active ? "Activo" : "Inactivo"}</StatusDot>
+                      <span className="text-right opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100">
+                        <Button variant="ghost" size="sm" onClick={() => setEditing(item)} aria-label={`Editar ${config.singular}`}><PencilIcon /> Editar</Button>
+                      </span>
+                    </StaggerItem>
                   ))}
-                  <td className="whitespace-nowrap py-3 pr-4">
-                    <StatusDot color={item.is_active ? COLORS.on : COLORS.off}>{item.is_active ? "Activo" : "Inactivo"}</StatusDot>
-                  </td>
-                  <td className="py-3 pr-6 text-right lg:pr-8">
-                    <Button variant="ghost" size="sm" onClick={() => setEditing(item)}>Editar</Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : null}
+                </Stagger>
+              </>
+            ) : null}
+          </div>
+        </div>
       </div>
       {editing !== null ? <SheetFor kind={config.kind} item={current} onDone={close} /> : null}
     </Sheet>
+  );
+}
+
+/** Ítem de la subnavegación lateral: indicador que se desliza y conteo de activos. */
+function NavItem({ config, active, onClick }: { config: (typeof ORDER)[number]; active: boolean; onClick: () => void }) {
+  const list = useFleet(config.kind);
+  const count = (list.data as Item[] | undefined)?.filter((i) => i.is_active).length;
+  return (
+    <button type="button" role="tab" aria-selected={active} onClick={onClick}
+      className={cn("relative flex h-10 shrink-0 items-center gap-2.5 rounded-lg px-3 text-[13px] transition-colors [&_svg]:size-4", active ? "font-medium text-ink" : "text-ink-2 hover:text-ink")}>
+      {active ? <motion.span layoutId="settings-nav" transition={SPRING} className="absolute inset-0 rounded-lg bg-surface shadow-card ring-1 ring-line" aria-hidden /> : null}
+      <span className="relative z-10 flex items-center gap-2.5">{config.icon}{config.label}</span>
+      {count !== undefined ? <span className="num relative z-10 ml-auto text-xs text-ink-2">{count}</span> : null}
+    </button>
   );
 }
 
@@ -155,28 +179,22 @@ export function SettingsPage() {
   return (
     <div className="flex min-h-full flex-col">
       <PageHeader title="Configuración" subtitle="Los datos de tu empresa: dónde salen los camiones, quién los maneja y quién usa el sistema." />
-      <div role="tablist" aria-label="Sección" className="flex gap-1 overflow-x-auto px-6 lg:px-8">
-        {ORDER.map((t) => {
-          const active = pathname.includes(`/configuracion/${t.path}`);
-          return (
-            <button key={t.path} role="tab" aria-selected={active} onClick={() => navigate(`/configuracion/${t.path}`)}
-              className={cn(
-                "-mb-px flex h-11 items-center whitespace-nowrap border-b-2 px-2.5 text-[13px] text-ink-2 transition-colors hover:text-ink",
-                active ? "border-ink font-medium text-ink" : "border-transparent",
-              )}>
-              {t.label}
-            </button>
-          );
-        })}
+      <div className="flex flex-col gap-4 px-6 pb-8 pt-4 lg:flex-row lg:gap-8 lg:px-8">
+        <div role="tablist" aria-label="Sección" aria-orientation="vertical"
+          className="flex gap-1 overflow-x-auto lg:sticky lg:top-4 lg:w-52 lg:shrink-0 lg:flex-col lg:self-start lg:overflow-visible">
+          {ORDER.map((t) => (
+            <NavItem key={t.path} config={t} active={pathname.includes(`/configuracion/${t.path}`)} onClick={() => navigate(`/configuracion/${t.path}`)} />
+          ))}
+        </div>
+        <Routes>
+          <Route index element={<Navigate to="bodegas" replace />} />
+          <Route path="bodegas" element={<FleetTab config={TABS.depots} />} />
+          <Route path="pilotos" element={<FleetTab config={TABS.drivers} />} />
+          <Route path="camiones" element={<FleetTab config={TABS.vehicles} />} />
+          <Route path="usuarios" element={<FleetTab config={TABS.users} />} />
+          <Route path="*" element={<Navigate to="bodegas" replace />} />
+        </Routes>
       </div>
-      <Routes>
-        <Route index element={<Navigate to="bodegas" replace />} />
-        <Route path="bodegas" element={<FleetTab config={TABS.depots} />} />
-        <Route path="pilotos" element={<FleetTab config={TABS.drivers} />} />
-        <Route path="camiones" element={<FleetTab config={TABS.vehicles} />} />
-        <Route path="usuarios" element={<FleetTab config={TABS.users} />} />
-        <Route path="*" element={<Navigate to="bodegas" replace />} />
-      </Routes>
     </div>
   );
 }

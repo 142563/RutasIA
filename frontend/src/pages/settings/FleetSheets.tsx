@@ -49,7 +49,7 @@ function FormShell({ kind, id, title, description, isActive, build, onSubmitAtte
           {children}
           {save.error ? <p className="text-[13px] text-err" role="alert">{save.error.message}</p> : null}
         </div>
-        <div className="flex items-center justify-between gap-2 border-t border-line px-6 py-4">
+        <div className="flex items-center justify-between gap-2 border-t border-line bg-elevated px-6 py-4">
           {id ? (
             <Button variant={isActive ? "danger" : "outline"} onClick={toggleActive} disabled={save.isPending}>
               {isActive ? "Desactivar" : "Reactivar"}
