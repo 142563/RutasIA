@@ -5,13 +5,14 @@ import { cn } from "@/lib/utils";
 
 // Una acción principal por pantalla: negro. El resto, neutros.
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[background-color,color,box-shadow,transform] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-ink text-white hover:bg-ink/85",
+        default: "bg-ink text-on-ink shadow-card hover:bg-ink/85",
         outline: "border border-line-strong bg-surface text-ink hover:bg-hover",
         ghost: "text-ink-3 hover:bg-hover hover:text-ink",
+        accent: "bg-accent text-white shadow-card hover:bg-accent/90",
         danger: "border border-err/30 bg-surface text-err hover:bg-err/5",
         link: "h-auto px-0 text-ink underline-offset-4 hover:text-accent hover:underline",
       },

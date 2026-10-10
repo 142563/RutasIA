@@ -375,7 +375,8 @@ Los datos actuales (10 departamentos, 13 conexiones con km a mano) se reemplazan
 - **Escala de congestión:** secuencial de un solo tono, de claro a oscuro según `m`, legible para personas con daltonismo. Nunca solo verde/rojo.
 - **Algoritmos:** Dijkstra y A\* con dos tonos que también difieren en luminosidad. Nodos explorados = puntos translúcidos; ruta final = línea gruesa.
 - **Mapa base de Google** con estilo desaturado (vía *Map ID*) para que las rutas destaquen.
-- **Navegación:** barra lateral clara, sin barra superior; búsqueda global con ⌘K.
+- **Navegación (rediseño 2026-10-10, RUT-44):** barra superior con la sección actual, búsqueda global ⌘K, rutas en vivo, avisos, tema y usuario; rail lateral de iconos que se expande al pasar el mouse; en celular, navegación inferior.
+- **Movimiento y tema (RUT-44):** animaciones con Motion (transiciones de página, listas en cascada, cifras que cuentan, indicadores que se deslizan), siempre respetando "reducir movimiento"; modo claro y oscuro con los mismos tokens. Acento azul de seguimiento y naranja de entrega. Detalle en `design-system/enruta/MASTER.md`.
 - **Estados como punto + texto** (sin "pastillas" de color).
 - **Accesibilidad:** contraste AA, teclado, objetivos táctiles ≥ 44 px en la vista del conductor.
 

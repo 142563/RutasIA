@@ -1,5 +1,7 @@
 import { LoaderCircleIcon } from "lucide-react";
 import * as React from "react";
+import { motion } from "motion/react";
+import { AnimatedNumber, SPRING } from "@/components/ui/motion";
 import { cn } from "@/lib/utils";
 
 /** Estado como punto + texto (sin "pastillas" de color, §9). */
@@ -40,36 +42,38 @@ export function EmptyState({ icon, title, children, action }: {
 export function ErrorNote({ error }: { error: unknown }) {
   const message = error instanceof Error ? error.message : "Ocurrió un error inesperado.";
   return (
-    <p className="rounded-lg border border-err/20 bg-err/5 px-3 py-2 text-[13px] text-err" role="alert">
+    <p className="rounded-lg border border-err/25 bg-err/8 px-3 py-2 text-[13px] text-err" role="alert">
       {message}
     </p>
   );
 }
 
-/** Control segmentado (p. ej. Más corta | Más rápida). */
+/** Control segmentado (p. ej. Más corta | Más rápida) con indicador que se desliza. */
 export function Segmented<T extends string>({ value, onChange, options, label }: {
   value: T;
   onChange: (value: T) => void;
   options: { value: T; label: string }[];
   label: string;
 }) {
+  const id = React.useId();
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex w-fit rounded-lg border border-line bg-bg p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            "h-8 rounded-md px-3 text-[13px] font-medium text-ink-2 transition-colors",
-            value === o.value ? "bg-surface text-ink shadow-[0_0_0_1px_var(--color-line)]" : "hover:text-ink",
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div role="radiogroup" aria-label={label} className="inline-flex w-fit gap-0.5 rounded-lg border border-line bg-hover p-0.5">
+      {options.map((o) => {
+        const active = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(o.value)}
+            className={cn("relative h-8 rounded-md px-3 text-[13px] font-medium transition-colors", active ? "text-ink" : "text-ink-2 hover:text-ink")}
+          >
+            {active ? <motion.span layoutId={`seg-${id}`} transition={SPRING} className="absolute inset-0 rounded-md bg-surface shadow-card" aria-hidden /> : null}
+            <span className="relative z-10">{o.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -79,7 +83,9 @@ export function Metric({ label, value, hint, className }: { label: string; value
   return (
     <div className={cn("flex flex-col gap-1", className)}>
       <span className="text-xs text-ink-2">{label}</span>
-      <span className="num text-2xl font-medium tracking-tight">{value}</span>
+      <span className="num text-2xl font-medium tracking-tight">
+        {typeof value === "number" ? <AnimatedNumber value={value} /> : value}
+      </span>
       {hint ? <span className="text-xs text-ink-2">{hint}</span> : null}
     </div>
   );
@@ -87,9 +93,9 @@ export function Metric({ label, value, hint, className }: { label: string; value
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-6 py-5 lg:px-8">
+    <header className="flex flex-wrap items-end justify-between gap-4 px-6 pb-2 pt-7 lg:px-8">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {subtitle ? <p className="mt-1 text-[13px] text-ink-2">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex items-center gap-2">{actions}</div> : null}

@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Navigate, Outlet, RouterProvider, createBrowserRouter, useLocation } from "react-router";
+import { MotionConfig } from "motion/react";
 import { Toaster } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { ErrorNote, Spinner } from "@/components/ui/misc";
 import { setUnauthorizedHandler } from "@/lib/api";
+import { useTheme } from "@/lib/theme";
 import { UserContext, homeFor, useSession } from "@/lib/auth";
 import type { Role } from "@/lib/types";
 import { DriverStopPage } from "@/pages/driver/DriverStopPage";
@@ -89,10 +91,14 @@ setUnauthorizedHandler(() => {
 });
 
 export function App() {
+  const theme = useTheme();
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-      <Toaster position="bottom-right" toastOptions={{ className: "font-sans" }} />
+      {/* "user": con "reducir movimiento" del sistema, Motion salta directo al estado final */}
+      <MotionConfig reducedMotion="user">
+        <RouterProvider router={router} />
+      </MotionConfig>
+      <Toaster position="bottom-right" theme={theme.resolved} toastOptions={{ className: "font-sans" }} />
     </QueryClientProvider>
   );
 }

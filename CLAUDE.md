@@ -69,9 +69,11 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
 
 - Interfaz y mensajes al usuario en **español**. Código (nombres) en inglés y comentarios en español, como el código existente.
 - Mantener la arquitectura por capas (domain / application / presentation).
-- Diseño **minimalista** según §9 de `docs/PLAN.md`:
-  - Geist + Geist Mono.
-  - Neutros; negro `#111113` para la acción principal; el color solo para rutas, tráfico y estados.
+- Diseño según §9 de `docs/PLAN.md` y `design-system/enruta/MASTER.md` (rediseño RUT-44):
+  - Geist + Geist Mono. Tokens claro/oscuro en `frontend/src/index.css`; nunca hex sueltos (`bg-ink text-on-ink` para la acción principal).
+  - Neutros con acento azul y naranja de entrega; el color sigue reservado para rutas, tráfico y estados.
+  - Animaciones con Motion vía `src/components/ui/motion.tsx`, respetando "reducir movimiento".
+  - Skill de diseño instalada: `.claude/skills/ui-ux-pro-max` (úsala para decisiones de UI).
 - Nunca commitear `.env`, keys ni la `DATABASE_URL`. Usa `.env.example` como plantilla.
 - Rama de trabajo: `dev`. **Mientras no haya deploy a producción, se trabaja directo en `dev`, sin pull requests**: pruebas en verde → commit → push a `dev`. Cuando el proyecto esté en producción, cada funcionalidad irá en su rama desde `dev` con PR hacia `dev`. `main` = lo que está en producción.
 - Antes de hacer commit: `python manage.py test` en verde.
