@@ -1,7 +1,10 @@
+import { motion, useReducedMotion } from "motion/react";
 import * as React from "react";
 import { makeProjection, type LatLng } from "@/lib/geo";
 import { useGoogleMaps } from "@/lib/googleMaps";
+import { cascadeDelay, mapStyles } from "@/lib/mapTheme";
 import { sampleWaypoints } from "@/lib/roads";
+import { useTheme } from "@/lib/theme";
 import type { GraphEdge, GraphNode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +26,8 @@ export interface MapPath {
   dashed?: boolean;
   /** Dibujar por la carretera real (solo con Google). Si falla, se usan líneas rectas entre nodos. */
   followRoads?: boolean;
+  /** Ruta "en camino": un destello discontinuo la recorre despacio. */
+  flow?: boolean;
 }
 
 export interface MapNodeMark {
@@ -89,18 +94,45 @@ function pathKey(codes: string[]) {
   return codes.join(">");
 }
 
+// Animaciones CSS ligeras (sin un spring por elemento). Los retardos van en --d.
+const MAP_CSS = `
+@keyframes nm-fade { from { opacity: 0 } }
+@keyframes nm-pop { from { opacity: 0; transform: scale(.4) } }
+@keyframes nm-flow { to { stroke-dashoffset: -24 } }
+.nm-fade { animation: nm-fade .28s ease-out both; animation-delay: var(--d, 0s) }
+.nm-pop { animation: nm-pop .34s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0s); transform-box: fill-box; transform-origin: center }
+.nm-flow { animation: nm-flow 1.4s linear infinite }
+.nm-marker { outline: none; cursor: pointer }
+.nm-marker:focus-visible .nm-ring { opacity: 1 }
+`;
+
+// Máximo de elementos que se animan en cascada; el resto aparece de golpe
+const MAX_CASCADE = 120;
+const DRAW_SECONDS = 1;
+
+function delayStyle(index: number, count: number, total: number): React.CSSProperties {
+  return { "--d": `${cascadeDelay(index, count, total).toFixed(3)}s` } as React.CSSProperties;
+}
+
 function MapLayers({ props, toXY, opts }: { props: NetworkMapProps; toXY: ToXY; opts: LayerOptions }) {
   const { nodes, edges, edgeStyle, paths = [], nodeMarks = [], markers = [], labels = "cabeceras", renderEdges, children } = props;
+  const reduce = useReducedMotion();
+  const [tip, setTip] = React.useState<string | null>(null);
   const byCode = React.useMemo(() => new Map(nodes.map((n) => [n.code, n])), [nodes]);
   const xy = (code: string) => {
     const node = byCode.get(code);
     return node ? toXY(node) : null;
   };
   // Sobre Google, la red base va más discreta para que se vea el mapa real
-  const baseEdge = opts.onGoogle ? { stroke: "#56595f", width: 1.2, opacity: 0.35 } : { stroke: "#d9d9d5", width: 1.4, opacity: 1 };
+  const baseEdge = opts.onGoogle
+    ? { stroke: "var(--color-ink-3)", width: 1.2, opacity: 0.35 }
+    : { stroke: "var(--color-line-strong)", width: 1.4, opacity: 1 };
+  const markCount = Math.min(nodeMarks.length, MAX_CASCADE);
 
   return (
     <>
+      <style>{MAP_CSS}</style>
+
       {/* Tramos de la red (base) */}
       {renderEdges ? renderEdges(toXY) : null}
       <g strokeLinecap="round" display={renderEdges ? "none" : undefined}>
@@ -121,31 +153,48 @@ function MapLayers({ props, toXY, opts }: { props: NetworkMapProps; toXY: ToXY; 
         {nodes.map((n) => {
           const [x, y] = toXY(n);
           return <circle key={n.code} cx={x} cy={y} r={n.kind === "cabecera" ? 2.6 : 1.8}
-            fill={opts.onGoogle ? "#56595f" : "#b9bab5"} fillOpacity={opts.onGoogle ? 0.55 : 1} />;
+            fill={opts.onGoogle ? "var(--color-ink-3)" : "var(--color-line-strong)"} fillOpacity={opts.onGoogle ? 0.55 : 1} />;
         })}
       </g>
 
-      {/* Nodos resaltados (p. ej. explorados por un algoritmo) */}
+      {/* Nodos resaltados (p. ej. explorados por un algoritmo): aparecen en el orden recibido */}
       <g>
-        {nodeMarks.map((m) => {
+        {nodeMarks.map((m, i) => {
           const p = xy(m.code);
-          return p ? <circle key={m.code} cx={p[0]} cy={p[1]} r={m.r ?? 5} fill={m.color} fillOpacity={m.opacity ?? 0.35} /> : null;
+          if (!p) return null;
+          const animated = !reduce && i < MAX_CASCADE;
+          return (
+            <circle key={m.code} cx={p[0]} cy={p[1]} r={m.r ?? 5} fill={m.color} fillOpacity={m.opacity ?? 0.35}
+              className={animated ? "nm-fade" : undefined} style={animated ? delayStyle(i, markCount, 1.2) : undefined} />
+          );
         })}
       </g>
 
-      {/* Rutas */}
+      {/* Rutas: se dibujan de origen a destino al aparecer */}
       <g fill="none" strokeLinecap="round" strokeLinejoin="round">
         {paths.map((path, i) => {
           const road = path.followRoads ? opts.roadGeometry?.get(pathKey(path.codes)) : undefined;
           const points = road ? road.map(toXY) : path.codes.map(xy).filter((p): p is [number, number] => p !== null);
           if (points.length < 2) return null;
           const d = points.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+          const w = path.width ?? 4;
+          const opacity = path.opacity ?? 1;
+          // pathLength 0→1 no combina con trazos discontinuos: esas rutas aparecen con un fundido
+          const draw = !reduce && !path.dashed;
+          const fade = !reduce && !!path.dashed;
+          const grow = draw
+            ? { initial: { pathLength: 0 }, animate: { pathLength: 1 }, transition: { duration: DRAW_SECONDS, ease: [0.22, 1, 0.36, 1] as const } }
+            : {};
           return (
-            <g key={i}>
-              {/* halo blanco para separar la ruta del fondo */}
-              <polyline points={d} stroke="#ffffff" strokeWidth={(path.width ?? 4) + 3} strokeOpacity={path.opacity ?? 1} />
-              <polyline points={d} stroke={path.color} strokeWidth={path.width ?? 4}
-                strokeOpacity={path.opacity ?? 1} strokeDasharray={path.dashed ? "6 5" : undefined} />
+            <g key={pathKey(path.codes) || i}>
+              {/* halo del color de la superficie para separar la ruta del fondo */}
+              <motion.polyline points={d} stroke="var(--color-surface)" strokeWidth={w + 3} strokeOpacity={opacity} {...grow} />
+              <motion.polyline points={d} stroke={path.color} strokeWidth={w} strokeOpacity={opacity}
+                strokeDasharray={path.dashed ? "6 5" : undefined} className={fade ? "nm-fade" : undefined} {...grow} />
+              {path.flow && !reduce ? (
+                <polyline points={d} stroke="var(--color-surface)" strokeWidth={Math.max(1.5, w - 2)} strokeOpacity={0.6}
+                  strokeDasharray="2 10" className="nm-flow" style={{ animationDelay: `${DRAW_SECONDS}s` }} />
+              ) : null}
             </g>
           );
         })}
@@ -153,7 +202,7 @@ function MapLayers({ props, toXY, opts }: { props: NetworkMapProps; toXY: ToXY; 
 
       {/* Nombres de las cabeceras (Google ya muestra los nombres de los lugares) */}
       {labels === "cabeceras" && !opts.onGoogle ? (
-        <g fontSize={10} fill="#6b6f76" fontFamily="var(--font-sans)" style={{ paintOrder: "stroke" }} stroke="#fafaf9" strokeWidth={3}>
+        <g fontSize={10} fill="var(--color-ink-2)" fontFamily="var(--font-sans)" style={{ paintOrder: "stroke" }} stroke="var(--color-surface)" strokeWidth={3}>
           {nodes.filter((n) => n.kind === "cabecera").map((n) => {
             const [x, y] = toXY(n);
             return <text key={n.code} x={x + 5} y={y - 4}>{n.name}</text>;
@@ -163,40 +212,74 @@ function MapLayers({ props, toXY, opts }: { props: NetworkMapProps; toXY: ToXY; 
 
       {children?.(toXY)}
 
-      {/* Marcadores: bodega (cuadro), paradas (círculo numerado), punto elegido */}
+      {/* Marcadores, distinguibles por forma: bodega (cuadro), parada (círculo numerado),
+          pedido (rombo) y punto elegido (anillo). Aparecen con un pop en cascada. */}
       <g fontFamily="var(--font-mono)" fontSize={10} fontWeight={600}>
-        {markers.map((m) => {
+        {markers.map((m, i) => {
           const [x, y] = toXY(m);
-          if (m.kind === "depot") {
-            return (
-              <g key={m.id}>
-                <rect x={x - 8} y={y - 8} width={16} height={16} rx={3} fill="#111113" stroke="#fff" strokeWidth={2} />
-                <title>{m.label ?? "Bodega"}</title>
-              </g>
-            );
-          }
-          if (m.kind === "dot") {
-            return (
-              <g key={m.id}>
-                <circle cx={x} cy={y} r={5.5} fill="#2f4bd8" stroke="#fff" strokeWidth={2} />
-                {m.label ? <title>{m.label}</title> : null}
-              </g>
-            );
-          }
-          if (m.kind === "pick") {
-            return <circle key={m.id} cx={x} cy={y} r={7} fill="#2f4bd8" stroke="#fff" strokeWidth={2.5} />;
-          }
+          const pop = !reduce && i < MAX_CASCADE;
+          const cls = pop ? "nm-pop" : undefined;
+          const style = pop ? delayStyle(i, Math.min(markers.length, MAX_CASCADE), 0.6) : undefined;
+          const text = m.kind === "depot" ? (m.label ?? "Bodega") : m.kind === "stop" ? `Parada ${m.label ?? ""}`.trim() : m.label;
+          const interactive = m.kind !== "pick" && !!text;
+          const hoverProps = interactive
+            ? {
+                tabIndex: 0,
+                role: "img" as const,
+                "aria-label": text,
+                className: "nm-marker",
+                style: { pointerEvents: "auto" as const },
+                onMouseEnter: () => setTip(m.id),
+                onMouseLeave: () => setTip((t) => (t === m.id ? null : t)),
+                onFocus: () => setTip(m.id),
+                onBlur: () => setTip((t) => (t === m.id ? null : t)),
+              }
+            : {};
           return (
-            <g key={m.id}>
-              <circle cx={x} cy={y} r={10} fill="#111113" stroke="#fff" strokeWidth={2} />
-              <text x={x} y={y + 3.5} textAnchor="middle" fill="#fff">{m.label}</text>
+            <g key={m.id} {...hoverProps}>
+              <g className={cls} style={style}>
+                {m.kind === "depot" ? (
+                  <rect x={x - 8} y={y - 8} width={16} height={16} rx={3} fill="var(--color-ink)" stroke="var(--color-surface)" strokeWidth={2} />
+                ) : m.kind === "dot" ? (
+                  <rect x={x - 5} y={y - 5} width={10} height={10} rx={1.5} transform={`rotate(45 ${x} ${y})`}
+                    fill="var(--color-accent)" stroke="var(--color-surface)" strokeWidth={2} />
+                ) : m.kind === "pick" ? (
+                  <>
+                    <circle cx={x} cy={y} r={7} fill="var(--color-accent)" stroke="var(--color-surface)" strokeWidth={2.5} />
+                    <circle cx={x} cy={y} r={2} fill="var(--color-surface)" />
+                  </>
+                ) : (
+                  <>
+                    <circle cx={x} cy={y} r={10} fill="var(--color-ink)" stroke="var(--color-surface)" strokeWidth={2} />
+                    <text x={x} y={y + 3.5} textAnchor="middle" fill="var(--color-on-ink)">{m.label}</text>
+                  </>
+                )}
+                {interactive ? <circle className="nm-ring" cx={x} cy={y} r={14} fill="none" stroke="var(--color-accent)" strokeWidth={2} opacity={0} /> : null}
+              </g>
             </g>
           );
         })}
       </g>
+
+      {/* Tooltip propio (nombre) del marcador con el cursor o el foco */}
+      {markers.map((m) => {
+        if (tip !== m.id) return null;
+        const text = m.kind === "depot" ? (m.label ?? "Bodega") : m.kind === "stop" ? `Parada ${m.label ?? ""}`.trim() : m.label;
+        if (!text) return null;
+        const [x, y] = toXY(m);
+        const w = Math.max(28, text.length * 6.2 + 14);
+        return (
+          <g key={`tip-${m.id}`} className={reduce ? undefined : "nm-fade"} pointerEvents="none" fontFamily="var(--font-sans)">
+            <rect x={x - w / 2} y={y - 40} width={w} height={22} rx={6} fill="var(--color-ink)" />
+            <path d={`M${x - 4},${y - 18} L${x},${y - 13} L${x + 4},${y - 18} Z`} fill="var(--color-ink)" />
+            <text x={x} y={y - 25} textAnchor="middle" fontSize={11} fontWeight={500} fill="var(--color-on-ink)">{text}</text>
+          </g>
+        );
+      })}
     </>
   );
 }
+
 
 /* ───────────────────────── Mapa esquemático (sin Google) ───────────────────────── */
 
@@ -236,18 +319,10 @@ function SchematicMap(props: NetworkMapProps) {
 
 const GUATEMALA_CENTER = { lat: 15.6, lng: -90.35 };
 
-// Estilo minimalista: sin puntos de interés ni transporte, colores apagados
-const MAP_STYLES: google.maps.MapTypeStyle[] = [
-  { featureType: "poi", stylers: [{ visibility: "off" }] },
-  { featureType: "transit", stylers: [{ visibility: "off" }] },
-  { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-  { elementType: "geometry", stylers: [{ saturation: -55 }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#d6e2ea" }] },
-];
-
 function GoogleNetworkMap(props: NetworkMapProps) {
   const { nodes, width = 640, height = 720, fitTo, onPick, fill, className, ariaLabel = "Mapa de la red vial de Guatemala" } = props;
   const divRef = React.useRef<HTMLDivElement>(null);
+  const { resolved: theme } = useTheme();
   const [map, setMap] = React.useState<google.maps.Map | null>(null);
   const [overlay, setOverlay] = React.useState<google.maps.OverlayView | null>(null);
   const [, redraw] = React.useReducer((x: number) => x + 1, 0);
@@ -258,7 +333,7 @@ function GoogleNetworkMap(props: NetworkMapProps) {
     const m = new google.maps.Map(divRef.current, {
       center: GUATEMALA_CENTER,
       zoom: 7,
-      styles: MAP_STYLES,
+      styles: mapStyles(theme),
       disableDefaultUI: true,
       zoomControl: true,
       fullscreenControl: true,
@@ -279,6 +354,11 @@ function GoogleNetworkMap(props: NetworkMapProps) {
       ov.setMap(null);
     };
   }, []);
+
+  // Cambio de tema: el mapa base sigue el modo claro/oscuro
+  React.useEffect(() => {
+    map?.setOptions({ styles: mapStyles(theme) });
+  }, [map, theme]);
 
   // Clic para elegir un punto (p. ej. la ubicación de un pedido)
   React.useEffect(() => {
