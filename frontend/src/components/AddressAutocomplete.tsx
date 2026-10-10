@@ -84,12 +84,12 @@ export function AddressAutocomplete({ id, value, onChange, onPlace, invalid, pla
       />
       {showList ? (
         <ul id={listId} role="listbox"
-          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-line bg-surface py-1 shadow-lg">
+          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-line bg-elevated p-1 shadow-pop">
           {suggestions.map((s, i) => (
             <li key={s.placeId} role="option" aria-selected={i === active}
               onMouseDown={(e) => { e.preventDefault(); void choose(s); }}
               onMouseEnter={() => setActive(i)}
-              className={cn("cursor-pointer px-3 py-2 text-sm", i === active && "bg-bg")}>
+              className={cn("cursor-pointer rounded-lg px-3 py-2 text-sm", i === active && "bg-hover")}>
               <span className="block truncate text-ink">{s.main}</span>
               {s.secondary ? <span className="block truncate text-xs text-ink-2">{s.secondary}</span> : null}
             </li>
