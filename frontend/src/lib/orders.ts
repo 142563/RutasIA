@@ -3,12 +3,12 @@ import { api } from "./api";
 import type { Depot, Order, OrderStatus, Priority } from "./types";
 
 export const STATUS: Record<OrderStatus, { label: string; color: string }> = {
-  pending: { label: "Pendiente", color: "#a3a6ac" },
-  assigned: { label: "Asignado", color: "#2f4bd8" },
-  in_transit: { label: "En ruta", color: "#b45309" },
-  delivered: { label: "Entregado", color: "#1a7f4b" },
-  failed: { label: "No entregado", color: "#b42318" },
-  canceled: { label: "Cancelado", color: "#6b6f76" },
+  pending: { label: "Pendiente", color: "var(--color-ink-2)" },
+  assigned: { label: "Asignado", color: "var(--color-accent)" },
+  in_transit: { label: "En ruta", color: "var(--color-warn)" },
+  delivered: { label: "Entregado", color: "var(--color-ok)" },
+  failed: { label: "No entregado", color: "var(--color-err)" },
+  canceled: { label: "Cancelado", color: "var(--color-ink-2)" },
 };
 
 export const PRIORITIES: { value: Priority; label: string }[] = [

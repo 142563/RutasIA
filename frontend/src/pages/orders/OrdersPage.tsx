@@ -214,7 +214,8 @@ export function OrdersPage() {
         </div>
 
         <div className="flex-1 overflow-x-auto">
-          <div className="min-w-[760px]">
+          {/* El ancho mínimo solo con filas: así el estado vacío no queda con scroll horizontal */}
+          <div className={rows.length > 0 ? "min-w-[760px]" : undefined}>
             {rows.length > 0 ? (
               <div className={cn(GRID, "h-9 border-b border-line text-xs text-ink-2")}>
                 <input type="checkbox" aria-label="Seleccionar todos los pendientes" className="size-4 accent-ink"

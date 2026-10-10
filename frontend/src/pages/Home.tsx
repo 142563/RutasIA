@@ -45,7 +45,8 @@ function Kpi({ label, value, hint, to, alert }: {
       <span className="min-h-4 text-xs text-ink-2">{hint}</span>
     </>
   );
-  const base = "flex flex-col gap-1.5 px-5 py-4 first:pl-0";
+  // Sin sangría al inicio de cada fila: la 1.ª y 3.ª en celular (2 columnas), solo la 1.ª con 4
+  const base = "flex flex-col gap-1.5 px-5 py-4 odd:pl-0 sm:odd:pl-5 sm:first:pl-0";
   return to ? (
     <Link to={to} className={cn(base, "rounded-lg transition-colors hover:bg-hover")}>{body}</Link>
   ) : <div className={base}>{body}</div>;
@@ -147,7 +148,7 @@ export function HomePage() {
 
           {/* Franja de indicadores */}
           {kpis ? (
-            <div className="grid grid-cols-2 divide-x divide-line border-y border-line py-1 sm:grid-cols-4">
+            <div className="grid grid-cols-2 border-y border-line py-1 sm:grid-cols-4 [&>*:nth-child(even)]:border-l [&>*]:border-line sm:[&>*:not(:first-child)]:border-l">
               <Kpi label="Rutas en camino" value={kpis.routes_in_progress} to="/rutas" />
               <Kpi label="Pedidos sin ruta" value={kpis.unassigned_orders} to="/pedidos" hint="Ver pedidos" />
               <Kpi label="Entregas de hoy" value={kpis.deliveries_today} />

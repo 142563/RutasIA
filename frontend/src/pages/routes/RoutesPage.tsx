@@ -127,7 +127,7 @@ export function RoutesPage() {
       </div>
 
       <div className="flex-1 overflow-x-auto border-t border-line">
-        <div className="min-w-[960px]">
+        <div className={rows.length > 0 && !routes.isPending ? "min-w-[960px]" : undefined}>
           {routes.isPending ? (
             <RouteSkeleton />
           ) : routes.error ? (

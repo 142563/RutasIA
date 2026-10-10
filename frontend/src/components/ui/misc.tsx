@@ -67,7 +67,7 @@ export function Segmented<T extends string>({ value, onChange, options, label }:
             role="radio"
             aria-checked={active}
             onClick={() => onChange(o.value)}
-            className={cn("relative h-8 rounded-md px-3 text-[13px] font-medium transition-colors", active ? "text-ink" : "text-ink-2 hover:text-ink")}
+            className={cn("relative h-8 shrink-0 whitespace-nowrap rounded-md px-3 text-[13px] font-medium transition-colors", active ? "text-ink" : "text-ink-2 hover:text-ink")}
           >
             {active ? <motion.span layoutId={`seg-${id}`} transition={SPRING} className="absolute inset-0 rounded-md bg-surface shadow-card" aria-hidden /> : null}
             <span className="relative z-10">{o.label}</span>

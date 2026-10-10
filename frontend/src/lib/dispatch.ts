@@ -9,18 +9,18 @@ export type StopStatus = "pending" | "delivered" | "failed";
 export type StopTiming = "on_time" | "late" | "overdue" | "pending" | "failed";
 
 export const ROUTE_STATUS: Record<RouteStatus, { label: string; color: string }> = {
-  planned: { label: "Planificada", color: "#2f4bd8" },
-  in_progress: { label: "En curso", color: "#b45309" },
-  completed: { label: "Completada", color: "#1a7f4b" },
-  canceled: { label: "Cancelada", color: "#6b6f76" },
+  planned: { label: "Planificada", color: "var(--color-accent)" },
+  in_progress: { label: "En curso", color: "var(--color-warn)" },
+  completed: { label: "Completada", color: "var(--color-ok)" },
+  canceled: { label: "Cancelada", color: "var(--color-ink-2)" },
 };
 
 export const TIMING: Record<StopTiming, { label: string; color: string }> = {
-  on_time: { label: "A tiempo", color: "#1a7f4b" },
-  late: { label: "Con retraso", color: "#b45309" },
-  overdue: { label: "Retrasada", color: "#b45309" },
-  pending: { label: "Pendiente", color: "#a3a6ac" },
-  failed: { label: "No entregada", color: "#b42318" },
+  on_time: { label: "A tiempo", color: "var(--color-ok)" },
+  late: { label: "Con retraso", color: "var(--color-warn)" },
+  overdue: { label: "Retrasada", color: "var(--color-warn)" },
+  pending: { label: "Pendiente", color: "var(--color-ink-2)" },
+  failed: { label: "No entregada", color: "var(--color-err)" },
 };
 
 export interface Progress {
