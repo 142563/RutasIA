@@ -458,3 +458,48 @@ Los datos actuales (10 departamentos, 13 conexiones con km a mano) se reemplazan
 - Un conductor recibe su ruta, reporta un incidente y recibe una ruta alternativa.
 - E1, E2, E3, E5 y E7 (idealmente todos) tienen tablas y gráficas listas.
 - Desplegado en Render con uso de memoria mínimo.
+
+---
+
+## 14. Visión: ruteo inteligente en vivo y avisos por correo (decidido 2026-10-10)
+
+**Foco del producto.** enruta **no es un gestor de bodegas y paquetes**: es un sistema que **controla el mapa y decide la mejor ruta con el tráfico**, con Dijkstra y A\* propios. Pedidos, usuarios y correos existen para alimentar y mostrar esa decisión.
+
+### 14.1 Ruteo inteligente en vivo (épica RUT-74)
+
+| Pieza | Qué hace | Quién |
+|---|---|---|
+| B1 · Trazo fiel | Cada arista guarda su geometría real (polilínea de la Routes API, una vez por arista). El mapa dibuja **exactamente** las aristas que eligió nuestro algoritmo, sin pedirle a Google que recalcule (hoy salen vueltas porque cada nodo de municipio se usa como waypoint de Directions). | Codex (RUT-75) |
+| B2 · GPS en vivo | El celular del conductor reporta su posición cada 10–15 s; después, un tracker físico usará el mismo endpoint. El despachador ve el camión moverse. | Codex (RUT-76) |
+| B3 · Tráfico visible | Capa de tráfico de Google **solo visual** + nuestras aristas coloreadas por `m` y "+N min por tráfico". | Codex (RUT-77) |
+| B4 · Navegación propia | "Navegar" abre **nuestro** mapa (ruta, posición, siguiente parada, ETA, avisos de recálculo); Google Maps queda como opción secundaria. | Codex (RUT-78) |
+| B5 · Recálculo en vivo | Con la posición y el tráfico del momento, si lo que falta se atrasa más de un umbral, A\* propone una alternativa desde donde va el camión (flujo de aprobación de RUT-15/36). | Nosotros (RUT-79) |
+| B6 · Aprender del piloto | La traza GPS se ajusta al grafo (map-matching); los tiempos reales actualizan los tiempos observados por franja (promedio móvil, `m ≥ 1`). Si el piloto tomó otro camino y fue más rápido, queda como "ruta aprendida". Cubre el "aprendizaje" del protocolo (RUT-22). | Nosotros (RUT-80) |
+
+Reglas que no cambian: pesos ≥ 0, costo y heurística en minutos, grafo en memoria, nunca Google ni BD dentro del bucle de búsqueda, `costo(A*) == costo(Dijkstra)`.
+
+### 14.2 Avisos por correo según el rol (épica RUT-68)
+
+Correo transaccional con Resend desde `enruta.world`. El **rol decide qué correos recibe cada quien**:
+
+| Evento | Admin | Despachador | Conductor | Cliente |
+|---|---|---|---|---|
+| Cuenta creada (usuario, rol, contraseña temporal) | ✓ | ✓ | ✓ | – |
+| Pedido recibido (con enlace de seguimiento) | – | – | – | ✓ |
+| Ruta asignada | – | – | ✓ | ✓ "programado" |
+| Ruta iniciada | – | – | – | ✓ "en camino" + ventana de llegada |
+| Entregado | – | – | – | ✓ |
+| No entregado | ✓ | ✓ creador | – | ✓ |
+| Incidente reportado | ✓ | ✓ | – | – |
+| Recálculo por aprobar / aprobado | – | ✓ creador | ✓ aprobado | – |
+| Ruta terminada (resumen) | – | ✓ creador | – | – |
+| Ruta cancelada | – | – | ✓ | – |
+
+- Usuarios nuevos: contraseña temporal (vence en 72 h) y **cambio obligatorio** al primer ingreso.
+- El cliente tiene la página pública `/seguimiento/<token>` (sin sesión, datos mínimos).
+- El despachador recibe solo **excepciones** y un **resumen** al terminar su ruta (evita la fatiga de alertas).
+- Los pedidos de demo nunca envían correo. Todo envío queda en `NotificationLog`.
+
+### 14.3 Cómo trabajamos con Codex
+
+Las tarjetas con etiqueta **Codex** en el kanban traen su contexto completo. Codex trabaja en `codex/rut-<n>` desde `main` y deja la tarjeta en **"En revision"**; Claude (Opus) revisa, prueba, integra a `main` y la pasa a Hecho.

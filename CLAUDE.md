@@ -9,6 +9,7 @@ El objetivo es **proponer la mejor ruta considerando el tráfico**, usando **Dij
 sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los datos de tráfico vienen de Google Maps.
 
 - **Plan completo (fuente de verdad):** [`docs/PLAN.md`](docs/PLAN.md). Antes de una tarea, lee la sección que corresponda.
+- **Foco (2026-10-10):** el producto es el **ruteo inteligente en vivo** (el sistema controla el mapa y decide la mejor ruta con tráfico), **no** un gestor de bodegas. Visión, avisos por rol y trabajo con Codex: §14 de `docs/PLAN.md`.
 - **Prototipo de diseño:** [`docs/prototipo/`](docs/prototipo/README.md) (pantallas de referencia, estilo minimalista).
 - **Cómo levantar el proyecto en tu compu:** [`docs/EMPEZAR.md`](docs/EMPEZAR.md).
 
@@ -77,4 +78,5 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
   - Skill de diseño instalada: `.claude/skills/ui-ux-pro-max` (úsala para decisiones de UI).
 - Nunca commitear `.env`, keys ni la `DATABASE_URL`. Usa `.env.example` como plantilla.
 - Rama de trabajo: `dev`. **Mientras no haya deploy a producción, se trabaja directo en `dev`, sin pull requests**: pruebas en verde → commit → push a `dev`. Cuando el proyecto esté en producción, cada funcionalidad irá en su rama desde `dev` con PR hacia `dev`. `main` = lo que está en producción.
-- Antes de hacer commit: `python manage.py test` en verde.
+- Antes de hacer commit: `python manage.py test` en verde (con `DATABASE_URL=` vacío para usar SQLite).
+- **Codex** también trabaja en el repo: tarjetas con etiqueta Codex en el kanban, rama `codex/rut-<n>` desde `main`, nunca merge directo; la tarjeta queda en "En revision" y Claude integra.

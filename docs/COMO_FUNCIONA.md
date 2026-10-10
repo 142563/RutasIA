@@ -46,6 +46,12 @@ Para probar rápido, el login tiene botones **Despachador** y **Conductor**: ent
 - **A\*** hace lo mismo, pero "apunta" hacia el destino. Usa la distancia en línea recta dividida entre la velocidad más alta posible del grafo, así que **nunca se pasa** en su estimación. Por eso encuentra **la misma ruta que Dijkstra revisando menos nodos**, y eso se demuestra con pruebas automáticas.
 - **Google** solo pone los datos de tráfico y el dibujo. **La decisión de qué ruta tomar la hace nuestro algoritmo.**
 
+## Hacia dónde va: el sistema decide en vivo
+
+La idea no es solo guardar pedidos: es que **el sistema maneje el mapa**. El camión manda su posición (primero desde el celular del conductor, después desde un GPS en el carro), el sistema mira el tráfico del momento y, si el camino que falta se atrasa, **A\* busca otro mejor** desde donde va el camión y lo propone. Si el piloto conoce un atajo y llega más rápido, el sistema **lo aprende**: guarda cuánto tardó en cada tramo y la próxima vez lo toma en cuenta.
+
+**¿Por qué Dijkstra y A\*?** Dijkstra garantiza la ruta más rápida revisando en orden todo lo que está más cerca; A\* llega al mismo resultado (lo comprobamos en todas las combinaciones) pero revisa menos tramos porque se orienta hacia el destino. Por eso A\* es el que se usa en vivo, donde hay que responder rápido.
+
 ## ¿Por qué a veces dice "datos estimados" o "sintéticos"?
 
 Para probar sin gastar en Google, `python manage.py preparar` crea tramos **estimados** y tráfico **sintético**. Sirven para ver que todo funciona, pero **no son resultados para la tesis**. Con la key de servidor (`GOOGLE_ROUTES_API_KEY`) corres `python manage.py preparar --google` y quedan datos reales.
