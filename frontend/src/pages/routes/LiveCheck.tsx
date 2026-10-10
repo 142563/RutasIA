@@ -1,15 +1,25 @@
-import { RadioIcon } from "lucide-react";
+import { LoaderCircleIcon, RadioIcon } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
+import { EASE } from "@/components/ui/motion";
 import { ErrorNote } from "@/components/ui/misc";
 import { formatClock, formatMinutes } from "@/lib/format";
 import { formatLiveDiff, liveTone, useLiveCheck } from "@/lib/live";
+
+const FADE = {
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -4 },
+  transition: { duration: 0.22, ease: EASE },
+} as const;
 
 /** Compara lo que calculó nuestro algoritmo con lo que Google mide ahora en esos mismos tramos. */
 export function LiveCheck({ routeId, status }: { routeId: number; status: string }) {
   const check = useLiveCheck();
   const result = check.data;
   if (status === "completed" || status === "canceled") return null;
-  const color = result && liveTone(result) === "ok" ? "var(--color-ok)" : "var(--color-warn)";
+  const ok = !!result && liveTone(result) === "ok";
+  const color = ok ? "var(--color-ok)" : "var(--color-warn)";
 
   return (
     <section aria-label="Tráfico de ahora">
@@ -18,31 +28,41 @@ export function LiveCheck({ routeId, status }: { routeId: number; status: string
         Google mide los tramos que faltan con el tráfico de este momento. No cambia la ruta, solo avisa.
       </p>
       <Button variant="outline" onClick={() => check.mutate(routeId)} disabled={check.isPending}>
-        <RadioIcon /> {check.isPending ? "Consultando…" : "Verificar con el tráfico de ahora"}
+        {check.isPending ? <LoaderCircleIcon className="animate-spin" aria-hidden /> : <RadioIcon aria-hidden />}
+        {check.isPending ? "Consultando…" : result ? "Verificar de nuevo" : "Verificar con el tráfico de ahora"}
       </Button>
-      {check.error ? <div className="mt-3"><ErrorNote error={check.error} /></div> : null}
-      {result ? (
-        <div className="mt-3 border-l-2 pl-3" style={{ borderColor: color }}>
-          <p className="text-sm font-medium" style={{ color }}>{result.message}</p>
-          <p className="num mt-1 text-[13px] text-ink-3">
-            Nuestro cálculo {formatMinutes(result.our_minutes)} · Google ahora {formatMinutes(result.google_minutes)} ({formatLiveDiff(result.diff_minutes)})
-          </p>
-          <ul className="mt-2 divide-y divide-line border-y border-line">
-            {result.stops.map((s) => (
-              <li key={s.stop_id ?? "regreso"} className="flex items-baseline justify-between gap-3 py-2 text-[13px]">
-                <span className="min-w-0 truncate text-ink-3">{s.label}</span>
-                <span className="num shrink-0">
-                  {formatClock(s.stored_eta)} → <strong className="font-medium">{formatClock(s.google_eta)}</strong>
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 text-xs text-ink-2">
-            Consultado a las {formatClock(result.checked_at)}{result.cached ? " (resultado de hace menos de 5 min)" : ""}
-            {result.partial ? " · Solo se verificaron los primeros tramos." : ""}
-          </p>
-        </div>
-      ) : null}
+      <div aria-live="polite">
+        <AnimatePresence mode="wait" initial={false}>
+          {check.isPending ? (
+            <motion.p key="loading" {...FADE} className="mt-3 text-[13px] text-ink-2">
+              Midiendo los tramos con Google…
+            </motion.p>
+          ) : check.error ? (
+            <motion.div key="error" {...FADE} className="mt-3"><ErrorNote error={check.error} /></motion.div>
+          ) : result ? (
+            <motion.div key={result.checked_at} {...FADE} className="mt-3 border-l-2 pl-3" style={{ borderColor: color }}>
+              <p className="text-sm font-medium" style={{ color }}>{result.message}</p>
+              <p className="num mt-1 text-[13px] text-ink-3">
+                Nuestro cálculo {formatMinutes(result.our_minutes)} · Google ahora {formatMinutes(result.google_minutes)} ({formatLiveDiff(result.diff_minutes)})
+              </p>
+              <ul className="mt-2 divide-y divide-line border-y border-line">
+                {result.stops.map((s) => (
+                  <li key={s.stop_id ?? "regreso"} className="flex items-baseline justify-between gap-3 py-2 text-[13px]">
+                    <span className="min-w-0 truncate text-ink-3">{s.label}</span>
+                    <span className="num shrink-0">
+                      {formatClock(s.stored_eta)} → <strong className="font-medium">{formatClock(s.google_eta)}</strong>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-ink-2">
+                Consultado a las {formatClock(result.checked_at)}{result.cached ? " (resultado de hace menos de 5 min)" : ""}
+                {result.partial ? " · Solo se verificaron los primeros tramos." : ""}
+              </p>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
     </section>
   );
 }
