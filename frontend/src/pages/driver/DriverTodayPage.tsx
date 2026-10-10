@@ -1,68 +1,68 @@
-import { CheckIcon, LogOutIcon, NavigationIcon, TruckIcon, XIcon } from "lucide-react";
+import { CheckIcon, ChevronRightIcon, NavigationIcon, PlayIcon, TruckIcon, XIcon } from "lucide-react";
+import { motion } from "motion/react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { EmptyState, ErrorNote, Spinner } from "@/components/ui/misc";
-import { useLogout, useUser } from "@/lib/auth";
+import { AnimatedNumber, Card, EASE, Skeleton, Stagger, StaggerItem } from "@/components/ui/motion";
+import { EmptyState, ErrorNote } from "@/components/ui/misc";
+import { useUser } from "@/lib/auth";
 import { navigationUrl, nextStop, routeProgress, useDriverToday, useStartRoute, type DriverRoute, type DriverStop } from "@/lib/driver";
 import { formatClock, formatDateLong, formatKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AlternativeRouteNotice } from "./AlternativeRouteNotice";
+import { AnimatedCheck, DriverHeader, DriverPage, ProgressBar } from "./parts";
 import { ReportIncident } from "./ReportIncident";
 
 /** Conductor · Mi ruta de hoy (docs/prototipo/Conductor-Hoy.dc.html). Móvil primero, sin AppShell. */
 export function DriverTodayPage() {
   const user = useUser();
   const today = useDriverToday();
-  const logout = useLogout();
-  const firstName = (today.data?.driver.name ?? user.full_name ?? user.username).split(" ")[0];
+  const fullName = today.data?.driver.name ?? user.full_name ?? user.username;
+  const firstName = fullName.split(" ")[0];
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col gap-6 bg-surface px-6 pb-10 pt-8">
-      <header className="flex items-start gap-3">
-        <div className="flex flex-1 flex-col gap-1">
-          <span className="text-[13px] text-ink-2">{formatDateLong(new Date())}</span>
+    <DriverPage>
+      <DriverHeader name={fullName} />
+      <main className="flex flex-1 flex-col gap-5 px-4 pb-10 pt-5">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[13px] capitalize text-ink-2">{formatDateLong(new Date())}</span>
           <h1 className="text-[26px] font-semibold leading-tight tracking-tight">Hola, {firstName}</h1>
         </div>
-        <Button
-          variant="ghost"
-          className="size-11 shrink-0"
-          aria-label="Cerrar sesión"
-          title="Cerrar sesión"
-          disabled={logout.isPending}
-          onClick={() => logout.mutate()}
-        >
-          <LogOutIcon />
-        </Button>
-      </header>
 
-      {today.isPending ? (
-        <div className="flex justify-center py-16">
-          <Spinner label="Cargando tu ruta…" />
-        </div>
-      ) : today.isError ? (
-        <div className="flex flex-col gap-3">
-          <ErrorNote error={today.error} />
-          <Button variant="outline" className="h-12" onClick={() => today.refetch()}>
-            Reintentar
-          </Button>
-        </div>
-      ) : today.data.routes.length === 0 ? (
-        <EmptyState icon={<TruckIcon />} title="No tienes ruta para hoy">
-          Cuando el despachador te asigne una, aparecerá aquí.
-        </EmptyState>
-      ) : (
-        today.data.routes.map((route) => <RouteSection key={route.id} route={route} />)
-      )}
-    </div>
+        {today.isPending ? (
+          <div className="flex flex-col gap-4" role="status" aria-label="Cargando tu ruta">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-64 rounded-2xl" />
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+          </div>
+        ) : today.isError ? (
+          <div className="flex flex-col gap-3">
+            <ErrorNote error={today.error} />
+            <Button variant="outline" className="h-12 rounded-xl text-[15px]" onClick={() => today.refetch()}>
+              Reintentar
+            </Button>
+          </div>
+        ) : today.data.routes.length === 0 ? (
+          <EmptyState icon={<TruckIcon />} title="No tienes ruta para hoy">
+            Cuando el despachador te asigne una, aparecerá aquí.
+          </EmptyState>
+        ) : (
+          today.data.routes.map((route) => <RouteSection key={route.id} route={route} />)
+        )}
+      </main>
+    </DriverPage>
   );
 }
 
 function RouteSection({ route }: { route: DriverRoute }) {
   const start = useStartRoute();
   const progress = routeProgress(route);
-  const next = route.status === "in_progress" ? nextStop(route) : undefined;
+  const inProgress = route.status === "in_progress";
+  const next = inProgress ? nextStop(route) : undefined;
   const stops = [...route.stops].sort((a, b) => a.sequence - b.sequence);
+  const rest = stops.filter((s) => s.id !== next?.id);
+  const allDone = progress.total > 0 && progress.done === progress.total;
 
   function onStart() {
     start.mutate(route.id, {
@@ -72,108 +72,156 @@ function RouteSection({ route }: { route: DriverRoute }) {
   }
 
   return (
-    <section aria-label={`Ruta ${route.code}`} className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2.5">
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[15px]">
-            <span className="font-semibold">{progress.done}</span> de {progress.total} entregas
-          </span>
+    <section aria-label={`Ruta ${route.code}`} className="flex flex-col gap-5">
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex items-baseline gap-1.5">
+            <AnimatedNumber value={progress.done} className="text-[34px] font-medium leading-none tracking-tight" />
+            <span className="text-[15px] text-ink-2">
+              de <span className="num">{progress.total}</span> entregas
+            </span>
+          </div>
           <span className="num text-xs text-ink-2">
             {route.code}
             {route.vehicle ? ` · ${route.vehicle}` : ""}
           </span>
         </div>
-        <div
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={progress.total}
-          aria-valuenow={progress.done}
-          className="h-1 overflow-hidden rounded-full bg-line"
-        >
-          <div className="h-1 rounded-full bg-ink transition-[width]" style={{ width: `${progress.percent}%` }} />
-        </div>
+        <ProgressBar done={progress.done} total={progress.total} percent={progress.percent} />
         <span className="text-[13px] text-ink-2">
           {formatKm(route.total_km)} · salida <span className="num">{formatClock(route.departure_at)}</span>
           {route.status === "completed" ? " · ruta completada" : null}
         </span>
-      </div>
+      </Card>
 
       <AlternativeRouteNotice route={route} />
 
       {route.status === "planned" ? (
-        <Button className="h-12 rounded-xl text-[15px]" onClick={onStart} disabled={start.isPending}>
+        <Button className="h-14 rounded-xl text-base" onClick={onStart} disabled={start.isPending}>
+          <PlayIcon className="fill-current" aria-hidden />
           {start.isPending ? "Iniciando…" : "Iniciar ruta"}
         </Button>
       ) : null}
       {start.isError ? <ErrorNote error={start.error} /> : null}
 
-      <ol aria-label="Paradas" className="flex flex-col">
-        {stops.map((stop) => (
-          <StopRow key={stop.id} stop={stop} highlighted={next?.id === stop.id} />
-        ))}
-      </ol>
+      {next ? <NextStopCard stop={next} total={progress.total} /> : null}
 
-      {route.status === "in_progress" ? <ReportIncident routeId={route.id} /> : null}
+      {allDone ? (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: EASE }}
+          className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-surface px-6 py-8 text-center shadow-card"
+        >
+          <AnimatedCheck />
+          <p className="mt-1 text-lg font-semibold tracking-tight">Terminaste tus entregas</p>
+          <p className="text-[13px] text-ink-2">
+            <span className="num">{progress.delivered}</span> entregadas
+            {progress.failed > 0 ? <> · <span className="num">{progress.failed}</span> sin entregar</> : null}
+          </p>
+        </motion.div>
+      ) : null}
+
+      {rest.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <h2 className="px-1 text-xs font-medium uppercase tracking-wide text-ink-2">
+            {next ? "Después" : "Paradas"}
+          </h2>
+          <Stagger as="ol" aria-label="Paradas" className="relative flex flex-col">
+            {rest.map((stop, i) => (
+              <StopRow key={stop.id} stop={stop} first={i === 0} last={i === rest.length - 1} />
+            ))}
+          </Stagger>
+        </div>
+      ) : null}
+
+      {inProgress ? <ReportIncident routeId={route.id} /> : null}
     </section>
   );
 }
 
-function StopRow({ stop, highlighted }: { stop: DriverStop; highlighted: boolean }) {
-  if (highlighted) {
-    const nav = navigationUrl(stop);
-    return (
-      <li className="flex flex-col gap-3.5 border-b border-line py-[18px]">
-        <div className="flex items-start gap-3.5">
-          <span className="num flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs text-white">
-            {stop.sequence}
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-xs font-medium text-accent">
-              Siguiente · llegada <span className="num">{formatClock(stop.eta)}</span>
-            </span>
-            <span className="text-[17px] font-semibold tracking-tight">{stop.recipient || stop.order_code}</span>
-            <span className="text-sm text-ink-3">{stop.address}</span>
-          </span>
-        </div>
-        <div className="ml-[38px] grid grid-cols-2 gap-2">
-          {/* Un toque para salir manejando: abre Google Maps con el destino */}
-          {nav ? (
-            <Button asChild variant="outline" className="h-12 rounded-xl text-[15px]">
-              <a href={nav} target="_blank" rel="noreferrer"><NavigationIcon /> Navegar</a>
-            </Button>
-          ) : null}
-          <Button asChild className={cn("h-12 rounded-xl text-[15px]", !nav && "col-span-2")}>
-            <Link to={`/conductor/paradas/${stop.id}`}>Entregar</Link>
-          </Button>
-        </div>
-      </li>
-    );
-  }
-
-  const marked = stop.status !== "pending";
+/** La parada protagonista: dirección grande, hora de llegada y un toque para navegar. */
+function NextStopCard({ stop, total }: { stop: DriverStop; total: number }) {
+  const nav = navigationUrl(stop);
   return (
-    <li className="border-b border-line last:border-b-0">
+    <motion.article
+      aria-label="Próxima parada"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: EASE }}
+      className="flex flex-col gap-5 rounded-2xl border border-line bg-surface p-5 shadow-lift"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="inline-flex items-center gap-2 text-[13px] font-medium text-ink-3">
+          <span className="live-dot size-2 rounded-full bg-delivery" aria-hidden />
+          Próxima parada
+        </span>
+        <span className="num text-xs text-ink-2">{stop.sequence} de {total}</span>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <h2 className="text-[26px] font-semibold leading-tight tracking-tight">{stop.recipient || stop.order_code}</h2>
+        <p className="text-base leading-snug text-ink-3">{stop.address}</p>
+      </div>
+
+      <div className="flex items-baseline gap-2 border-t border-line pt-4">
+        <span className="text-[13px] text-ink-2">Llegada estimada</span>
+        <span className="num ml-auto text-[28px] font-medium leading-none tracking-tight">{formatClock(stop.eta)}</span>
+      </div>
+
+      <div className={cn("grid gap-2.5", nav ? "grid-cols-[1.4fr_1fr]" : "grid-cols-1")}>
+        {/* Un toque para salir manejando: abre Google Maps con el destino */}
+        {nav ? (
+          <Button asChild className="h-14 rounded-xl text-base">
+            <a href={nav} target="_blank" rel="noreferrer"><NavigationIcon className="fill-current" aria-hidden /> Navegar</a>
+          </Button>
+        ) : null}
+        <Button asChild variant={nav ? "outline" : "default"} className="h-14 rounded-xl text-base">
+          <Link to={`/conductor/paradas/${stop.id}`}>Llegué</Link>
+        </Button>
+      </div>
+    </motion.article>
+  );
+}
+
+/** Fila de la línea de tiempo: punto en el riel, destinatario, dirección y hora. */
+function StopRow({ stop, first, last }: { stop: DriverStop; first: boolean; last: boolean }) {
+  const delivered = stop.status === "delivered";
+  const failed = stop.status === "failed";
+  const marked = delivered || failed;
+  return (
+    <StaggerItem as="li" className="relative">
+      {/* Riel vertical: no se pasa del primero ni del último punto */}
+      <span
+        className={cn("absolute left-[15px] w-px bg-line-strong", first ? "top-1/2" : "top-0", last ? "bottom-1/2" : "bottom-0")}
+        aria-hidden
+      />
       <Link
         to={`/conductor/paradas/${stop.id}`}
-        className="flex min-h-14 items-center gap-3.5 py-3.5 focus-visible:rounded-lg"
+        className="group relative flex min-h-14 items-center gap-3 rounded-xl py-2 pr-2 transition-colors hover:bg-hover active:bg-hover"
       >
-        <span className="flex w-6 shrink-0 justify-center">
-          {stop.status === "delivered" ? (
-            <CheckIcon className="size-4 text-ok" aria-label="Entregado" />
-          ) : stop.status === "failed" ? (
-            <XIcon className="size-4 text-err" aria-label="No entregado" />
+        <span
+          className={cn(
+            "z-10 flex size-[31px] shrink-0 items-center justify-center rounded-full border text-xs",
+            delivered ? "border-ok bg-ok/10 text-ok" : failed ? "border-err bg-err/10 text-err" : "border-line-strong bg-surface text-ink-3",
+          )}
+        >
+          {delivered ? (
+            <CheckIcon className="size-4" aria-label="Entregado" />
+          ) : failed ? (
+            <XIcon className="size-4" aria-label="No entregado" />
           ) : (
-            <span className="num text-xs text-ink-3">{stop.sequence}</span>
+            <span className="num">{stop.sequence}</span>
           )}
         </span>
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className={cn("truncate text-sm", marked ? "text-ink-2" : "text-ink")}>{stop.recipient || stop.order_code}</span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className={cn("truncate text-[15px]", marked ? "text-ink-2" : "font-medium text-ink")}>{stop.recipient || stop.order_code}</span>
           <span className="truncate text-[13px] text-ink-2">
-            {stop.status === "failed" && stop.reason ? `No entregado · ${stop.reason}` : stop.address}
+            {failed && stop.reason ? `No entregado · ${stop.reason}` : stop.address}
           </span>
         </span>
         <span className="num text-xs text-ink-2">{formatClock(stop.delivered_at ?? stop.eta)}</span>
+        <ChevronRightIcon className="size-4 shrink-0 text-ink-2 transition-transform group-hover:translate-x-0.5" aria-hidden />
       </Link>
-    </li>
+    </StaggerItem>
   );
 }
