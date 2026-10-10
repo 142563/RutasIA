@@ -56,6 +56,7 @@ function Detail({ order }: { order: Order }) {
   const priority = PRIORITIES.find((p) => p.value === order.priority)?.label ?? order.priority;
   const items: [string, React.ReactNode][] = [
     ["Teléfono", order.phone ? <span className="num">{order.phone}</span> : "—"],
+    ...(order.recipient_email ? ([["Correo", <span className="break-all">{order.recipient_email}</span>]] as [string, React.ReactNode][]) : []),
     ["Bultos", <span className="num">{order.package_count}</span>],
     ["Prioridad", priority],
     ["Referencias", order.reference || "—"],

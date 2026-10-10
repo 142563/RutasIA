@@ -14,7 +14,7 @@ import { PRIORITIES, useCreateOrder } from "@/lib/orders";
 import { useNetwork } from "@/lib/queries";
 import type { Priority } from "@/lib/types";
 
-const EMPTY = { recipient: "", phone: "", address: "", reference: "", weight: "", packages: "1" };
+const EMPTY = { recipient: "", phone: "", email: "", address: "", reference: "", weight: "", packages: "1" };
 
 export function NewOrderSheet({ onDone }: { onDone: (createdCode?: string) => void }) {
   const network = useNetwork();
@@ -46,6 +46,7 @@ export function NewOrderSheet({ onDone }: { onDone: (createdCode?: string) => vo
       {
         recipient: form.recipient.trim(),
         phone: form.phone.trim(),
+        recipient_email: form.email.trim(),
         address: form.address.trim(),
         reference: form.reference.trim(),
         place_id: placeId || undefined,
@@ -79,6 +80,9 @@ export function NewOrderSheet({ onDone }: { onDone: (createdCode?: string) => vo
           </Field>
           <Field label="Teléfono" htmlFor="phone">
             <Input id="phone" type="tel" inputMode="tel" value={form.phone} onChange={set("phone")} placeholder="5555-1234" />
+          </Field>
+          <Field label="Correo del cliente (opcional)" htmlFor="email" hint="Le avisaremos cuando su pedido sea entregado.">
+            <Input id="email" type="email" inputMode="email" value={form.email} onChange={set("email")} placeholder="cliente@correo.com" />
           </Field>
           <div className="h-px bg-line" />
           <h3 className="text-xs font-medium uppercase tracking-wide text-ink-2">Entrega</h3>

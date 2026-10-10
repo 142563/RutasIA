@@ -72,6 +72,7 @@ export interface Order {
   code: string;
   recipient: string;
   phone: string;
+  recipient_email: string;
   address: string;
   reference: string;
   latitude: number;
