@@ -7,6 +7,7 @@ import { sampleWaypoints } from "@/lib/roads";
 import { useTheme } from "@/lib/theme";
 import type { GraphEdge, GraphNode } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { pickMarker } from "./markerPick";
 
 /**
  Mapa de la red vial nacional.
@@ -221,18 +222,20 @@ function MapLayers({ props, toXY, opts }: { props: NetworkMapProps; toXY: ToXY; 
           const cls = pop ? "nm-pop" : undefined;
           const style = pop ? delayStyle(i, Math.min(markers.length, MAX_CASCADE), 0.6) : undefined;
           const text = m.kind === "depot" ? (m.label ?? "Bodega") : m.kind === "stop" ? `Parada ${m.label ?? ""}`.trim() : m.label;
-          const interactive = m.kind !== "pick" && !!text;
+          const interactive = m.kind !== "pick" && (!!text || !!props.onPick);
           const hoverProps = interactive
             ? {
                 tabIndex: 0,
-                role: "img" as const,
-                "aria-label": text,
+                role: props.onPick ? "button" as const : "img" as const,
+                "aria-label": text ?? "Elegir ubicación",
                 className: "nm-marker",
                 style: { pointerEvents: "auto" as const },
                 onMouseEnter: () => setTip(m.id),
                 onMouseLeave: () => setTip((t) => (t === m.id ? null : t)),
                 onFocus: () => setTip(m.id),
                 onBlur: () => setTip((t) => (t === m.id ? null : t)),
+                onClick: (event: React.MouseEvent<SVGGElement>) => pickMarker(m, props.onPick, event),
+                onKeyDown: (event: React.KeyboardEvent<SVGGElement>) => pickMarker(m, props.onPick, event),
               }
             : {};
           return (
@@ -407,7 +410,7 @@ function GoogleNetworkMap(props: NetworkMapProps) {
     >
       <div ref={divRef} className="absolute inset-0" role="region" aria-label={ariaLabel} />
       {toXY ? (
-        <svg className="pointer-events-none absolute inset-0 size-full select-none" aria-hidden>
+        <svg className="pointer-events-none absolute inset-0 size-full select-none" role="group" aria-label="Marcadores del mapa">
           <MapLayers props={props} toXY={toXY} opts={{ onGoogle: true, roadGeometry }} />
         </svg>
       ) : null}
