@@ -62,7 +62,7 @@ export function NodeSearch({ nodes, onSelect, id, placeholder = "Buscar municipi
         }}
       />
       {open && matches.length > 0 ? (
-        <ul id={listId} role="listbox" className="absolute inset-x-0 top-full z-10 mt-1 max-h-64 overflow-auto rounded-lg border border-line bg-surface py-1 shadow-sm">
+        <ul id={listId} role="listbox" className="absolute inset-x-0 top-full z-10 mt-1 max-h-64 overflow-auto rounded-lg border border-line bg-elevated py-1 shadow-pop">
           {matches.map((node, i) => (
             <li
               key={node.code}

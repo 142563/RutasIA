@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { CheckIcon, PauseIcon, PlayIcon, RotateCcwIcon, StepForwardIcon } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import * as React from "react";
 import { DataSourceNote } from "@/components/DataSourceNote";
 import { NetworkMap } from "@/components/map/NetworkMap";
 import { NodeSearch } from "@/components/NodeSearch";
 import { Button } from "@/components/ui/button";
 import { Field, Select } from "@/components/ui/field";
-import { ErrorNote, PageHeader, Segmented, Spinner } from "@/components/ui/misc";
+import { ErrorNote, Segmented } from "@/components/ui/misc";
+import { AnimatedNumber, EASE, Reveal, Skeleton } from "@/components/ui/motion";
 import { api } from "@/lib/api";
 import { formatKm, formatMinutes } from "@/lib/format";
 import { departureFor, isFinished, savingPct, totalSteps, visibleOrder } from "@/lib/lab";
@@ -21,8 +23,8 @@ interface ExploreResponse extends Meta {
 }
 
 const ALGOS: { id: Algo; name: string; color: string; idea: string }[] = [
-  { id: "dijkstra", name: "Dijkstra", color: "#2a78d6", idea: "Expande por tiempo acumulado g(n): crece en todas direcciones." },
-  { id: "astar", name: "A*", color: "#eb6834", idea: "Expande por f(n) = g(n) + h(n), con h = distancia en línea recta / v_max." },
+  { id: "dijkstra", name: "Dijkstra", color: "var(--color-dijkstra)", idea: "Expande por tiempo acumulado g(n): crece en todas direcciones." },
+  { id: "astar", name: "A*", color: "var(--color-astar)", idea: "Expande por f(n) = g(n) + h(n), con h = distancia en línea recta / v_max." },
 ];
 const SPEEDS = [
   { value: "1", label: "1×" },
@@ -80,46 +82,49 @@ export function LabPage() {
   const done = result ? step >= steps : false;
   const sameCost = result && result.dijkstra.cost !== null && result.astar.cost !== null
     && Math.abs(result.dijkstra.cost - result.astar.cost) <= 1e-9 * Math.max(1, result.dijkstra.cost);
+  const loading = explore.isPending && explore.fetchStatus !== "idle";
 
   return (
     <div className="flex min-h-full flex-col">
-      <PageHeader title="Laboratorio · Dijkstra vs A*" subtitle="La misma consulta con los dos algoritmos, sobre la red vial nacional." />
-
-      <div className="flex flex-wrap items-end gap-3 border-b border-line px-6 py-4 lg:px-8">
+      {/* Barra de herramientas: consulta a la izquierda, reproducción a la derecha */}
+      <div className="flex flex-wrap items-end gap-x-3 gap-y-3 border-b border-line bg-surface px-6 py-3 lg:px-8">
         {network.data ? (
           <>
-            <Field label="Origen" htmlFor="lab-origin" className="w-full sm:w-52">
+            <Field label="Origen" htmlFor="lab-origin" className="w-full sm:w-44">
               <NodeSearch key={`o-${origin?.code}`} id="lab-origin" nodes={network.data.nodes} placeholder={origin?.name ?? "Origen"} onSelect={setOrigin} />
             </Field>
-            <Field label="Destino" htmlFor="lab-destination" className="w-full sm:w-52">
+            <Field label="Destino" htmlFor="lab-destination" className="w-full sm:w-44">
               <NodeSearch key={`d-${destination?.code}`} id="lab-destination" nodes={network.data.nodes} placeholder={destination?.name ?? "Destino"} onSelect={setDestination} />
             </Field>
           </>
-        ) : null}
-        <Field label="Franja" htmlFor="lab-band" className="w-full sm:w-52">
+        ) : <Skeleton className="h-14 w-96 max-w-full" />}
+        <Field label="Franja" htmlFor="lab-band" className="w-full sm:w-48">
           <Select id="lab-band" value={band} onChange={(e) => setBand(e.target.value as Band)}>
             {BANDS.map((b) => <option key={b.id} value={b.id}>{b.label} · {b.hours}</option>)}
           </Select>
         </Field>
         <Segmented label="Tipo de día" value={dayType} onChange={setDayType}
           options={[{ value: "weekday", label: "Laboral" }, { value: "weekend", label: "Fin de semana" }]} />
+
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={() => (done ? (setStep(0), setPlaying(true)) : setPlaying((p) => !p))} disabled={!result}>
+            {playing ? <><PauseIcon /> Pausar</> : done ? <><RotateCcwIcon /> Repetir</> : <><PlayIcon /> Reproducir</>}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => { setPlaying(false); setStep((s) => Math.min(s + 1, steps)); }} disabled={!result || done}>
+            <StepForwardIcon /> Paso
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => { setPlaying(false); setStep(0); }} disabled={!result || step === 0}>
+            <RotateCcwIcon /> Reiniciar
+          </Button>
+          <Segmented label="Velocidad" value={speed} onChange={setSpeed} options={SPEEDS} />
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-3 lg:px-8">
-        <Button size="sm" onClick={() => (done ? (setStep(0), setPlaying(true)) : setPlaying((p) => !p))} disabled={!result}>
-          {playing ? <><PauseIcon /> Pausar</> : done ? <><RotateCcwIcon /> Repetir</> : <><PlayIcon /> Reproducir</>}
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => { setPlaying(false); setStep((s) => Math.min(s + 1, steps)); }} disabled={!result || done}>
-          <StepForwardIcon /> Paso
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => { setPlaying(false); setStep(0); }} disabled={!result || step === 0}>
-          <RotateCcwIcon /> Reiniciar
-        </Button>
-        <Segmented label="Velocidad" value={speed} onChange={setSpeed} options={SPEEDS} />
-        <span className="num ml-auto text-xs text-ink-2">Paso {Math.min(step, steps)} de {steps}</span>
-      </div>
-
-      {explore.isPending && explore.fetchStatus !== "idle" ? <div className="p-8"><Spinner label="Ejecutando los dos algoritmos…" /></div> : null}
+      {loading ? (
+        <div className="grid gap-px bg-line lg:grid-cols-2" aria-busy="true" aria-label="Ejecutando los dos algoritmos">
+          {ALGOS.map((a) => <div key={a.id} className="bg-surface p-5"><Skeleton className="h-6 w-40" /><Skeleton className="mt-4 h-[360px] w-full" /></div>)}
+        </div>
+      ) : null}
       {explore.error ? <div className="p-6"><ErrorNote error={explore.error} /></div> : null}
       {origin && destination && origin.code === destination.code ? (
         <p className="px-8 py-6 text-sm text-ink-2">Elige un destino distinto del origen.</p>
@@ -127,7 +132,8 @@ export function LabPage() {
 
       {result && network.data ? (
         <>
-          <div className="grid gap-px bg-line lg:grid-cols-2">
+          <Scoreboard result={result} step={step} steps={steps} done={done} sameCost={!!sameCost} bandLabel={explore.data?.band_label} />
+          <div className="grid gap-px border-y border-line bg-line lg:grid-cols-2">
             {ALGOS.map((algo) => (
               <AlgoPanel
                 key={algo.id}
@@ -142,16 +148,7 @@ export function LabPage() {
               />
             ))}
           </div>
-          <div className="flex flex-col gap-4 px-6 py-5 lg:px-8">
-            {done ? (
-              <p className="text-sm">
-                A* expandió <b className="num">{result.astar.expanded}</b> nodos contra <b className="num">{result.dijkstra.expanded}</b> de
-                Dijkstra (<b className="num text-ok">−{savingPct(result.dijkstra.expanded, result.astar.expanded)} %</b>)
-                {sameCost ? <> y encontró el <b>mismo costo</b>: {formatMinutes(result.astar.minutes)} con el tráfico de {explore.data?.band_label?.toLowerCase()}.</> : "."}
-              </p>
-            ) : (
-              <p className="text-sm text-ink-2">Los dos algoritmos avanzan un nodo por paso. Observa hacia dónde se expande cada uno.</p>
-            )}
+          <Reveal className="flex flex-col gap-4 px-6 py-5 lg:px-8">
             <details className="text-[13px] text-ink-3">
               <summary className="cursor-pointer text-ink">¿Por qué A* da el mismo resultado explorando menos?</summary>
               <p className="mt-2 max-w-3xl">
@@ -165,11 +162,84 @@ export function LabPage() {
                 es la cantidad de nodos expandidos. La ventaja en tiempo aparece en grafos grandes (experimento E7).
               </p>
             </details>
-            <DataSourceNote source={explore.data?.data_source} />
-          </div>
+            <DataSourceNote source={explore.data?.data_source} alwaysShow />
+          </Reveal>
         </>
       ) : null}
     </div>
+  );
+}
+
+/** Marcador comparativo: el protagonista. Las barras de nodos crecen al ritmo de la reproducción. */
+function Scoreboard({ result, step, steps, done, sameCost, bandLabel }: {
+  result: Record<Algo, ExploreResult>;
+  step: number;
+  steps: number;
+  done: boolean;
+  sameCost: boolean;
+  bandLabel?: string;
+}) {
+  const full = Math.max(result.dijkstra.expanded, result.astar.expanded, 1);
+  const saving = savingPct(result.dijkstra.expanded, result.astar.expanded);
+  return (
+    <section aria-label="Comparativa" className="bg-surface px-6 py-5 lg:px-8">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="min-h-[2.25rem]">
+          <AnimatePresence mode="wait" initial={false}>
+            {done && sameCost ? (
+              <motion.p key="done" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, ease: EASE }} className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+                <CheckIcon className="size-5 text-ok" aria-hidden />
+                Mismo costo, <span className="text-ok">{saving} % menos nodos</span>
+                <span className="text-sm font-normal text-ink-2">· tráfico de {bandLabel?.toLowerCase() ?? "la franja"}</span>
+              </motion.p>
+            ) : (
+              <motion.p key="wip" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="text-sm text-ink-2">
+                Cada algoritmo avanza un nodo por paso. Observa hacia dónde se expande cada uno.
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </div>
+        <span className="num text-xs text-ink-2">Paso {Math.min(step, steps)} de {steps}</span>
+      </div>
+
+      <div className="mt-4 overflow-x-auto">
+        <div className="grid min-w-[560px] grid-cols-[7rem_minmax(160px,1fr)_repeat(4,5.5rem)] items-center gap-x-4 gap-y-3 text-[13px]">
+          <span /><span className="text-xs text-ink-2">Nodos expandidos</span>
+          <span className="text-right text-xs text-ink-2">Nodos</span>
+          <span className="text-right text-xs text-ink-2">Cómputo</span>
+          <span className="text-right text-xs text-ink-2">Tiempo</span>
+          <span className="text-right text-xs text-ink-2">Distancia</span>
+          {ALGOS.map((algo) => {
+            const r = result[algo.id];
+            const seen = visibleOrder(r.order, step).length;
+            const finished = isFinished(r.order, step);
+            return (
+              <React.Fragment key={algo.id}>
+                <span className="flex items-center gap-2 font-medium">
+                  <span className="size-2.5 rounded-full" style={{ background: algo.color }} aria-hidden />{algo.name}
+                </span>
+                <div className="h-2.5 rounded-full bg-hover" role="img" aria-label={`${algo.name}: ${seen} de ${r.expanded} nodos`}>
+                  <motion.div className="h-full rounded-full" style={{ background: algo.color }}
+                    initial={false} animate={{ width: `${(seen / full) * 100}%` }} transition={{ duration: 0.25, ease: "linear" }} />
+                </div>
+                <span className="num text-right text-base font-medium">{seen}</span>
+                <span className="num text-right text-ink-3">
+                  {finished ? <><AnimatedNumber value={r.elapsed_ms} decimals={2} /> ms</> : "—"}
+                </span>
+                <span className="num text-right text-base font-medium">
+                  {finished ? <AnimatedNumber value={r.minutes} format={formatMinutes} /> : "—"}
+                </span>
+                <span className="num text-right text-ink-3">
+                  {finished ? <AnimatedNumber value={r.km} format={formatKm} /> : "—"}
+                </span>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -195,25 +265,16 @@ function AlgoPanel({ algo, result, step, nodes, edges, origin, destination, same
           </h2>
           <p className="mt-0.5 max-w-xs text-xs text-ink-2">{algo.idea}</p>
         </div>
-        {finished && sameCost ? (
-          <span className="flex items-center gap-1 text-xs font-medium text-ok"><CheckIcon className="size-3.5" /> Costo idéntico</span>
-        ) : null}
+        <AnimatePresence>
+          {finished && sameCost ? (
+            <motion.span initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.25, ease: EASE }} className="flex items-center gap-1 text-xs font-medium text-ok">
+              <CheckIcon className="size-3.5" aria-hidden /> Costo idéntico
+            </motion.span>
+          ) : null}
+        </AnimatePresence>
       </div>
-      <dl className="grid grid-cols-3 gap-3 px-5 py-3">
-        <div>
-          <dt className="text-xs text-ink-2">Nodos expandidos</dt>
-          <dd className="num text-2xl font-medium">{visible.length}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-ink-2">Tiempo de cómputo</dt>
-          <dd className="num text-2xl font-medium">{finished ? `${result.elapsed_ms.toFixed(2)}` : "—"}<span className="text-sm text-ink-2"> ms</span></dd>
-        </div>
-        <div>
-          <dt className="text-xs text-ink-2">Costo de la ruta</dt>
-          <dd className="num text-2xl font-medium">{finished ? formatMinutes(result.minutes) : "—"}</dd>
-        </div>
-      </dl>
-      <div className="px-2 pb-2">
+      <div className="px-2 pb-2 pt-2">
         <NetworkMap
           nodes={nodes}
           edges={edges}
