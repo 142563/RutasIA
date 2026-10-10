@@ -172,6 +172,62 @@ class FleetApiTests(TestCase):
         self.assertEqual(self.post("users", {"username": "admin1", "role": "admin", "password": "contraseña-larga"}).status_code, 400)
         self.assertEqual(self.post("users", {"username": "x", "role": "jefe", "password": "contraseña-larga"}).status_code, 400)
 
+    def test_user_email_create_edit_and_list(self):
+        response = self.post("users", {"username": "correo", "role": "dispatcher", "password": PASSWORD,
+                                       "email": "  nora@example.com  "})
+        self.assertEqual(response.status_code, 201)
+        user = User.objects.get(username="correo")
+        self.assertEqual(user.email, "nora@example.com")
+        self.assertEqual(response.json()["user"]["email"], user.email)
+        response = self.patch("users", user.id, {"email": "nuevo@example.com"})
+        self.assertEqual(response.status_code, 200)
+        user.refresh_from_db()
+        self.assertEqual(user.email, "nuevo@example.com")
+        self.patch("users", user.id, {"full_name": "Nora"})
+        user.refresh_from_db()
+        self.assertEqual(user.email, "nuevo@example.com")
+        listed = self.client.get(self.url("users")).json()["users"]
+        self.assertEqual(next(item for item in listed if item["id"] == user.id)["email"], user.email)
+
+    def test_user_email_invalid_does_not_save(self):
+        for email in ("sin-arroba", "a@", "a" * 255):
+            with self.subTest(email=email):
+                response = self.post("users", {"username": "invalido", "role": "dispatcher",
+                                               "password": PASSWORD, "email": email})
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("correo", response.json()["error"])
+                self.assertFalse(User.objects.filter(username="invalido").exists())
+                response = self.patch("users", self.dispatcher.id, {"email": email, "full_name": "Cambio"})
+                self.assertEqual(response.status_code, 400)
+                self.dispatcher.refresh_from_db()
+                self.assertEqual(self.dispatcher.email, "")
+                self.assertEqual(self.dispatcher.first_name, "")
+
+    def test_user_email_empty_is_allowed(self):
+        for email in ("", "  ", None):
+            with self.subTest(email=email):
+                self.dispatcher.email = "antes@example.com"
+                self.dispatcher.save()
+                response = self.patch("users", self.dispatcher.id, {"email": email})
+                self.assertEqual(response.status_code, 200)
+                self.dispatcher.refresh_from_db()
+                self.assertEqual(self.dispatcher.email, "")
+        response = self.post("users", {"username": "sin-correo", "role": "driver", "password": PASSWORD,
+                                       "email": ""})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["user"]["email"], "")
+
+    def test_only_admin_can_read_and_edit_user_email(self):
+        for actor in (self.dispatcher, self.driver_user):
+            with self.subTest(role=actor.profile.role):
+                self.client.force_login(actor)
+                self.assertEqual(self.client.get(self.url("users")).status_code, 403)
+                self.assertEqual(self.client.get(self.url("users", self.admin.id)).status_code, 403)
+                self.assertEqual(self.patch("users", actor.id, {"email": "nuevo@example.com"}).status_code, 403)
+                self.assertEqual(self.post("users", {"email": "nuevo@example.com"}).status_code, 403)
+                actor.refresh_from_db()
+                self.assertEqual(actor.email, "")
+
     def test_admin_cannot_deactivate_or_demote_self(self):
         self.assertEqual(self.client.delete(self.url("users", self.admin.id)).status_code, 400)
         self.assertEqual(self.patch("users", self.admin.id, {"role": "dispatcher"}).status_code, 400)
