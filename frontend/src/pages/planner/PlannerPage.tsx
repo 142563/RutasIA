@@ -1,4 +1,5 @@
-import { ArrowRightIcon, ClockIcon, PackageIcon, PencilIcon } from "lucide-react";
+import { ArrowRightIcon, CheckIcon, ClockIcon, LoaderCircleIcon, PackageIcon, PencilIcon } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import * as React from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -6,6 +7,7 @@ import { DataSourceNote } from "@/components/DataSourceNote";
 import { NetworkMap, type MapMarker } from "@/components/map/NetworkMap";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
+import { AnimatedNumber, Card, EASE, SPRING, Skeleton, Stagger, StaggerItem } from "@/components/ui/motion";
 import { EmptyState, ErrorNote, Metric, PageHeader, Segmented, Spinner } from "@/components/ui/misc";
 import { formatClock, formatKm, formatMinutes, toLocalInputValue } from "@/lib/format";
 import { useDepots, useOrders } from "@/lib/orders";
@@ -28,6 +30,34 @@ function defaultDeparture(): string {
 
 function parseIds(value: string | null): number[] {
   return (value ?? "").split(",").map(Number).filter((n) => Number.isInteger(n) && n > 0);
+}
+
+const STEPS = ["Pedidos", "Ruta propuesta", "Vehículo", "Asignar"] as const;
+
+/** Indicador de pasos: la pastilla activa se desliza (layoutId) y los pasos hechos se marcan. */
+function Stepper({ current }: { current: number }) {
+  return (
+    <ol aria-label="Pasos para planificar" className="flex items-center gap-1 px-6 pb-4 pt-2 lg:px-8">
+      {STEPS.map((label, i) => {
+        const done = i < current;
+        const active = i === current;
+        return (
+          <li key={label} className="flex items-center gap-1" aria-current={active ? "step" : undefined}>
+            <span className={cn("relative flex h-7 items-center gap-2 rounded-full px-2.5 text-xs font-medium transition-colors",
+              active ? "text-on-ink" : done ? "text-ink" : "text-ink-2")}>
+              {active ? <motion.span layoutId="planner-step" transition={SPRING} className="absolute inset-0 rounded-full bg-ink" aria-hidden /> : null}
+              <span className="num relative z-10 grid size-4 place-items-center text-[11px]">
+                {done ? <CheckIcon className="size-3.5 text-ok" aria-hidden /> : i + 1}
+              </span>
+              <span className="relative z-10 hidden sm:inline">{label}</span>
+              <span className="sr-only">{done ? `${label} (listo)` : active ? `${label} (paso actual)` : label}</span>
+            </span>
+            {i < STEPS.length - 1 ? <span className={cn("h-px w-4 transition-colors", done ? "bg-ok" : "bg-line-strong")} aria-hidden /> : null}
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 export function PlannerPage() {
@@ -85,6 +115,9 @@ export function PlannerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weight, fleet.vehicles.length]);
 
+  // Paso actual: 0 elegir pedidos · 1 calcular ruta · 2 vehículo y conductor · 3 asignando / asignada
+  const step = showPicker ? 0 : !data ? 1 : create.isPending || create.isSuccess ? 3 : 2;
+
   function confirm() {
     if (!request) return;
     create.mutate(
@@ -92,7 +125,8 @@ export function PlannerPage() {
       {
         onSuccess: ({ route }) => {
           toast.success(`Ruta ${route.code} asignada`, { description: `${formatMinutes(route.driving_minutes)} de manejo con tráfico. Sigue su avance aquí.` });
-          navigate("/");
+          // Deja ver el estado de éxito un instante antes de volver a Hoy
+          window.setTimeout(() => navigate("/"), 700);
         },
       },
     );
@@ -111,7 +145,8 @@ export function PlannerPage() {
             options={[{ value: "distance", label: "Más corta" }, { value: "time", label: "Más rápida" }]} />
         ) : null}
       />
-      <div className="grid flex-1 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+      <Stepper current={step} />
+      <div className="grid flex-1 border-t border-line lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
         <section className="flex flex-col gap-6 border-line px-6 py-6 lg:border-r lg:px-8">
           {/* La hora de salida importa: el tráfico cambia según la franja */}
           <Field label="Hora de salida" htmlFor="departure" hint="El tráfico cambia según la hora: prueba distintas.">
@@ -142,7 +177,14 @@ export function PlannerPage() {
             </div>
           </details>
 
-          {plan.isFetching && !data ? <Spinner label="Calculando rutas…" /> : null}
+          {plan.isFetching && !data ? (
+            <div className="flex flex-col gap-3" role="status" aria-label="Calculando rutas">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-9 w-32" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          ) : null}
           {plan.error ? <ErrorNote error={plan.error} /> : null}
 
           {data && variant && other && !showPicker ? (
@@ -170,8 +212,16 @@ export function PlannerPage() {
                 </div>
                 {create.error ? <ErrorNote error={create.error} /> : null}
                 <div className="flex gap-2">
-                  <Button size="lg" className="flex-1" disabled={create.isPending || overCapacity || plan.isFetching} onClick={confirm}>
-                    {create.isPending ? "Asignando…" : "Confirmar y asignar"}
+                  <Button size="lg" className="flex-1 overflow-hidden" disabled={create.isPending || create.isSuccess || overCapacity || plan.isFetching} onClick={confirm}
+                    style={create.isSuccess ? { background: "var(--color-ok)", color: "var(--color-on-ink)", opacity: 1 } : undefined}>
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.span key={create.isSuccess ? "ok" : create.isPending ? "wait" : "idle"} className="inline-flex items-center gap-2"
+                        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18, ease: EASE }}>
+                        {create.isSuccess ? <><CheckIcon /> Ruta asignada</>
+                          : create.isPending ? <><LoaderCircleIcon className="animate-spin" /> Asignando…</>
+                          : "Confirmar y asignar"}
+                      </motion.span>
+                    </AnimatePresence>
                   </Button>
                   <Button size="lg" variant="outline" onClick={() => { setPickMode("list"); setEditing(true); }}>Ajustar</Button>
                 </div>
@@ -181,7 +231,7 @@ export function PlannerPage() {
           ) : null}
         </section>
 
-        <section aria-label="Mapa de la ruta" className="relative bg-surface p-3 lg:sticky lg:top-0 lg:h-screen">
+        <section aria-label="Mapa de la ruta" className="relative bg-surface p-2 lg:sticky lg:top-0 lg:h-[calc(100vh-7.5rem)]">
           {network.data ? (
             <RouteMap nodes={network.data.nodes} edges={network.data.edges} data={data} variant={variant} other={other} />
           ) : (
@@ -281,7 +331,7 @@ function DepartureOptions({ data, current, onPick }: { data: PlanResponse; curre
           : <span>Ya sales en una de las mejores franjas del día</span>}
       </summary>
       <ul className="mt-3 flex flex-col gap-1.5" aria-label="Tiempo de manejo según la hora de salida">
-        {options.map((o) => {
+        {options.map((o, i) => {
           const width = max === min ? 100 : 35 + 65 * ((o.driving_minutes - min) / (max - min));
           const isBest = o.band === best.band;
           const isCurrent = o.band === data.band;
@@ -291,7 +341,9 @@ function DepartureOptions({ data, current, onPick }: { data: PlanResponse; curre
                 <span className="w-24 shrink-0 text-ink-3">{bandLabel(o.band)}</span>
                 <span className="num w-10 shrink-0 text-ink-2">{formatClock(o.departure)}</span>
                 <span className="relative h-2 flex-1 rounded-full bg-hover">
-                  <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${width}%`, background: isBest ? "#1a7f4b" : isCurrent ? "#111113" : "#c9cac5" }} />
+                  <motion.span className="absolute inset-y-0 left-0 origin-left rounded-full"
+                    style={{ width: `${width}%`, background: isBest ? "var(--color-ok)" : isCurrent ? "var(--color-ink)" : "var(--color-line-strong)" }}
+                    initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.5, ease: EASE, delay: 0.04 * i }} />
                 </span>
                 <span className={cn("num w-20 shrink-0 text-right", isBest ? "font-medium text-ok" : "text-ink-3")}>{formatMinutes(o.driving_minutes)}</span>
               </button>
@@ -311,12 +363,12 @@ function StopList({ variant, returnToDepot, depotName, onEdit }: { variant: Plan
         <h2 className="text-sm font-semibold">Paradas en orden</h2>
         <Button variant="ghost" size="sm" onClick={onEdit}><PencilIcon /> Cambiar pedidos</Button>
       </div>
-      <ol className="flex flex-col">
+      <Stagger as="ol" className="flex flex-col">
         {variant.stops.map((stop, i) => {
           const leg = variant.legs[i];
           return (
-            <li key={stop.order_id} className="flex gap-3 border-b border-line py-3 last:border-b-0">
-              <span className="num grid size-6 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-semibold text-white">{stop.sequence}</span>
+            <StaggerItem as="li" layout transition={SPRING} key={stop.order_id} className="flex gap-3 border-b border-line py-3 last:border-b-0">
+              <span className="num grid size-6 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-semibold text-on-ink">{stop.sequence}</span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="truncate text-sm font-medium">{stop.recipient}</p>
@@ -329,17 +381,17 @@ function StopList({ variant, returnToDepot, depotName, onEdit }: { variant: Plan
                   </p>
                 ) : null}
               </div>
-            </li>
+            </StaggerItem>
           );
         })}
         {returnToDepot && variant.legs.length > variant.stops.length ? (
-          <li className="flex gap-3 py-3 text-xs text-ink-2">
+          <StaggerItem as="li" className="flex gap-3 py-3 text-xs text-ink-2">
             <span className="grid size-6 shrink-0 place-items-center"><span className="size-2.5 rounded-sm bg-ink" /></span>
             <span className="flex-1">Regreso a {depotName}</span>
             <span className="num">{formatClock(variant.finish_at)}</span>
-          </li>
+          </StaggerItem>
         ) : null}
-      </ol>
+      </Stagger>
     </div>
   );
 }
@@ -360,24 +412,26 @@ function ZonePicker({ onPick, onList }: { onPick: (ids: number[]) => void; onLis
           Registra un pedido y vuelve aquí para planificar su ruta.
         </EmptyState>
       ) : null}
-      <ul className="flex flex-col gap-2">
+      <Stagger as="ul" className="flex flex-col gap-2">
         {zones.map((z) => (
-          <li key={z.code}>
+          <StaggerItem as="li" key={z.code}>
+            <Card interactive className="hover:border-accent focus-within:border-accent">
             <button type="button" onClick={() => onPick(z.orderIds)}
-              className="group flex w-full items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3 text-left transition-colors hover:border-ink">
+              className="group flex min-h-14 w-full items-center gap-3 rounded-xl px-4 py-3 text-left">
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium">{z.name}</span>
                 <span className="block truncate text-xs text-ink-2">{placesLabel(z.places)}</span>
               </span>
               <span className="num shrink-0 text-right text-xs text-ink-2">
-                <span className="block text-sm font-medium text-ink">{z.orderIds.length} {z.orderIds.length === 1 ? "pedido" : "pedidos"}</span>
-                {z.weightKg.toLocaleString("es-GT", { maximumFractionDigits: 1 })} kg
+                <span className="block text-sm font-medium text-ink"><AnimatedNumber value={z.orderIds.length} /> {z.orderIds.length === 1 ? "pedido" : "pedidos"}</span>
+                <AnimatedNumber value={Math.round(z.weightKg * 10) / 10} decimals={1} /> kg
               </span>
               <ArrowRightIcon className="size-4 shrink-0 text-ink-2 transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
             </button>
-          </li>
+            </Card>
+          </StaggerItem>
         ))}
-      </ul>
+      </Stagger>
       {zones.length > 0 ? (
         <button type="button" onClick={onList} className="self-start text-[13px] text-ink-2 underline hover:text-ink">
           Prefiero elegir los pedidos uno por uno
