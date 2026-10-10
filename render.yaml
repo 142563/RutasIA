@@ -17,6 +17,13 @@ services:
         sync: false
       - key: GOOGLE_ROUTES_API_KEY
         sync: false
+      # Correos de entrega con Resend; sin la key no se envía nada
+      - key: RESEND_API_KEY
+        sync: false
+      - key: NOTIFY_FROM
+        value: "enruta <entregas@enruta.world>"
+      - key: SITE_URL
+        value: "https://enruta.world"
       - key: DEBUG
         value: "False"
 

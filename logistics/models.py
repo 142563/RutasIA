@@ -185,6 +185,8 @@ class Order(TimestampedModel):
     # Pedido con dirección real (docs/PLAN.md §6): se asocia al nodo más cercano del grafo.
     recipient = models.CharField(max_length=120, blank=True)
     phone = models.CharField(max_length=30, blank=True)
+    # Correo del cliente: se le avisa cuando su pedido es entregado (opcional)
+    recipient_email = models.EmailField(blank=True)
     address = models.CharField(max_length=255, blank=True)
     reference = models.CharField(max_length=255, blank=True, help_text="Referencias para encontrar la dirección.")
     place_id = models.CharField(max_length=255, blank=True, help_text="Google Places (cuando haya key del navegador).")

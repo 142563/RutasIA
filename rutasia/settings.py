@@ -109,6 +109,12 @@ GOOGLE_MAPS_MAP_ID = os.getenv("GOOGLE_MAPS_MAP_ID", "DEMO_MAP_ID")
 # (build_graph, calibrate_traffic), nunca el motor de rutas.
 GOOGLE_ROUTES_API_KEY = os.getenv("GOOGLE_ROUTES_API_KEY", "")
 
+# Correos de entrega con Resend (API HTTP). Sin RESEND_API_KEY no se envía nada.
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+NOTIFY_FROM = os.getenv("NOTIFY_FROM", "enruta <entregas@enruta.world>")
+# Base de los enlaces que llevan los correos al despachador
+SITE_URL = os.getenv("SITE_URL", "https://enruta.world")
+
 
 # Application definition
 

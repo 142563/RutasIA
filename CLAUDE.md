@@ -33,6 +33,7 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
     - Login de un clic como despachador o conductor (`/api/auth/demo/`, activo con `DEMO_LOGIN`; por defecto igual a `DEBUG`; nunca para admin).
     - `preparar` crea una ruta de ejemplo en curso (`logistics/application/demo.py`).
     - La jerga técnica (nodos, multiplicadores, fuentes de datos) va en Análisis o en `<details>` plegados, no en las pantallas operativas.
+- **Notificaciones (RUT-55):** al marcar una parada ENTREGADA, `logistics/application/notifications.py` envía correo con la API HTTP de Resend (`httpx`) al cliente (`Order.recipient_email`) y al despachador (`Route.created_by.email`), vía `transaction.on_commit` y sin romper nunca la entrega. Sin `RESEND_API_KEY` solo registra un log. Las entregas fallidas no envían nada. Los usuarios de demo no tienen correo.
 - **Datos:** mientras no haya `GOOGLE_ROUTES_API_KEY`, el grafo usa aristas `estimate` y tráfico `synthetic`. Toda respuesta y todo CSV indica la fuente (`data_source`). **Nunca** presentar esos números como resultados de tesis.
 - BD: PostgreSQL (Neon) vía `DATABASE_URL`; sin esa variable usa SQLite local.
 - Deploy: Render (`render.yaml`, `Procfile`), archivos estáticos con WhiteNoise. `matplotlib` solo en `requirements-dev.txt`.

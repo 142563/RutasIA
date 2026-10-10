@@ -9,6 +9,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from logistics.application.notifications import notify_delivery_safe
 from logistics.application.planning import route_payload
 from logistics.domain.exceptions import PlanningError
 from logistics.models import Driver, Order, Route, RouteStop
@@ -105,6 +106,11 @@ def update_stop(user, stop_id: int, payload: dict) -> dict:
         status=Order.Status.DELIVERED if status == RouteStop.Status.DELIVERED else Order.Status.FAILED,
         updated_at=now,
     )
+
+    # Solo las entregas exitosas avisan por correo. Si una entrega FALLA por ahora no se
+    # envía nada; aquí se puede agregar luego un aviso de "no pudimos entregar".
+    if status == RouteStop.Status.DELIVERED:
+        transaction.on_commit(lambda: notify_delivery_safe(stop.id))
 
     if route.status == Route.Status.PLANNED:
         _begin(route)

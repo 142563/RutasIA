@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db.models import Count, Q
 from django.utils import timezone
 
@@ -47,6 +49,7 @@ def order_payload(order: Order) -> dict:
         "code": order.code,
         "recipient": order.recipient,
         "phone": order.phone,
+        "recipient_email": order.recipient_email,
         "address": order.address,
         "reference": order.reference,
         "latitude": order.latitude,
@@ -106,6 +109,18 @@ def list_orders(params) -> dict:
     return {"orders": [order_payload(o) for o in orders], "counts": counts}
 
 
+def parse_email(payload: dict) -> str:
+    """Correo opcional del cliente; vacío es válido."""
+    email = str(payload.get("recipient_email") or "").strip()
+    if not email:
+        return ""
+    try:
+        validate_email(email)
+    except ValidationError:
+        raise PlanningError("El correo del cliente no es válido.") from None
+    return email[:254]
+
+
 def create_order(payload: dict) -> dict:
     recipient = str(payload.get("recipient", "")).strip()
     address = str(payload.get("address", "")).strip()
@@ -126,6 +141,7 @@ def create_order(payload: dict) -> dict:
         raise PlanningError("Los bultos deben ser un número entero.") from None
     if packages < 1:
         raise PlanningError("Debe haber al menos 1 bulto.")
+    recipient_email = parse_email(payload)
     priority = payload.get("priority") or Order.Priority.NORMAL
     if priority not in Order.Priority.values:
         raise PlanningError("Prioridad inválida.")
@@ -133,6 +149,7 @@ def create_order(payload: dict) -> dict:
     order = Order.objects.create(
         recipient=recipient[:120],
         phone=str(payload.get("phone", "")).strip()[:30],
+        recipient_email=recipient_email,
         address=address[:255],
         reference=str(payload.get("reference", "")).strip()[:255],
         place_id=str(payload.get("place_id", "")).strip()[:255],

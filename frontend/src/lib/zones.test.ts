@@ -4,7 +4,7 @@ import { groupByZone, placesLabel } from "./zones";
 
 function order(id: number, region: [string, string] | null, place: string, weight = 1): Order {
   return {
-    id, code: `P${id}`, recipient: "x", phone: "", address: "", reference: "", latitude: 0, longitude: 0,
+    id, code: `P${id}`, recipient: "x", phone: "", recipient_email: "", address: "", reference: "", latitude: 0, longitude: 0,
     node: { code: place.toLowerCase(), name: place }, region: region ? { code: region[0], name: region[1] } : null,
     weight_kg: weight, package_count: 1, priority: "normal", status: "pending", status_label: "Pendiente",
     is_demo: true, created_at: "",

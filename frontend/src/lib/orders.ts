@@ -33,6 +33,7 @@ export function useOrders(params: { status?: string; q?: string; ids?: string })
 export interface NewOrder {
   recipient: string;
   phone: string;
+  recipient_email?: string;
   address: string;
   reference: string;
   /** Id de Google Places si la dirección se eligió del autocompletado */
