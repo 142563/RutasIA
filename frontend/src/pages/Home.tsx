@@ -10,25 +10,15 @@ import { useUser } from "@/lib/auth";
 import { useDashboard, useMonitoring } from "@/lib/dispatch";
 import { formatDateLong } from "@/lib/format";
 import { useDepots, useOrders } from "@/lib/orders";
-import { useNetwork } from "@/lib/queries";
+import { useNetwork, useTrafficProfile } from "@/lib/queries";
 import { nextStep } from "@/lib/today";
-import { BANDS, bandFor, type Band } from "@/lib/traffic";
+import { BANDS, bandFor, dayTypeFor } from "@/lib/traffic";
+import { trafficLevel } from "@/lib/trafficLevel";
 import { cn } from "@/lib/utils";
 import { useIncidents } from "@/lib/incidents";
 import {
   IncidentItem, PresenceList, ProposalItem, ReportIncidentForm, RouteItem, RouteRowSkeleton, RowSkeleton, Section,
 } from "@/pages/monitoring/parts";
-
-/** Cómo suele estar el tráfico en cada franja: punto de color + palabra, sin jerga. */
-const BAND_FEEL: Record<Band, { word: string; dot: string }> = {
-  dawn: { word: "fluido", dot: "bg-ok" },
-  peak_am: { word: "pesado", dot: "bg-err" },
-  mid_morning: { word: "moderado", dot: "bg-warn" },
-  midday: { word: "moderado", dot: "bg-warn" },
-  afternoon: { word: "moderado", dot: "bg-warn" },
-  peak_pm: { word: "pesado", dot: "bg-err" },
-  night: { word: "fluido", dot: "bg-ok" },
-};
 
 type FeedTab = "reroutes" | "incidents";
 
@@ -68,9 +58,15 @@ export function HomePage() {
   const network = useNetwork();
   const pending = useOrders({ status: "pending" });
   const depots = useDepots();
-  const now = new Date();
+  const [now, setNow] = React.useState(() => new Date());
+  React.useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   const band = BANDS.find((b) => b.id === bandFor(now))!;
-  const feel = BAND_FEEL[band.id];
+  const day = dayTypeFor(now);
+  const profile = useTrafficProfile(band.id, day);
+  const feel = trafficLevel(profile.isError ? undefined : profile.data, band.id, day);
 
   const kpis = dashboard.data;
   const live = monitoring.data;
@@ -100,9 +96,9 @@ export function HomePage() {
         subtitle={(
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <span>{formatDateLong(now)}</span>
-            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-2.5 py-0.5 text-xs text-ink-3">
-              <span className={cn("size-2 rounded-full", feel.dot)} aria-hidden />
-              {band.label} · tráfico {feel.word}
+            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-2.5 py-0.5 text-xs text-ink-3" title={feel?.synthetic ? "Datos de ejemplo" : undefined}>
+              {feel ? <span className={cn("size-2 rounded-full", feel.step < 2 ? "bg-ok" : feel.step < 3 ? "bg-warn" : "bg-err")} aria-hidden /> : null}
+              {band.label}{feel ? ` · tráfico ${feel.word}` : ""}
               <span className="num text-ink-2">{band.hours}</span>
             </span>
           </span>

@@ -1,6 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api";
 import type { NetworkResponse } from "./types";
+import type { Band, DayType } from "./traffic";
+import type { TrafficProfile } from "./trafficLevel";
+
+export function useTrafficProfile(band: Band, day: DayType) {
+  return useQuery({
+    queryKey: ["traffic-profile", band, day],
+    queryFn: () => api<TrafficProfile>("/api/traffic/profile/", { query: { band, day } }),
+    refetchInterval: 60_000,
+  });
+}
 
 /** Red vial (nodos + tramos). Cambia muy poco: se cachea una hora. */
 export function useNetwork() {
