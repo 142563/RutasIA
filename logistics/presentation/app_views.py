@@ -90,12 +90,16 @@ def api_demo_login(request: HttpRequest):
         payload = _parse_json(request)
     except PlanningError as exc:
         return _error(str(exc))
-    username = DEMO_ACCOUNTS.get(str(payload.get("role", "")))
+    role = str(payload.get("role", ""))
+    username = DEMO_ACCOUNTS.get(role)
     if username is None:
         return _error("Rol de demostración inválido.")
-    user = User.objects.filter(username=username, is_active=True).first()
+    user = User.objects.filter(username=username, is_active=True).select_related("profile").first()
     if user is None:
         return _error("No existen los usuarios de demostración: corre python manage.py preparar.", 404)
+    # Una cuenta renombrada o promovida nunca puede dar privilegios sin contraseña.
+    if user.is_staff or user.is_superuser or getattr(getattr(user, "profile", None), "role", None) != role:
+        return _error("La cuenta de demostración no tiene el rol permitido.", 403)
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     return _ok({"user": user_payload(user)})
 
