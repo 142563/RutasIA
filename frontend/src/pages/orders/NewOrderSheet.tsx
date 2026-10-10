@@ -1,4 +1,5 @@
 import { CheckIcon } from "lucide-react";
+import { motion } from "motion/react";
 import * as React from "react";
 import { toast } from "sonner";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
@@ -15,7 +16,7 @@ import type { Priority } from "@/lib/types";
 
 const EMPTY = { recipient: "", phone: "", address: "", reference: "", weight: "", packages: "1" };
 
-export function NewOrderSheet({ onDone }: { onDone: () => void }) {
+export function NewOrderSheet({ onDone }: { onDone: (createdCode?: string) => void }) {
   const network = useNetwork();
   const create = useCreateOrder();
   const [form, setForm] = React.useState(EMPTY);
@@ -62,7 +63,7 @@ export function NewOrderSheet({ onDone }: { onDone: () => void }) {
           setPlaceId("");
           setPriority("normal");
           setSubmitted(false);
-          onDone();
+          onDone(order.code);
         },
       },
     );
@@ -71,13 +72,16 @@ export function NewOrderSheet({ onDone }: { onDone: () => void }) {
   return (
     <SheetContent title="Nuevo pedido" description="La entrega se asocia al nodo más cercano de la red vial.">
       <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col" noValidate>
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+        <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-2">Destinatario</h3>
           <Field label="Destinatario" htmlFor="recipient" error={show("recipient")}>
             <Input id="recipient" value={form.recipient} onChange={set("recipient")} aria-invalid={!!show("recipient")} autoFocus />
           </Field>
           <Field label="Teléfono" htmlFor="phone">
             <Input id="phone" type="tel" inputMode="tel" value={form.phone} onChange={set("phone")} placeholder="5555-1234" />
           </Field>
+          <div className="h-px bg-line" />
+          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-2">Entrega</h3>
           <Field label="Dirección de entrega" htmlFor="address" error={show("address")}>
             <AddressAutocomplete id="address" value={form.address} invalid={!!show("address")} placeholder="5a avenida 10-20, zona 1"
               onChange={(text) => { setForm((f) => ({ ...f, address: text })); setPlaceId(""); }}
@@ -107,7 +111,7 @@ export function NewOrderSheet({ onDone }: { onDone: () => void }) {
                   />
                 </div>
                 {location ? (
-                  <p className="flex items-center gap-1.5 text-xs text-ok"><CheckIcon className="size-3.5" /> Ubicación elegida: {location.label}</p>
+                  <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-1.5 text-xs text-ok"><CheckIcon className="size-3.5" /> Ubicación elegida: {location.label}</motion.p>
                 ) : null}
               </>
             ) : (
@@ -117,6 +121,8 @@ export function NewOrderSheet({ onDone }: { onDone: () => void }) {
           <Field label="Referencias" htmlFor="reference">
             <Textarea id="reference" value={form.reference} onChange={set("reference")} placeholder="Portón negro, preguntar en recepción" />
           </Field>
+          <div className="h-px bg-line" />
+          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-2">Paquete</h3>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Peso (kg)" htmlFor="weight" error={show("weight")}>
               <Input id="weight" type="number" min="0" step="0.1" inputMode="decimal" className="num" value={form.weight} onChange={set("weight")} aria-invalid={!!show("weight")} />
@@ -131,8 +137,8 @@ export function NewOrderSheet({ onDone }: { onDone: () => void }) {
           </div>
           {create.error ? <p className="text-[13px] text-err" role="alert">{create.error.message}</p> : null}
         </div>
-        <div className="flex justify-end gap-2 border-t border-line px-6 py-4">
-          <Button variant="outline" onClick={onDone}>Cancelar</Button>
+        <div className="flex justify-end gap-2 border-t border-line bg-elevated px-6 py-4">
+          <Button variant="outline" onClick={() => onDone()}>Cancelar</Button>
           <Button type="submit" disabled={create.isPending}>{create.isPending ? "Guardando…" : "Guardar pedido"}</Button>
         </div>
       </form>
