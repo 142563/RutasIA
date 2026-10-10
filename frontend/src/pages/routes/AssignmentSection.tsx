@@ -3,7 +3,8 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, Select, Textarea } from "@/components/ui/field";
-import { ErrorNote, Spinner } from "@/components/ui/misc";
+import { ErrorNote } from "@/components/ui/misc";
+import { Skeleton } from "@/components/ui/motion";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   canManage, driverDisabled, driverNote, useAssignmentOptions, useAssignRoute, useCancelRoute, vehicleDisabled,
@@ -68,7 +69,12 @@ function ChangePanel({ route, open, onOpenChange }: { route: DetailRoute; open: 
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent title="Cambiar asignación" description={`${route.code}: elige quién la maneja y en qué camión.`}>
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
-          {options.isPending ? <Spinner /> : null}
+          {options.isPending ? (
+            <div className="flex flex-col gap-5" aria-busy="true" aria-label="Cargando opciones">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          ) : null}
           {options.error ? <ErrorNote error={options.error} /> : null}
           {data ? (
             <>
