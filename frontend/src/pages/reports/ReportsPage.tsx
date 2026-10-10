@@ -1,15 +1,17 @@
 import { TriangleAlertIcon } from "lucide-react";
 import type { ReactElement } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ErrorNote, Metric, PageHeader, Spinner } from "@/components/ui/misc";
+import { ErrorNote, Metric } from "@/components/ui/misc";
+import { Reveal, Skeleton, Stagger, StaggerItem } from "@/components/ui/motion";
+import { AXIS_TICK, GRID_STROKE, TOOLTIP_CURSOR, TOOLTIP_ITEM, TOOLTIP_LABEL, TOOLTIP_STYLE } from "@/pages/analysis/chartTheme";
 import { useReports, type ExperimentResult } from "@/lib/dispatch";
 import { formatMinutes } from "@/lib/format";
 import { formatWhen } from "@/pages/routes/shared";
 
-const AXIS = { fontSize: 11, fill: "#6b6f76" };
-const DIJKSTRA = "#2a78d6";
-const ASTAR = "#eb6834";
-const NEUTRAL = "#56595f";
+const AXIS = AXIS_TICK;
+const DIJKSTRA = "var(--color-dijkstra)";
+const ASTAR = "var(--color-astar)";
+const NEUTRAL = "var(--color-ink-3)";
 
 const num = (v: unknown, digits = 1) => (typeof v === "number" ? v.toLocaleString("es-GT", { maximumFractionDigits: digits }) : "—");
 
@@ -72,10 +74,10 @@ function ExperimentBody({ result }: { result: ExperimentResult }) {
           </div>
           <Chart title="Nodos expandidos por consulta (promedio)" height={180}>
             <BarChart data={[{ name: "Dijkstra", nodos: s.dijkstra_expanded }, { name: "A*", nodos: s.astar_expanded }]}>
-              <CartesianGrid stroke="#ecece9" vertical={false} />
+              <CartesianGrid stroke={GRID_STROKE} vertical={false} />
               <XAxis dataKey="name" tick={AXIS} axisLine={false} tickLine={false} />
               <YAxis tick={AXIS} axisLine={false} tickLine={false} width={40} />
-              <Tooltip />
+              <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL} itemStyle={TOOLTIP_ITEM} cursor={TOOLTIP_CURSOR} />
               <Bar dataKey="nodos" name="Nodos" fill={DIJKSTRA} radius={[3, 3, 0, 0]} />
             </BarChart>
           </Chart>
@@ -95,11 +97,11 @@ function ExperimentBody({ result }: { result: ExperimentResult }) {
       return (
         <Chart title="Mejora de 2-opt según el número de paradas (%)" height={200}>
           <BarChart data={data.map((d) => ({ name: `${d.stops} paradas`, capture: d.two_opt_vs_capture_pct, nn: d.two_opt_vs_nn_pct }))}>
-            <CartesianGrid stroke="#ecece9" vertical={false} />
+            <CartesianGrid stroke={GRID_STROKE} vertical={false} />
             <XAxis dataKey="name" tick={AXIS} axisLine={false} tickLine={false} />
             <YAxis tick={AXIS} axisLine={false} tickLine={false} width={40} />
-            <Tooltip />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL} itemStyle={TOOLTIP_ITEM} cursor={TOOLTIP_CURSOR} />
+            <Legend wrapperStyle={{ fontSize: 12, color: "var(--color-ink-2)" }} />
             <Bar dataKey="capture" name="Frente al orden de captura" fill={NEUTRAL} radius={[3, 3, 0, 0]} />
             <Bar dataKey="nn" name="Frente al vecino más cercano" fill={ASTAR} radius={[3, 3, 0, 0]} />
           </BarChart>
@@ -123,7 +125,7 @@ function ExperimentBody({ result }: { result: ExperimentResult }) {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={`${r.graph}-${r.nodes}`}>
+                <tr key={`${r.graph}-${r.nodes}`} className="transition-colors hover:bg-hover">
                   <td className={cell}>{r.graph}</td>
                   <td className={`${cell} num text-right`}>{num(r.nodes, 0)}</td>
                   <td className={`${cell} num text-right`}>{num(r.dijkstra_expanded)}</td>
@@ -146,42 +148,47 @@ export function ReportsPage() {
 
   return (
     <div>
-      <PageHeader title="Reportes" subtitle="Minutos ahorrados, puntualidad y resultados de los experimentos" />
-      {query.isPending ? <div className="p-8"><Spinner /></div> : null}
+      {query.isPending ? (
+        <div className="flex flex-col gap-6 px-6 py-6 lg:px-8" aria-busy="true" aria-label="Cargando resultados">
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-16" />)}</div>
+          <div className="grid gap-8 lg:grid-cols-2"><Skeleton className="h-56" /><Skeleton className="h-56" /></div>
+        </div>
+      ) : null}
       {query.error ? <div className="p-6 lg:px-8"><ErrorNote error={query.error} /></div> : null}
       {data ? (
         <div className="flex flex-col gap-10 px-6 py-6 lg:px-8">
           <section aria-label="Operación" className="flex flex-col gap-6">
-            <div className="grid grid-cols-2 gap-6 border-b border-line pb-6 sm:grid-cols-4">
-              <Metric label="Minutos ahorrados" value={formatMinutes(data.minutes_saved.total)}
-                hint={`En ${data.minutes_saved.routes} rutas, frente a la más corta`} />
-              <Metric label="Puntualidad" value={data.punctuality.pct != null ? `${data.punctuality.pct} %` : "—"}
+            <p className="text-[13px] text-ink-2">Minutos ahorrados, puntualidad y resultados de los experimentos.</p>
+            <Stagger className="grid grid-cols-2 gap-6 border-b border-line pb-6 sm:grid-cols-4">
+              <StaggerItem><Metric label="Minutos ahorrados" value={formatMinutes(data.minutes_saved.total)}
+                hint={`En ${data.minutes_saved.routes} rutas, frente a la más corta`} /></StaggerItem>
+              <StaggerItem><Metric label="Puntualidad" value={data.punctuality.pct != null ? `${data.punctuality.pct} %` : "—"}
                 hint={data.punctuality.delivered > 0
                   ? `${data.punctuality.on_time} de ${data.punctuality.delivered} entregas, tolerancia ${data.punctuality.tolerance_min} min`
-                  : "Aún no hay entregas"} />
-              <Metric label="Entregas fallidas" value={data.failed_by_reason.reduce((sum, r) => sum + r.count, 0)} />
-              <Metric label="Rutas con ahorro medido" value={data.minutes_saved.routes} />
-            </div>
-            <div className="grid gap-8 lg:grid-cols-2">
+                  : "Aún no hay entregas"} /></StaggerItem>
+              <StaggerItem><Metric label="Entregas fallidas" value={data.failed_by_reason.reduce((sum, r) => sum + r.count, 0)} /></StaggerItem>
+              <StaggerItem><Metric label="Rutas con ahorro medido" value={data.minutes_saved.routes} /></StaggerItem>
+            </Stagger>
+            <Reveal className="grid gap-8 lg:grid-cols-2">
               <Chart title="Minutos ahorrados por ruta" empty={data.minutes_saved.by_route.length === 0 ? "Aún no hay rutas planificadas." : undefined}>
                 <BarChart data={data.minutes_saved.by_route}>
-                    <CartesianGrid stroke="#ecece9" vertical={false} />
+                    <CartesianGrid stroke={GRID_STROKE} vertical={false} />
                     <XAxis dataKey="code" tick={false} axisLine={false} tickLine={false} />
                     <YAxis tick={AXIS} axisLine={false} tickLine={false} width={40} />
-                    <Tooltip />
+                    <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL} itemStyle={TOOLTIP_ITEM} cursor={TOOLTIP_CURSOR} />
                     <Bar dataKey="minutes_saved" name="Minutos ahorrados" fill={NEUTRAL} radius={[3, 3, 0, 0]} />
                 </BarChart>
               </Chart>
               <Chart title="Entregas fallidas por motivo" empty={data.failed_by_reason.length === 0 ? "No hay entregas fallidas." : undefined}>
                 <BarChart data={data.failed_by_reason} layout="vertical" margin={{ left: 8 }}>
-                    <CartesianGrid stroke="#ecece9" horizontal={false} />
+                    <CartesianGrid stroke={GRID_STROKE} horizontal={false} />
                     <XAxis type="number" allowDecimals={false} tick={AXIS} axisLine={false} tickLine={false} />
                     <YAxis type="category" dataKey="reason" tick={AXIS} axisLine={false} tickLine={false} width={120} />
-                    <Tooltip />
-                    <Bar dataKey="count" name="Entregas" fill="#b42318" radius={[0, 3, 3, 0]} />
+                    <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL} itemStyle={TOOLTIP_ITEM} cursor={TOOLTIP_CURSOR} />
+                    <Bar dataKey="count" name="Entregas" fill="var(--color-err)" radius={[0, 3, 3, 0]} />
                 </BarChart>
               </Chart>
-            </div>
+            </Reveal>
           </section>
 
           <section aria-label="Experimentos" className="flex flex-col gap-2">
@@ -195,14 +202,16 @@ export function ReportsPage() {
               </p>
             ) : (
               data.experiments.map((exp) => (
-                <article key={exp.key} className="flex flex-col gap-4 border-t border-line py-6">
-                  <header className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h3 className="text-sm font-medium">{exp.title}</h3>
-                    <span className="num text-xs text-ink-2">{exp.rows} filas · {formatWhen(exp.updated_at)}</span>
-                  </header>
-                  <ExperimentBody result={exp} />
-                  <ExperimentSource result={exp} />
-                </article>
+                <Reveal key={exp.key}>
+                  <article className="flex flex-col gap-4 border-t border-line py-6">
+                    <header className="flex flex-wrap items-baseline justify-between gap-2">
+                      <h3 className="text-sm font-medium">{exp.title}</h3>
+                      <span className="num text-xs text-ink-2">{exp.rows} filas · {formatWhen(exp.updated_at)}</span>
+                    </header>
+                    <ExperimentBody result={exp} />
+                    <ExperimentSource result={exp} />
+                  </article>
+                </Reveal>
               ))
             )}
           </section>

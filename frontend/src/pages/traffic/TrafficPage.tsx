@@ -5,7 +5,9 @@ import { DataSourceNote } from "@/components/DataSourceNote";
 import { NetworkMap } from "@/components/map/NetworkMap";
 import { NodeSearch } from "@/components/NodeSearch";
 import { Field } from "@/components/ui/field";
-import { ErrorNote, Metric, PageHeader, Segmented, Spinner } from "@/components/ui/misc";
+import { ErrorNote, Metric, Segmented } from "@/components/ui/misc";
+import { Reveal, Skeleton, Stagger, StaggerItem } from "@/components/ui/motion";
+import { AXIS_LINE, AXIS_TICK, GRID_STROKE, TOOLTIP_ITEM, TOOLTIP_LABEL, TOOLTIP_STYLE } from "@/pages/analysis/chartTheme";
 import { api } from "@/lib/api";
 import { CONGESTION_STEPS, congestionColor } from "@/lib/congestion";
 import { formatMinutes } from "@/lib/format";
@@ -66,14 +68,13 @@ export function TrafficPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <PageHeader title="Tráfico por franja" subtitle="Multiplicador m de cada tramo, en cada sentido: tiempo con tráfico = t0 × m." />
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-3 border-b border-line px-6 py-4 lg:px-8">
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-3 border-b border-line bg-surface px-6 py-4 lg:px-8">
         <div className="flex min-w-[280px] flex-1 flex-col gap-1.5">
           <label htmlFor="band-slider" className="text-[13px] font-medium text-ink-3">
             Franja: <span className="text-ink">{band.label}</span> <span className="num text-ink-2">{band.hours}</span>
           </label>
           <input id="band-slider" type="range" min={0} max={BANDS.length - 1} step={1} value={bandIndex}
-            onChange={(e) => setBandIndex(Number(e.target.value))} className="w-full accent-ink"
+            onChange={(e) => setBandIndex(Number(e.target.value))} className="w-full accent-accent"
             aria-valuetext={`${band.label}, ${band.hours}`} />
           <div className="flex justify-between text-[11px] text-ink-2">
             {BANDS.map((b, i) => (
@@ -124,7 +125,7 @@ export function TrafficPage() {
               >
                 {view === "metro"
                   ? (toXY) => (
-                    <g fontSize={11} fill="#56595f" style={{ paintOrder: "stroke" }} stroke="#fff" strokeWidth={3}>
+                    <g fontSize={11} fill="var(--color-ink-3)" style={{ paintOrder: "stroke" }} stroke="var(--color-surface)" strokeWidth={3}>
                       {network.data!.nodes.filter((n) => n.lat > METRO[0].lat && n.lat < METRO[1].lat && n.lng > METRO[0].lng && n.lng < METRO[1].lng)
                         .map((n) => { const [x, y] = toXY(n); return <text key={n.code} x={x + 6} y={y - 6}>{n.name.split(" (")[0]}</text>; })}
                     </g>
@@ -139,7 +140,7 @@ export function TrafficPage() {
               <p className="px-2 pt-1 text-xs text-ink-2">Cada tramo tiene dos líneas: una por sentido. Pasa el cursor sobre una para ver los minutos.</p>
             </>
           ) : (
-            <div className="p-6"><Spinner label="Cargando tráfico…" /></div>
+            <div className="p-3" aria-busy="true" aria-label="Cargando tráfico"><Skeleton className="h-[420px] w-full" /></div>
           )}
         </section>
 
@@ -152,19 +153,20 @@ export function TrafficPage() {
               </div>
               <div>
                 <h2 className="mb-2 text-sm font-semibold">Tramos más congestionados</h2>
-                <ol className="flex flex-col">
+                <Stagger as="ol" className="flex flex-col" key={`${band.id}-${dayType}`}>
                   {stats.top.map((e) => (
-                    <li key={`${e.from}>${e.to}`} className="flex items-center justify-between gap-3 border-b border-line py-2 text-[13px] last:border-b-0">
+                    <StaggerItem as="li" key={`${e.from}>${e.to}`} className="flex items-center justify-between gap-3 border-b border-line py-2 text-[13px] transition-colors last:border-b-0 hover:bg-hover">
                       <span className="min-w-0 truncate">{names.get(e.from)} → {names.get(e.to)}</span>
-                      <span className="num shrink-0 font-medium" style={{ color: e.multiplier >= 1.5 ? "#9c3f16" : undefined }}>×{e.multiplier.toFixed(2)}</span>
-                    </li>
+                      <span className="num shrink-0 font-medium" style={{ color: e.multiplier >= 1.5 ? "var(--color-delivery)" : undefined }}>×{e.multiplier.toFixed(2)}</span>
+                    </StaggerItem>
                   ))}
-                </ol>
+                </Stagger>
               </div>
             </>
           ) : null}
           {profile.data && !profile.data.calibrated ? <p className="text-[13px] text-ink-2">Esta franja aún no está calibrada: se usa m = 1.</p> : null}
-          <DataSourceNote source={profile.data?.data_source} />
+          <p className="text-xs text-ink-2">Multiplicador m de cada tramo, en cada sentido: tiempo con tráfico = t0 × m.</p>
+          <DataSourceNote source={profile.data?.data_source} alwaysShow />
         </aside>
       </div>
 
@@ -188,7 +190,7 @@ function BestDeparture({ nodes }: { nodes: GraphNode[] }) {
   const worst = data?.reduce((a, b) => (b.minutes > a.minutes ? b : a));
 
   return (
-    <section className="border-t border-line px-6 py-6 lg:px-8" aria-labelledby="best-title">
+    <Reveal className="border-t border-line px-6 py-6 lg:px-8"><section aria-labelledby="best-title">
       <h2 id="best-title" className="text-base font-semibold">¿A qué hora conviene salir?</h2>
       <p className="mt-1 text-[13px] text-ink-2">Tiempo del mismo viaje saliendo a la hora representativa de cada franja.</p>
       <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -200,32 +202,33 @@ function BestDeparture({ nodes }: { nodes: GraphNode[] }) {
         </Field>
         <Field label="Fecha" htmlFor="bd-date">
           <input id="bd-date" type="date" value={date} onChange={(e) => setDate(e.target.value)}
-            className="num h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm" />
+            className="num h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink" />
         </Field>
       </div>
       {query.error ? <div className="mt-4"><ErrorNote error={query.error} /></div> : null}
       {data && best && worst ? (
         <>
-          <p className="mt-4 text-sm">
-            Mejor salida: <b>{best.label}</b> ({formatMinutes(best.minutes)}). En {worst.label.toLowerCase()} tardarías{" "}
-            <b className="num">{formatMinutes(worst.minutes - best.minutes)}</b> más.
+          <p className="mt-4 flex flex-wrap items-center gap-x-2 text-sm">
+            <span className="rounded-md bg-ok/10 px-2 py-0.5 font-medium text-ok">Mejor salida: {best.label} · <span className="num">{formatMinutes(best.minutes)}</span></span>
+            <span className="text-ink-2">En {worst.label.toLowerCase()} tardarías <b className="num text-ink">{formatMinutes(worst.minutes - best.minutes)}</b> más.</span>
           </p>
           <div className="mt-3 h-64 w-full max-w-4xl" role="img" aria-label={`Minutos de viaje por franja: ${data.map((d) => `${d.label} ${Math.round(d.minutes)}`).join(", ")}`}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} margin={{ top: 16, right: 24, bottom: 4, left: 4 }}>
-                <CartesianGrid stroke="#ecece9" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#6b6f76" }} tickLine={false} axisLine={{ stroke: "#d9d9d5" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#6b6f76" }} tickLine={false} axisLine={false} width={56}
+                <CartesianGrid stroke={GRID_STROKE} vertical={false} />
+                <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={AXIS_LINE} />
+                <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={56}
                   tickFormatter={(v: number) => formatMinutes(v)} domain={["dataMin - 10", "dataMax + 10"]} />
                 <Tooltip formatter={(v) => [formatMinutes(Number(v)), "Tiempo de viaje"]}
-                  contentStyle={{ borderRadius: 8, border: "1px solid #ecece9", fontSize: 12 }} />
-                <Line type="monotone" dataKey="minutes" stroke="#111113" strokeWidth={2} dot={{ r: 4, fill: "#111113" }} activeDot={{ r: 6 }} />
-                <ReferenceDot x={best.label} y={best.minutes} r={7} fill="#1a7f4b" stroke="#fff" strokeWidth={2} />
+                  contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL} itemStyle={TOOLTIP_ITEM} />
+                <Line type="monotone" dataKey="minutes" stroke="var(--color-ink)" strokeWidth={2}
+                  dot={{ r: 4, fill: "var(--color-ink)", stroke: "var(--color-surface)", strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                <ReferenceDot x={best.label} y={best.minutes} r={7} fill="var(--color-ok)" stroke="var(--color-surface)" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </>
-      ) : query.isFetching ? <div className="mt-4"><Spinner /></div> : null}
-    </section>
+      ) : query.isFetching ? <Skeleton className="mt-4 h-64 w-full max-w-4xl" /> : null}
+    </section></Reveal>
   );
 }
