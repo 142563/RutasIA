@@ -3,7 +3,7 @@ import * as React from "react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { AnimatedTabs, Skeleton, Stagger, StaggerItem } from "@/components/ui/motion";
-import { EmptyState, ErrorNote, PageHeader } from "@/components/ui/misc";
+import { EmptyState, ErrorNote, PageHeader, StatusDot } from "@/components/ui/misc";
 import { isUnassigned } from "@/lib/assignment";
 import { formatClock, formatKm, formatMinutes } from "@/lib/format";
 import { progressOf, ROUTE_STATUS, useRoutes, type RouteRow, type RouteStatus } from "@/lib/dispatch";
@@ -34,7 +34,21 @@ function RouteLine({ r }: { r: RouteRow }) {
   const dim = r.status === "canceled" || r.status === "completed";
   return (
     <div className={cn("group relative transition-colors hover:bg-hover/60", dim && "text-ink-3")}>
-      <div className={cn(GRID, "px-6 py-3 lg:px-8")}>
+      <div className="space-y-3 p-4 sm:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Link to={`/rutas/${r.id}`} className="num flex min-h-11 min-w-0 items-center break-all text-sm font-medium after:absolute after:inset-0 after:content-['']">{r.code}</Link>
+          <StatusDot color={ROUTE_STATUS[r.status].color}>{r.status_label}</StatusDot>
+        </div>
+        <p className="break-words text-[13px]">{r.driver ?? (unassigned ? "Sin asignar" : "Sin piloto")} · <span className="num">{r.vehicle ?? "Sin camión"}</span></p>
+        <ProgressBar progress={progressOf(r.stops)} />
+        <div className="flex flex-wrap justify-between gap-2 text-[13px]">
+          <span className="num">{formatMinutes(r.driving_minutes)} · {formatKm(r.total_km)}</span>
+          <span className="num text-ink-2">Termina {formatClock(r.finish_at)}</span>
+        </div>
+        <p className="text-xs text-ink-2">{formatWhen(r.departure_at)}</p>
+        <span className="inline-flex min-h-11 items-center gap-2 text-sm font-medium">Ver detalle <ArrowRightIcon className="size-4" /></span>
+      </div>
+      <div className={cn(GRID, "hidden px-6 py-3 sm:grid lg:px-8")}>
         <div className="flex min-w-0 items-center gap-2.5">
           <span
             className={cn("size-2 shrink-0 rounded-full", live && "live-dot")}
@@ -78,7 +92,7 @@ function RouteSkeleton() {
   return (
     <div aria-busy="true" aria-label="Cargando rutas">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className={cn(GRID, "border-b border-line px-6 py-3.5 lg:px-8")}>
+        <div key={i} className={cn(GRID, "hidden border-b border-line px-6 py-3.5 sm:grid lg:px-8")}>
           <Skeleton className="h-8 w-3/4" />
           <Skeleton className="h-8 w-2/3" />
           <Skeleton className="h-3 w-full" />
@@ -88,6 +102,9 @@ function RouteSkeleton() {
           <Skeleton className="ml-auto h-4 w-16" />
         </div>
       ))}
+      <div className="space-y-3 p-4 sm:hidden">
+        {[0, 1, 2].map((i) => <Skeleton key={i} className="h-44 w-full rounded-xl" />)}
+      </div>
     </div>
   );
 }
@@ -119,15 +136,15 @@ export function RoutesPage() {
       <PageHeader
         title="Rutas"
         subtitle="Las últimas 50 rutas planificadas"
-        actions={<Button asChild variant="outline"><Link to="/planificar">Planificar ruta</Link></Button>}
+        actions={<Button asChild variant="outline" className="max-sm:min-h-11"><Link to="/planificar">Planificar ruta</Link></Button>}
       />
 
       <div className="overflow-x-auto px-6 pb-3 pt-2 lg:px-8">
-        <AnimatedTabs id="routes-status" label="Filtrar por estado" value={tab} onChange={setTab} options={options} />
+        <AnimatedTabs id="routes-status" label="Filtrar por estado" value={tab} onChange={setTab} options={options} className="max-sm:[&_button]:min-h-11" />
       </div>
 
       <div className="flex-1 overflow-x-auto border-t border-line">
-        <div className={rows.length > 0 && !routes.isPending ? "min-w-[960px]" : undefined}>
+        <div className={rows.length > 0 && !routes.isPending ? "sm:min-w-[960px]" : undefined}>
           {routes.isPending ? (
             <RouteSkeleton />
           ) : routes.error ? (
@@ -139,7 +156,7 @@ export function RoutesPage() {
             </EmptyState>
           ) : (
             <>
-              <div className={cn(GRID, "border-b border-line px-6 py-2 text-xs text-ink-2 lg:px-8")} aria-hidden>
+              <div className={cn(GRID, "hidden border-b border-line px-6 py-2 text-xs text-ink-2 sm:grid lg:px-8")} aria-hidden>
                 <span>Ruta</span>
                 <span>Piloto y camión</span>
                 <span>Avance</span>

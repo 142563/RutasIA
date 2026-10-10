@@ -37,7 +37,7 @@ function SkeletonRows() {
   return (
     <div aria-busy="true" aria-label="Cargando pedidos">
       {Array.from({ length: 8 }, (_, i) => (
-        <div key={i} className={cn(GRID, "h-14 border-b border-line")}>
+        <div key={i} className={cn(GRID, "hidden h-14 border-b border-line sm:grid")}>
           <Skeleton className="size-4" />
           <div className="space-y-1.5"><Skeleton className="h-3.5 w-32" /><Skeleton className="h-3 w-20" /></div>
           <Skeleton className="h-3.5 w-3/4" />
@@ -47,6 +47,9 @@ function SkeletonRows() {
           <span />
         </div>
       ))}
+      <div className="space-y-3 p-4 sm:hidden">
+        {[0, 1, 2].map((i) => <Skeleton key={i} className="h-36 w-full rounded-xl" />)}
+      </div>
     </div>
   );
 }
@@ -64,7 +67,7 @@ function Detail({ order }: { order: Order }) {
     ["Coordenadas", <span className="num">{order.latitude.toFixed(4)}, {order.longitude.toFixed(4)}</span>],
   ];
   return (
-    <dl className="grid gap-x-8 gap-y-3 pb-4 pl-[60px] pr-6 pt-1 sm:grid-cols-2 lg:grid-cols-3 lg:pl-[68px] lg:pr-8">
+    <dl className="grid gap-x-8 gap-y-3 px-6 pb-4 pt-1 sm:grid-cols-2 sm:pl-[60px] lg:grid-cols-3 lg:pl-[68px] lg:pr-8">
       {items.map(([k, v]) => (
         <div key={k} className="min-w-0">
           <dt className="text-xs text-ink-2">{k}</dt>
@@ -89,7 +92,31 @@ function OrderRow({ order, checked, open, fresh, onToggleCheck, onToggleOpen, on
       transition={{ duration: 0.2, ease: EASE }}
       className={cn("group border-b border-line transition-colors duration-700", fresh && "bg-accent-soft", checked && "bg-hover/70", !fresh && !checked && open && "bg-hover/40")}
     >
-      <div className={cn(GRID, "relative min-h-14 py-2.5 transition-colors hover:bg-hover/50")}>
+      <div className="p-4 sm:hidden">
+        <div className="flex items-start gap-2">
+          <label className="grid min-h-11 min-w-11 shrink-0 place-items-center">
+            <input type="checkbox" className="size-4 accent-ink" aria-label={`Seleccionar ${order.code}`}
+              checked={checked} disabled={!selectable} onChange={onToggleCheck} />
+          </label>
+          <button type="button" onClick={onToggleOpen} aria-expanded={open} className="min-h-11 min-w-0 flex-1 text-left">
+            <span className="block break-words text-sm font-medium">{order.recipient}</span>
+            <span className="num block text-xs text-ink-2">{order.code}</span>
+          </button>
+          <button type="button" onClick={onToggleOpen} aria-expanded={open} aria-label={open ? `Ocultar detalle de ${order.code}` : `Ver detalle de ${order.code}`}
+            className="grid size-11 shrink-0 place-items-center rounded-md text-ink-2 hover:bg-hover">
+            <ChevronRightIcon className={cn("size-4 transition-transform duration-200", open && "rotate-90")} />
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <StatusDot color={STATUS[order.status].color}>{order.status_label}</StatusDot>
+          <span className="num text-[13px]">{order.weight_kg.toLocaleString("es-GT")} kg · {order.package_count} bultos</span>
+        </div>
+        {order.priority === "high" ? <p className="mt-1 text-xs font-medium text-err">Prioridad alta</p> : null}
+        <p className="mt-2 break-words text-[13px] text-ink-3">{order.address}</p>
+        <p className="mt-1 break-words text-xs text-ink-2">{order.region?.name ?? ""} · {createdLabel(order.created_at)}</p>
+        {selectable ? <Button variant="outline" className="mt-3 min-h-11 w-full" onClick={onPlan} aria-label={`Planificar ruta con ${order.code}`}><RouteIcon /> Planificar</Button> : null}
+      </div>
+      <div className={cn(GRID, "relative hidden min-h-14 py-2.5 transition-colors hover:bg-hover/50 sm:grid")}>
         <input type="checkbox" className="size-4 accent-ink" aria-label={`Seleccionar ${order.code}`}
           checked={checked} disabled={!selectable} onChange={onToggleCheck} />
         <button type="button" onClick={onToggleOpen} aria-expanded={open} className="min-w-0 text-left focus-visible:outline-offset-4">
@@ -192,38 +219,46 @@ export function OrdersPage() {
         <PageHeader
           title="Pedidos"
           subtitle={`${counts.pending ?? 0} pendientes de asignar`}
-          actions={<Button onClick={() => setSheetOpen(true)}><PlusIcon /> Nuevo pedido</Button>}
+          actions={<Button className="max-sm:min-h-11" onClick={() => setSheetOpen(true)}><PlusIcon /> Nuevo pedido</Button>}
         />
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-3 lg:px-8">
           <AnimatedTabs id="orders-status" label="Estado" value={tab} onChange={changeTab}
-            className="max-w-full overflow-x-auto"
+            className="max-w-full overflow-x-auto max-sm:[&_button]:min-h-11"
             options={TABS.map((t) => ({
               value: t.value,
               label: <>{t.label}<span className="num text-xs text-ink-2">{counts[t.value] ?? 0}</span></>,
             }))} />
           <div className="flex w-full items-center gap-2 sm:w-auto">
-            <Button variant={byRegion ? "outline" : "ghost"} size="sm" aria-pressed={byRegion} onClick={() => setByRegion((v) => !v)}>
+            <Button variant={byRegion ? "outline" : "ghost"} size="sm" className="max-sm:min-h-11" aria-pressed={byRegion} onClick={() => setByRegion((v) => !v)}>
               <MapPinIcon /> Por región
             </Button>
             <label className="relative w-full sm:w-60">
               <span className="sr-only">Buscar pedidos</span>
               <SearchIcon className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-2" aria-hidden />
-              <Input placeholder="Buscar pedidos" className="h-9 pl-8 text-[13px]" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input placeholder="Buscar pedidos" className="h-9 pl-8 text-[13px] max-sm:min-h-11" value={search} onChange={(e) => setSearch(e.target.value)} />
             </label>
           </div>
         </div>
 
         <div className="flex-1 overflow-x-auto">
           {/* El ancho mínimo solo con filas: así el estado vacío no queda con scroll horizontal */}
-          <div className={rows.length > 0 ? "min-w-[760px]" : undefined}>
+          <div className={rows.length > 0 ? "sm:min-w-[760px]" : undefined}>
             {rows.length > 0 ? (
-              <div className={cn(GRID, "h-9 border-b border-line text-xs text-ink-2")}>
+              <div className={cn(GRID, "hidden h-9 border-b border-line text-xs text-ink-2 sm:grid")}>
                 <input type="checkbox" aria-label="Seleccionar todos los pendientes" className="size-4 accent-ink"
                   checked={allChecked} disabled={allSelectable.length === 0}
                   onChange={() => setSelected(allChecked ? new Set() : new Set(allSelectable.map((o) => o.id)))} />
                 <span>Destinatario</span><span>Dirección</span><span className="text-right">Peso</span><span>Estado</span><span className="text-right">Creado</span><span />
               </div>
+            ) : null}
+            {rows.length > 0 ? (
+              <label className="flex min-h-11 items-center gap-3 border-b border-line px-6 text-sm sm:hidden">
+                <input type="checkbox" aria-label="Seleccionar todos los pendientes" className="size-4 accent-ink"
+                  checked={allChecked} disabled={allSelectable.length === 0}
+                  onChange={() => setSelected(allChecked ? new Set() : new Set(allSelectable.map((o) => o.id)))} />
+                Seleccionar pendientes
+              </label>
             ) : null}
             {orders.isPending ? <SkeletonRows /> : null}
             {orders.error ? <div className="p-6"><ErrorNote error={orders.error} /></div> : null}
@@ -262,7 +297,7 @@ export function OrdersPage() {
                 <span className="num font-medium">{selected.size}</span> seleccionados
                 <span className="num text-ink-2"> · {selectedWeight.toLocaleString("es-GT", { maximumFractionDigits: 1 })} kg</span>
               </p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-sm:[&_button]:min-h-11">
                 <Button variant="ghost" onClick={() => setSelected(new Set())}><XIcon /> Quitar</Button>
                 <Button onClick={() => navigate(`/planificar?pedidos=${[...selected].join(",")}`)}><RouteIcon /> Planificar ruta</Button>
               </div>
