@@ -1,0 +1,14 @@
+{% comment %}
+ Avance del envío, como las mensajerías: Recibido → Programado → En camino → Entregado.
+ Uso: {% include "emails/_steps.html" with current=2 %}  (0..3; con failed=True el último paso dice "No entregado")
+{% endcomment %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 18px">
+  <tr>
+    {% for i in "0123" %}{% with idx=forloop.counter0 %}
+    <td width="25%" valign="top" style="padding:0 2px">
+      <div style="height:6px;border-radius:999px;background:{% if failed and idx == 3 %}#b42318{% elif idx <= current %}#2563eb{% else %}#e4e4e0{% endif %};font-size:0;line-height:0">&nbsp;</div>
+      <p style="margin:8px 0 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.3;font-weight:{% if idx == current %}700{% else %}500{% endif %};color:{% if failed and idx == 3 %}#b42318{% elif idx <= current %}#111113{% else %}#8a8d93{% endif %}">{% if idx == 0 %}Recibido{% elif idx == 1 %}Programado{% elif idx == 2 %}En camino{% elif failed %}No entregado{% else %}Entregado{% endif %}</p>
+    </td>
+    {% endwith %}{% endfor %}
+  </tr>
+</table>

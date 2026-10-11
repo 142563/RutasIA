@@ -24,10 +24,13 @@ def notify_delivered(stop_id: int) -> list[str]:
     if not customer_gets(Event.DELIVERED) or not _reachable(order):
         return []
     subject = f"Tu pedido {order.code} fue entregado"
+    when = format_moment(stop.delivered_at)
+    driver_name = route.driver.name if route.driver else "nuestro conductor"
     html, text = render_email("delivered", {
-        "subject": subject, "recipient": order.recipient or "cliente", "code": order.code,
-        "when": format_moment(stop.delivered_at), "address": order.address,
-        "driver_name": route.driver.name if route.driver else "nuestro conductor",
+        "subject": subject, "status_label": "Entregado", "recipient": order.recipient or "cliente",
+        "code": order.code, "when": when, "address": order.address, "driver_name": driver_name,
+        "details": [("Pedido", order.code), ("Entregado", when), ("Dirección", order.address),
+                    ("Entregó", driver_name)],
         "tracking_url": "",
     })
     return dispatch([Message(

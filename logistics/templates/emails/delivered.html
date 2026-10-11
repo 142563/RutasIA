@@ -1,9 +1,11 @@
 {% extends "emails/base.html" %}
-{% block title %}{{ subject }}{% endblock %}
+{% block preheader %}Tu pedido {{ code }} fue entregado el {{ when }}.{% endblock %}
+{% block accent %}#1a7f4b{% endblock %}
 {% block heading %}Tu pedido fue entregado{% endblock %}
+{% block lead %}Hola {{ recipient }}, tu pedido llegó a su destino. ¡Gracias por tu confianza!{% endblock %}
 {% block body %}
-<p style="margin:0 0 12px">Hola {{ recipient }},</p>
-<p style="margin:0 0 12px">Tu pedido <strong>{{ code }}</strong> fue entregado el {{ when }} en {{ address }}.</p>
-<p style="margin:0">Lo entregó {{ driver_name }}. ¡Gracias por tu confianza!</p>
+{% include "emails/_steps.html" with current=3 %}
+{% include "emails/_details.html" with rows=details %}
 {% endblock %}
-{% block action %}{% if tracking_url %}{% include "emails/_button.html" with url=tracking_url label="Ver el detalle" %}{% endif %}{% endblock %}
+{% block action %}{% if tracking_url %}{% include "emails/_button.html" with url=tracking_url label="Ver el detalle del envío" %}{% endif %}{% endblock %}
+{% block reason %}Recibes este correo porque registraron un envío a tu nombre con este correo.{% endblock %}
