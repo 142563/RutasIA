@@ -30,7 +30,7 @@ export function setUnauthorizedHandler(handler: () => void) {
 
 type Query = Record<string, string | number | boolean | null | undefined>;
 
-export async function api<T>(path: string, options: { method?: string; body?: unknown; query?: Query } = {}): Promise<T> {
+export async function api<T>(path: string, options: { method?: string; body?: unknown; query?: Query; signal?: AbortSignal } = {}): Promise<T> {
   const method = options.method ?? "GET";
   const headers: Record<string, string> = { Accept: "application/json" };
   if (method !== "GET") {
@@ -51,6 +51,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
       method,
       headers,
       credentials: "same-origin",
+      signal: options.signal,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
   } catch {

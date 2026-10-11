@@ -16,6 +16,7 @@ import { BANDS, bandFor, dayTypeFor } from "@/lib/traffic";
 import { trafficLevel } from "@/lib/trafficLevel";
 import { cn } from "@/lib/utils";
 import { useIncidents } from "@/lib/incidents";
+import { useVehicleTracking } from "@/lib/positions";
 import {
   IncidentItem, PresenceList, ProposalItem, ReportIncidentForm, RouteItem, RouteRowSkeleton, RowSkeleton, Section,
 } from "@/pages/monitoring/parts";
@@ -70,6 +71,7 @@ export function HomePage() {
 
   const kpis = dashboard.data;
   const live = monitoring.data;
+  const gps = useVehicleTracking(live?.routes ?? []);
   const step = kpis && live
     ? nextStep({
         pendingOrders: kpis.unassigned_orders,
@@ -215,9 +217,12 @@ export function HomePage() {
           <div className="overflow-hidden rounded-xl border border-line bg-surface p-2 shadow-card">
             {network.data ? (
               <NetworkMap nodes={network.data.nodes} edges={network.data.edges} markers={markers} labels="none"
+                vehicles={gps.vehicles}
                 width={560} height={640} ariaLabel="Mapa de Guatemala con los pedidos pendientes" />
             ) : <Skeleton className="h-[480px] w-full" />}
           </div>
+          <p className="text-xs text-ink-2" role="status">{gps.failed ? "No se pudo actualizar el GPS. Se reintentará." : `${gps.vehicles.length} vehículos con GPS recibido · actualización cada 10 s`}</p>
+          {gps.vehicles.map((vehicle) => <p key={vehicle.id} className="text-xs text-ink-2">{vehicle.label} · último GPS {new Date(vehicle.position.recorded_at).toLocaleString("es-GT")}</p>)}
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1 text-xs text-ink-2">
             <p className="flex flex-wrap gap-x-4 gap-y-1">
               <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-accent" /> Pedido sin ruta</span>

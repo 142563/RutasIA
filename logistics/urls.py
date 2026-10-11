@@ -1,7 +1,7 @@
 from django.urls import path
 from logistics.presentation.csp_views import api_csp_report
 from logistics.presentation import (
-    app_views, assignment_views, dispatch_views, driver_views, fleet_views, incident_views, live_views, orders_views, routing_views,
+    app_views, assignment_views, dispatch_views, driver_views, fleet_views, incident_views, live_views, orders_views, routing_views, position_views,
 )
 from logistics.presentation import notification_views, password_views, tracking_views
 
@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/v2/routes/", orders_views.api_v2_routes, name="api-v2-routes"),
     # Pantallas del despachador: Rutas, Monitoreo, Inicio y Reportes
     path("api/v2/routes/<int:route_id>/", dispatch_views.api_v2_route_detail, name="api-v2-route-detail"),
+    path("api/v2/routes/<int:route_id>/positions/", position_views.api_route_positions, name="api-route-positions"),
     # Asignar, reasignar y cancelar rutas
     path("api/v2/assignment/options/", assignment_views.api_assignment_options, name="api-v2-assignment-options"),
     path("api/v2/routes/<int:route_id>/assign/", assignment_views.api_route_assign, name="api-v2-route-assign"),
@@ -36,6 +37,7 @@ urlpatterns = [
     path("api/v2/reports/", dispatch_views.api_v2_reports, name="api-v2-reports"),
     # Vista del conductor (solo sus rutas)
     path("api/driver/today/", driver_views.api_driver_today, name="api-driver-today"),
+    path("api/driver/position/", position_views.api_driver_position, name="api-driver-position"),
     path("api/driver/routes/<int:route_id>/start/", driver_views.api_driver_route_start, name="api-driver-route-start"),
     path("api/driver/stops/<int:stop_id>/", driver_views.api_driver_stop_update, name="api-driver-stop-update"),
     # Motor de rutas nuevo (grafo nacional con tráfico)
