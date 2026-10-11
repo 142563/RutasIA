@@ -251,7 +251,7 @@ def route_payload(route: Route) -> dict:
         "data_source": route.data_source,
         "stops": [
             {"id": s.id, "sequence": s.sequence, "order_code": s.order.code, "recipient": s.order.recipient,
-             "phone": s.order.phone, "address": s.order.address,
+             "phone": s.order.phone, "address": s.order.address, "reference": s.order.reference,
              "lat": s.order.latitude, "lng": s.order.longitude,
              "node": node_ref(s.order.node), "eta": timezone.localtime(s.eta).isoformat(),
              "status": s.status, "status_label": s.get_status_display(), "reason": s.reason,

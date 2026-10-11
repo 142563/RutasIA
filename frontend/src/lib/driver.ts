@@ -12,6 +12,7 @@ export interface DriverStop {
   recipient: string;
   phone: string;
   address: string;
+  reference?: string;
   lat: number | null;
   lng: number | null;
   node: NodeRef | null;
@@ -43,6 +44,25 @@ export interface DriverToday {
   driver: { id: number; name: string; phone: string };
   date: string;
   routes: DriverRoute[];
+}
+
+/** Lo mínimo para dibujar la ruta propia (RUT-78): tramos por parada, nodos y geometría de sus aristas. */
+export interface DriverRouteMap {
+  route_id: number;
+  legs: { to_sequence: number; nodes: string[] }[];
+  nodes: { code: string; name: string; kind: "cabecera" | "municipio" | "cruce" | ""; lat: number; lng: number }[];
+  edges: { from: string; to: string; polyline: string }[];
+}
+
+export function useDriverRouteMap(routeId: number | undefined) {
+  return useQuery({
+    queryKey: ["driver", "route-map", routeId],
+    queryFn: () => api<DriverRouteMap>(`/api/driver/routes/${routeId}/map/`),
+    enabled: routeId !== undefined,
+    // Un recálculo aceptado cambia los tramos
+    refetchInterval: 60_000,
+    retry: false,
+  });
 }
 
 export const REASONS = ["Cliente ausente", "Dirección incorrecta", "Rechazó el paquete", "Negocio cerrado"] as const;

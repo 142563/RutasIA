@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from logistics.models import Depot, Driver, Order, Route, RouteStop, UserProfile
+from logistics.models import Depot, Driver, Edge, Node, Order, Route, RouteStop, UserProfile
 
 
 def make_user(name, role):
@@ -131,6 +131,30 @@ class DriverApiTests(TestCase):
         self.assertIsNone(route_b.started_at)
         self.assertEqual(stop_b.status, RouteStop.Status.PENDING)
         self.assertEqual(stop_b.order.status, Order.Status.ASSIGNED)
+
+    # --- mapa de la ruta (RUT-78) ---
+    def test_route_map_gives_only_nodes_and_geometry_of_own_route(self):
+        a = Node.objects.create(code="a", name="Alfa", kind="cabecera", department="01", latitude=14.6, longitude=-90.5)
+        b = Node.objects.create(code="b", name="Beta", kind="cabecera", department="01", latitude=14.7, longitude=-90.4)
+        c = Node.objects.create(code="c", name="Gama", kind="cabecera", department="01", latitude=14.8, longitude=-90.3)
+        Edge.objects.create(origin=a, destination=b, distance_km=10, duration_free_min=10, polyline="abc")
+        Edge.objects.create(origin=b, destination=c, distance_km=10, duration_free_min=10, polyline="zzz")
+        route, _ = self.make_route(self.driver_a)
+        route.legs = [{"nodes": ["a", "b"]}]
+        route.save()
+        self.client.force_login(self.user_a)
+        data = self.client.get(reverse("api-driver-route-map", kwargs={"route_id": route.id})).json()
+        self.assertEqual({n["code"] for n in data["nodes"]}, {"a", "b"})
+        self.assertEqual([(e["from"], e["to"], e["polyline"]) for e in data["edges"]], [("a", "b", "abc")])
+        self.assertEqual(data["legs"], [{"to_sequence": 1, "nodes": ["a", "b"]}])
+
+    def test_route_map_is_not_available_to_other_drivers_or_dispatch(self):
+        route_b, _ = self.make_route(self.driver_b)
+        url = reverse("api-driver-route-map", kwargs={"route_id": route_b.id})
+        self.client.force_login(self.user_a)
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.client.force_login(self.dispatcher)
+        self.assertEqual(self.client.get(url).status_code, 403)
 
     def test_dispatcher_cannot_use_driver_endpoints(self):
         route, (stop, _) = self.make_route(self.driver_a)

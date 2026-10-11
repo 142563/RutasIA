@@ -28,6 +28,18 @@ def api_driver_today(request: HttpRequest):
 
 
 @login_required
+@require_GET
+def api_driver_route_map(request: HttpRequest, route_id: int):
+    denied = _require_role(request, UserProfile.Role.DRIVER)
+    if denied:
+        return denied
+    try:
+        return _ok(service.route_map(request.user, route_id))
+    except PlanningError as exc:
+        return _fail(exc)
+
+
+@login_required
 @require_POST
 def api_driver_route_start(request: HttpRequest, route_id: int):
     denied = _require_role(request, UserProfile.Role.DRIVER)
