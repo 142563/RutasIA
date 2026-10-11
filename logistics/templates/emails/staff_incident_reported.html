@@ -1,9 +1,11 @@
 {% extends "emails/base.html" %}
 {% block title %}{{ subject }}{% endblock %}
+{% block preheader %}{{ kind }}{% if blocked %}, tramo bloqueado{% endif %}, reportado por {{ reporter }}.{% endblock %}
+{% block accent %}#ea580c{% endblock %}
 {% block heading %}Incidente reportado{% endblock %}
+{% block lead %}{{ reporter }} reportó un incidente en carretera{% if blocked %} que bloquea el tramo{% endif %}.{% endblock %}
 {% block body %}
-<p style="margin:0 0 12px">{{ reporter }} reportó: <strong>{{ kind }}</strong>{% if blocked %} (tramo bloqueado){% endif %}.</p>
-{% if note %}<p style="margin:0 0 12px">Nota: {{ note }}</p>{% endif %}
-<p style="margin:0">{{ when }}{% if route_code %} · desde la ruta {{ route_code }}{% endif %}{% if affected_routes %} · {{ affected_routes }} ruta{{ affected_routes|pluralize }} con recálculo propuesto{% endif %}.</p>
+{% if note %}<p style="margin:0 0 12px;padding:12px 14px;background:#fff4ec;border-radius:10px;font-size:14px;color:#2b2b30">{{ note }}</p>{% endif %}{% include "emails/_details.html" with rows=details %}
 {% endblock %}
 {% block action %}{% include "emails/_button.html" with url=url label="Abrir enruta" %}{% endblock %}
+{% block reason %}Recibes este correo por tu rol en el equipo de enruta.{% endblock %}

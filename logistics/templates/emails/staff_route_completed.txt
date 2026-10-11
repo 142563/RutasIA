@@ -1,9 +1,12 @@
-{% autoescape off %}{{ driver_name }} terminó la ruta {{ code }}.
+{% autoescape off %}ESTADO: {{ status_label }}
 
-Entregados: {{ delivered }} de {{ total }}. No entregados: {{ failed_count }}.
+{{ driver_name }} terminó la ruta {{ code }}. Este es el resumen.
+
+{% for label, value in details %}{{ label }}: {{ value }}
+{% endfor %}{% if failed %}
+No entregados:
 {% for s in failed %}- {{ s.code }} · {{ s.recipient }}: {{ s.reason }}
-{% endfor %}Tiempo: {% if real_minutes is not None %}{{ real_minutes }} min reales contra {% endif %}{{ estimated_minutes }} min estimados.
-
+{% endfor %}{% endif %}
 Ver el detalle: {{ url }}
 
 enruta{% endautoescape %}

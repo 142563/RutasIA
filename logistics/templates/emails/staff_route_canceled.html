@@ -1,8 +1,11 @@
 {% extends "emails/base.html" %}
 {% block title %}{{ subject }}{% endblock %}
+{% block preheader %}La ruta {{ code }} del {{ day }} ya no va.{% endblock %}
+{% block accent %}#b42318{% endblock %}
 {% block heading %}Se canceló tu ruta{% endblock %}
+{% block lead %}La ruta {{ code }} se canceló. No necesitas hacer nada con ella.{% endblock %}
 {% block body %}
-<p style="margin:0 0 12px">La ruta <strong>{{ code }}</strong> que salía el {{ day }} a las {{ clock }} desde {{ depot }} se canceló.</p>
-<p style="margin:0">No necesitas hacer nada con ella.</p>
+{% include "emails/_details.html" with rows=details %}
 {% endblock %}
 {% block action %}{% include "emails/_button.html" with url=url label="Ver mis rutas" %}{% endblock %}
+{% block reason %}Recibes este correo porque eres conductor en enruta.{% endblock %}

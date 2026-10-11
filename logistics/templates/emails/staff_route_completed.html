@@ -1,10 +1,11 @@
 {% extends "emails/base.html" %}
 {% block title %}{{ subject }}{% endblock %}
+{% block preheader %}{{ delivered }} de {{ total }} entregados{% if failed_count %}, {{ failed_count }} sin entregar{% endif %}.{% endblock %}
+{% block accent %}#1a7f4b{% endblock %}
 {% block heading %}Ruta terminada{% endblock %}
+{% block lead %}{{ driver_name }} terminó la ruta {{ code }}. Este es el resumen.{% endblock %}
 {% block body %}
-<p style="margin:0 0 12px">{{ driver_name }} terminó la ruta <strong>{{ code }}</strong>.</p>
-<p style="margin:0 0 12px">Entregados: {{ delivered }} de {{ total }}. No entregados: {{ failed_count }}.</p>
-{% if failed %}<ul style="margin:0 0 12px;padding-left:18px">{% for s in failed %}<li>{{ s.code }} · {{ s.recipient }}: {{ s.reason }}</li>{% endfor %}</ul>{% endif %}
-<p style="margin:0">Tiempo: {% if real_minutes is not None %}{{ real_minutes }} min reales contra {% endif %}{{ estimated_minutes }} min estimados.</p>
+{% include "emails/_details.html" with rows=details %}{% if failed %}<p style="margin:14px 0 6px;font-size:13px;font-weight:600;color:#b42318">No entregados</p><ul style="margin:0 0 12px;padding-left:18px;font-size:14px">{% for s in failed %}<li style="margin:0 0 4px"><strong>{{ s.code }}</strong> · {{ s.recipient }}: {{ s.reason }}</li>{% endfor %}</ul>{% endif %}
 {% endblock %}
 {% block action %}{% include "emails/_button.html" with url=url label="Ver el detalle" %}{% endblock %}
+{% block reason %}Recibes este correo por tu rol en el equipo de enruta.{% endblock %}

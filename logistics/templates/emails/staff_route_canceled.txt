@@ -1,7 +1,9 @@
-{% autoescape off %}La ruta {{ code }} que salía el {{ day }} a las {{ clock }} desde {{ depot }} se canceló.
+{% autoescape off %}ESTADO: {{ status_label }}
 
-No necesitas hacer nada con ella.
+La ruta {{ code }} se canceló. No necesitas hacer nada con ella.
 
+{% for label, value in details %}{{ label }}: {{ value }}
+{% endfor %}
 Ver mis rutas: {{ url }}
 
 enruta{% endautoescape %}

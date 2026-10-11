@@ -1,9 +1,13 @@
-{% autoescape off %}Hola {{ recipient }},
+{% autoescape off %}ESTADO: {{ status_label }}
 
-Tu pedido {{ code }} llegará el {{ day }}, entre las {{ window_from }} y las {{ window_to }}, en {{ address }}.
+Hola {{ recipient }},
 
-El horario es estimado y puede variar según el tráfico. Te avisaremos cuando salga hacia tu dirección.
-{% if tracking_url %}
+Tu pedido {{ code }} llegará el {{ day }}, entre las {{ window_from }} y las {{ window_to }}. El horario es estimado y puede variar según el tráfico.
+
+Te avisaremos cuando salga hacia tu dirección.
+
+{% for label, value in details %}{{ label }}: {{ value }}
+{% endfor %}{% if tracking_url %}
 Seguir mi pedido: {{ tracking_url }}
 {% endif %}
 enruta{% endautoescape %}
