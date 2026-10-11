@@ -294,6 +294,7 @@ function PlanSummary({ data, variant, criterion, fetching }: { data: PlanRespons
     <div className={cn("flex flex-col gap-5 transition-opacity", fetching && "opacity-60")}>
       <Metric label="Tiempo total de manejo" value={formatMinutes(variant.driving_minutes)} hint={
         <span className={cn(criterion === "time" && saved >= 1 && "font-medium text-ok")}>{hint}</span>} />
+      <p className="num text-sm text-ink-3">+{variant.traffic_minutes.toLocaleString("es-GT", { maximumFractionDigits: 1 })} min por tráfico</p>
       <div className="grid grid-cols-3 gap-4 border-b border-line pb-5">
         <Metric label="Distancia" value={formatKm(variant.total_km)} className="[&>span:nth-child(2)]:text-lg" />
         <Metric label="Paradas" value={variant.stops.length} className="[&>span:nth-child(2)]:text-lg" />

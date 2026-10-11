@@ -87,6 +87,22 @@ class DispatchApiTests(TestCase):
         response = self.client.get(reverse("api-v2-route-detail", args=[9999]))
         self.assertEqual(response.status_code, 404)
 
+    def test_traffic_breakdown_uses_saved_legs_including_return(self):
+        route = self.make_route()
+        route.legs = [{"nodes": ["a", "b"], "minutes": 75, "free_minutes": 50},
+                      {"nodes": ["b", "a"], "minutes": 60, "free_minutes": 40}]
+        route.save(update_fields=["legs"])
+        # Cambiar el grafo no debe reescribir los tiempos históricos de una ruta.
+        self.edge.duration_free_min = 10
+        self.edge.save()
+        data = self.client.get(reverse("api-v2-route-detail", args=[route.id])).json()
+        self.assertEqual(data["route"]["traffic_minutes"], 45)
+
+    def test_legacy_route_has_unknown_traffic_breakdown(self):
+        route = self.make_route()
+        data = self.client.get(reverse("api-v2-route-detail", args=[route.id])).json()
+        self.assertIsNone(data["route"]["traffic_minutes"])
+
     # --- Inicio ---
     def test_dashboard_kpis(self):
         running = self.make_route()

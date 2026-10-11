@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { replaceSession, SESSION_KEY } from "./sessionCache";
 import type { User } from "./types";
 
-const nextUser: User = { id: 2, username: "otro", full_name: "Otro conductor", role: "driver", role_label: "Conductor", driver_id: 2 };
+const nextUser: User = { id: 2, username: "otro", full_name: "Otro conductor", role: "driver", role_label: "Conductor", driver_id: 2, must_change_password: false };
 
 describe("replaceSession", () => {
   it.each([nextUser, null])("elimina datos de consultas y mutaciones antes de establecer %s", async (user) => {

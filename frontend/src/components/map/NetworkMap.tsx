@@ -11,6 +11,10 @@ import { cn } from "@/lib/utils";
 import { pickMarker } from "./markerPick";
 import { api } from "@/lib/api";
 import { concatenateGeometry, type EdgeGeometry } from "@/lib/polyline";
+import { CONGESTION_STEPS, congestionColor } from "@/lib/congestion";
+import { useTrafficProfile } from "@/lib/queries";
+import { bandFor, bandLabel, dayTypeFor } from "@/lib/traffic";
+import { trafficMapEdges } from "@/lib/trafficMap";
 
 /**
  Mapa de la red vial nacional.
@@ -98,15 +102,67 @@ export function NetworkMap(props: NetworkMapProps) {
     const points = concatenateGeometry(path.codes, query.data ?? []);
     if (points) stored.set(pathKey(path.codes), points);
   }
-  if (google.status === "ready") return <GoogleNetworkMap {...props} storedGeometry={stored} geometryReady={!query.isPending || !pairs.length} />;
+  const [trafficVisible, setTrafficVisible] = React.useState(false);
+  const [now, setNow] = React.useState(() => new Date());
+  React.useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const band = bandFor(now);
+  const day = dayTypeFor(now);
+  const profile = useTrafficProfile(band, day);
+  const automatic = !props.renderEdges && !props.edgeStyle;
+  const traffic = automatic ? trafficMapEdges(profile.data, band, day) : null;
+  const byCode = new Map(props.nodes.map((node) => [node.code, node]));
+  const layers = traffic?.length ? {
+    ...props,
+    renderEdges: (toXY: ToXY) => <g strokeLinecap="round">{traffic.map((edge) => {
+      const origin = byCode.get(edge.from);
+      const destination = byCode.get(edge.to);
+      if (!origin || !destination) return null;
+      const [ax, ay] = toXY(origin);
+      const [bx, by] = toXY(destination);
+      const length = Math.hypot(bx - ax, by - ay);
+      if (!length) return null;
+      // Separar sentidos opuestos para que un multiplicador no tape al otro.
+      const dx = -(by - ay) / length * 2.5;
+      const dy = (bx - ax) / length * 2.5;
+      return <line key={`${edge.from}>${edge.to}`} x1={ax + dx} y1={ay + dy} x2={bx + dx} y2={by + dy}
+        stroke={congestionColor(edge.multiplier)} strokeWidth={3}>
+        <title>{origin.name} → {destination.name}: ×{edge.multiplier}</title>
+      </line>;
+    })}</g>,
+  } : props;
   return (
-    <div className={cn("relative flex flex-col", props.fill && "h-full")}>
-      <SchematicMap {...props} storedGeometry={stored} />
-      {google.status === "unavailable" ? (
-        <p className="absolute left-2 top-2 max-w-[calc(100%-1rem)] rounded-md border border-line bg-surface/95 px-2 py-1 text-[11px] text-ink-2">
-          Mapa esquemático · Google Maps no disponible{google.reason ? `: ${google.reason}` : ""}
-        </p>
-      ) : null}
+    <div className={cn("relative flex min-h-0 min-w-0 w-full max-w-full flex-col", props.fill && "h-full")}>
+      <div className={cn("relative flex flex-col", props.fill && "min-h-0 flex-1")}>
+        {google.status === "ready" ? <GoogleNetworkMap {...layers} trafficVisible={trafficVisible} storedGeometry={stored} geometryReady={!query.isPending || !pairs.length} /> : <SchematicMap {...layers} storedGeometry={stored} />}
+        {google.status === "unavailable" ? (
+          <p className="absolute left-2 top-2 max-w-[calc(100%-1rem)] rounded-md border border-line bg-surface/95 px-2 py-1 text-[11px] text-ink-2">
+            Mapa esquemático · Google Maps no disponible{google.reason ? `: ${google.reason}` : ""}
+          </p>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 flex-wrap items-start gap-3 px-2 py-2 text-xs text-ink-3">
+        <button type="button" role="switch" aria-checked={trafficVisible} disabled={google.status !== "ready"}
+          onClick={() => setTrafficVisible((value) => !value)}
+          className="flex min-h-11 items-center gap-2 rounded-md border border-line bg-surface px-3 disabled:opacity-50">
+          <span className={cn("size-2 rounded-full", trafficVisible ? "bg-accent" : "bg-line-strong")} aria-hidden />
+          Tráfico {trafficVisible ? "activado" : "desactivado"}
+        </button>
+        <div className="min-w-0 flex-1 basis-48">
+          <p>Capa de Google: solo visual.{google.status !== "ready" ? " Requiere Google Maps." : ""}</p>
+          {automatic ? <>
+            <p className="mt-1">Nuestro tráfico · {bandLabel(band)}
+              {profile.data?.data_source.traffic.includes("synthetic") ? " · datos de ejemplo" : ""}</p>
+            {traffic?.length ? <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1" aria-label="Leyenda del tráfico por sentido">
+              {CONGESTION_STEPS.map((step) => <li key={step.min} className="flex items-center gap-1.5">
+                <span className="h-1.5 w-5 rounded border border-line-strong" style={{ background: step.color }} aria-hidden />{step.label}
+              </li>)}
+            </ul> : <p className="mt-1">{profile.isPending ? "Cargando tráfico…" : "No hay datos de tráfico para esta franja."}</p>}
+          </> : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -335,7 +391,7 @@ function SchematicMap(props: NetworkMapProps & { storedGeometry: Map<string, Lat
     <svg
       ref={svgRef}
       viewBox={`0 0 ${width} ${height}`}
-      className={cn("h-auto w-full select-none overflow-hidden", props.fill && "min-h-0 flex-1", onPick && "cursor-crosshair", className)}
+      className={cn("h-auto min-w-0 w-full max-w-full select-none overflow-hidden", props.fill && "min-h-0 flex-1", onPick && "cursor-crosshair", className)}
       role="img"
       aria-label={ariaLabel}
       onClick={handleClick}
@@ -349,7 +405,7 @@ function SchematicMap(props: NetworkMapProps & { storedGeometry: Map<string, Lat
 
 const GUATEMALA_CENTER = { lat: 15.6, lng: -90.35 };
 
-function GoogleNetworkMap(props: NetworkMapProps & { storedGeometry: Map<string, LatLng[]>; geometryReady: boolean }) {
+function GoogleNetworkMap(props: NetworkMapProps & { storedGeometry: Map<string, LatLng[]>; geometryReady: boolean; trafficVisible: boolean }) {
   const { nodes, width = 640, height = 720, fitTo, onPick, fill, className, ariaLabel = "Mapa de la red vial de Guatemala" } = props;
   const divRef = React.useRef<HTMLDivElement>(null);
   const { resolved: theme } = useTheme();
@@ -389,6 +445,14 @@ function GoogleNetworkMap(props: NetworkMapProps & { storedGeometry: Map<string,
   React.useEffect(() => {
     map?.setOptions({ styles: mapStyles(theme) });
   }, [map, theme]);
+
+  React.useEffect(() => {
+    if (!map || !props.trafficVisible) return;
+    // Solo mostrar la capa: no consultar ni extraer sus condiciones.
+    const layer = new google.maps.TrafficLayer();
+    layer.setMap(map);
+    return () => layer.setMap(null);
+  }, [map, props.trafficVisible]);
 
   // Clic para elegir un punto (p. ej. la ubicación de un pedido)
   React.useEffect(() => {

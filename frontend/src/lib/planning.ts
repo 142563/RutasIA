@@ -33,6 +33,7 @@ export interface PlanLeg {
 export interface PlanVariant {
   criterion: Criterion;
   driving_minutes: number;
+  traffic_minutes: number;
   total_km: number;
   finish_at: string;
   expanded: number;

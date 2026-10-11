@@ -91,7 +91,7 @@ function RouteMap({ detail }: { detail: RouteDetail }) {
   });
   const fitTo = codes.map((c) => byCode.get(c)).filter((n): n is NonNullable<typeof n> => !!n).map((n) => ({ lat: n.lat, lng: n.lng }));
   return (
-    <section aria-label="Mapa de la ruta">
+    <section aria-label="Mapa de la ruta" className="min-w-0">
       <div className="overflow-hidden rounded-xl border border-line bg-surface p-1.5 shadow-card">
         <NetworkMap nodes={network.data.nodes} edges={network.data.edges} labels="none" width={720} height={560}
           paths={[{ codes, color: "#2f4bd8", width: 4.5, followRoads: true }]} markers={markers} fitTo={fitTo}
@@ -175,6 +175,11 @@ export function RouteDetailPage() {
                 {route.depot} · {formatWhen(route.departure_at)}
                 {route.driver ? <> · {route.driver}{route.vehicle ? ` · ${route.vehicle}` : ""}</> : <> · <span className="font-medium text-warn">Sin piloto</span></>}
               </p>
+              <p className="num mt-1 text-[13px] text-ink-3">
+                {route.traffic_minutes != null
+                  ? `+${route.traffic_minutes.toLocaleString("es-GT", { maximumFractionDigits: 1 })} min por tráfico`
+                  : "Esta ruta no tiene un desglose de tráfico guardado."}
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
               <SummaryStat label="Tiempo de manejo" hint={`Termina ${formatClock(route.finish_at)}`}>
@@ -198,13 +203,13 @@ export function RouteDetailPage() {
         <div className="flex flex-col gap-10 px-6 pb-10 lg:px-8">
           <ProgressBar progress={route.progress} className="max-w-md" />
 
-          <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+          <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
             {/* El mapa manda: va primero en móvil y se queda fijo en escritorio mientras corre la lista */}
-            <div className="flex flex-col gap-3 lg:sticky lg:top-4 lg:order-2">
+            <div className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-4 lg:order-2">
               <RouteMap detail={detail} />
               <DataSourceNote source={parseDataSource(route.data_source)} />
             </div>
-            <div className="lg:order-1"><Timeline detail={detail} /></div>
+            <div className="min-w-0 lg:order-1"><Timeline detail={detail} /></div>
           </div>
 
           <div className="grid gap-x-10 gap-y-8 border-t border-line pt-8 lg:grid-cols-2">

@@ -405,6 +405,7 @@ def recompute_routes(incident: Incident | None = None, now: datetime | None = No
                 "nodes": [graph.codes[n] for n in result.path],
                 "roads": roads_along(graph, result.edges),
                 "minutes": round(minutes, 2),
+                "free_minutes": round(result.total(graph.t0), 2),
                 "km": round(result.total(graph.km), 2),
                 "band": band,
                 "depart_at": clock.isoformat(),
