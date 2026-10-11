@@ -81,6 +81,9 @@ class PlanningApiTests(TestCase):
         self.assertGreaterEqual(route.shortest_minutes, route.driving_minutes - 1e-6)
         self.assertEqual(set(Order.objects.filter(id__in=ids).values_list("status", flat=True)), {"assigned"})
         self.assertIn("edges=estimate", route.data_source)
+        self.assertIsNotNone(response.json()["route"]["traffic_minutes"])
+        self.assertAlmostEqual(response.json()["route"]["traffic_minutes"],
+                               sum(leg["minutes"] - leg["free_minutes"] for leg in route.legs), places=2)
 
         listed = self.client.get(reverse("api-v2-routes")).json()["routes"]
         self.assertEqual(listed[0]["code"], route.code)

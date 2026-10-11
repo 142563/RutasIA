@@ -1,5 +1,17 @@
+/// <reference types="node" />
 import { describe, expect, it } from "vitest";
 import { CONGESTION_STEPS, congestionColor, congestionStep, relativeLuminance } from "./congestion";
+import { readFileSync } from "node:fs";
+
+const css = readFileSync(new URL("../index.css", import.meta.url), "utf8");
+const light = css.split(".dark {")[0];
+const dark = css.split(".dark {")[1].split("@layer base")[0];
+function palette(theme: string) {
+  return CONGESTION_STEPS.map((s) => {
+    const token = s.color.slice(4, -1);
+    return theme.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})`))![1];
+  });
+}
 
 describe("escala de congestión", () => {
   it("asigna el tramo según el multiplicador", () => {
@@ -12,12 +24,19 @@ describe("escala de congestión", () => {
   });
 
   it("es secuencial: la luminosidad baja estrictamente de fluido a muy pesado", () => {
-    const luminances = CONGESTION_STEPS.map((s) => relativeLuminance(s.color));
-    for (let i = 1; i < luminances.length; i++) expect(luminances[i]).toBeLessThan(luminances[i - 1]);
+    for (const theme of [light, dark]) {
+      const luminances = palette(theme).map(relativeLuminance);
+      for (let i = 1; i < luminances.length; i++) expect(luminances[i]).toBeLessThan(luminances[i - 1]);
+    }
   });
 
   it("el tramo más oscuro contrasta al menos 3:1 con el fondo blanco", () => {
-    const darkest = relativeLuminance(CONGESTION_STEPS[CONGESTION_STEPS.length - 1].color);
+    const darkest = relativeLuminance(palette(light).at(-1)!);
     expect((1 + 0.05) / (darkest + 0.05)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("mantiene contraste de los tramos sobre la superficie oscura", () => {
+    const background = relativeLuminance(dark.match(/--color-surface:\s*(#[0-9a-f]{6})/)![1]);
+    for (const color of palette(dark)) expect((relativeLuminance(color) + 0.05) / (background + 0.05)).toBeGreaterThanOrEqual(3);
   });
 });

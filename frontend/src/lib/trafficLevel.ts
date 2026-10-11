@@ -6,7 +6,7 @@ export interface TrafficProfile {
   band: Band;
   day_type: DayType;
   calibrated: boolean;
-  edges: { multiplier: number }[];
+  edges: { from?: string; to?: string; multiplier: number }[];
   data_source: DataSource;
 }
 

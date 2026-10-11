@@ -127,6 +127,7 @@ def _variant_payload(req: dict, plan: MultiStopPlan) -> dict:
             "nodes": [graph.codes[i] for i in leg.search.path],
             "roads": roads_along(graph, leg.search.edges),
             "minutes": round(leg.minutes, 2),
+            "free_minutes": round(leg.search.total(graph.t0), 2),
             "km": round(leg.km, 2),
             "unpaved_km": round(graph.unpaved_km(leg.search.edges), 2),
             "band": leg.band,
@@ -140,6 +141,7 @@ def _variant_payload(req: dict, plan: MultiStopPlan) -> dict:
         # El criterio con el que se trazaron los tramos (la más rápida puede resultar ser la de km)
         "criterion": plan.criterion,
         "driving_minutes": round(plan.driving_minutes, 2),
+        "traffic_minutes": round(sum(leg.minutes - leg.search.total(graph.t0) for leg in plan.legs), 2),
         "total_km": round(plan.total_km, 2),
         "finish_at": plan.finish_at.isoformat(),
         "expanded": plan.expanded,
@@ -239,6 +241,7 @@ def route_payload(route: Route) -> dict:
         "started_at": _local_iso(route.started_at),
         "completed_at": _local_iso(route.completed_at),
         "driving_minutes": round(route.driving_minutes, 2),
+        "traffic_minutes": stored_traffic_minutes(route.legs),
         "total_km": round(route.total_km, 2),
         "minutes_saved": round(route.shortest_minutes - route.driving_minutes, 2) if route.shortest_minutes else None,
         "data_source": route.data_source,
@@ -252,6 +255,13 @@ def route_payload(route: Route) -> dict:
             for s in stops
         ],
     }
+
+
+def stored_traffic_minutes(legs: list[dict]) -> float | None:
+    # Las rutas anteriores no guardaban t0: no reconstruir su historia con el grafo actual.
+    if not legs or any("free_minutes" not in leg for leg in legs):
+        return None
+    return round(sum(max(0, leg["minutes"] - leg["free_minutes"]) for leg in legs), 2)
 
 
 def _local_iso(moment) -> str | None:

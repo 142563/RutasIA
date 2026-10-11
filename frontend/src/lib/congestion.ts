@@ -5,11 +5,11 @@
 */
 
 export const CONGESTION_STEPS: { min: number; color: string; label: string }[] = [
-  { min: 1.0, color: "#f1e2d6", label: "Fluido (×1.0–1.1)" },
-  { min: 1.1, color: "#f3c4ae", label: "Leve (×1.1–1.25)" },
-  { min: 1.25, color: "#e39068", label: "Moderado (×1.25–1.5)" },
-  { min: 1.5, color: "#c45a2c", label: "Pesado (×1.5–1.75)" },
-  { min: 1.75, color: "#7f3412", label: "Muy pesado (×1.75 o más)" },
+  { min: 1.0, color: "var(--color-congestion-0)", label: "Fluido (×1.0–1.1)" },
+  { min: 1.1, color: "var(--color-congestion-1)", label: "Leve (×1.1–1.25)" },
+  { min: 1.25, color: "var(--color-congestion-2)", label: "Moderado (×1.25–1.5)" },
+  { min: 1.5, color: "var(--color-congestion-3)", label: "Pesado (×1.5–1.75)" },
+  { min: 1.75, color: "var(--color-congestion-4)", label: "Muy pesado (×1.75 o más)" },
 ];
 
 export function congestionStep(multiplier: number): number {

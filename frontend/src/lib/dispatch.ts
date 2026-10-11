@@ -60,6 +60,7 @@ export interface RouteRow {
   started_at: string | null;
   completed_at: string | null;
   driving_minutes: number;
+  traffic_minutes: number | null;
   total_km: number;
   minutes_saved: number | null;
   data_source: string;

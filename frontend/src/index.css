@@ -32,6 +32,11 @@
   --color-err: #b42318;
   --color-warn: #b45309;
   --color-traffic: #f3c4ae;
+  --color-congestion-0: #f1e2d6;
+  --color-congestion-1: #f3c4ae;
+  --color-congestion-2: #e39068;
+  --color-congestion-3: #c45a2c;
+  --color-congestion-4: #7f3412;
 
   /* Algoritmos: paleta categórica validada para daltonismo (mismos tonos que las gráficas) */
   --color-dijkstra: #2a78d6;
@@ -63,6 +68,11 @@
   --color-err: #f26b5e;
   --color-warn: #f0a24a;
   --color-traffic: #7a4a36;
+  --color-congestion-0: #fff0e8;
+  --color-congestion-1: #fbcdbb;
+  --color-congestion-2: #f7ac8f;
+  --color-congestion-3: #ef8566;
+  --color-congestion-4: #e26044;
   --color-dijkstra: #5b9bea;
   --color-astar: #f0834f;
 
