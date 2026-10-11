@@ -24,6 +24,8 @@ const TrafficPage = lazy(() => import("@/pages/traffic/TrafficPage").then((m) =>
 const ReportsPage = lazy(() => import("@/pages/reports/ReportsPage").then((m) => ({ default: m.ReportsPage })));
 const SettingsPage = lazy(() => import("@/pages/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 const DriverTodayPage = lazy(() => import("@/pages/driver/DriverTodayPage").then((m) => ({ default: m.DriverTodayPage })));
+const ChangePasswordPage = lazy(() => import("@/pages/account/ChangePasswordPage").then((m) => ({ default: m.ChangePasswordPage })));
+const TrackingPage = lazy(() => import("@/pages/tracking/TrackingPage").then((m) => ({ default: m.TrackingPage })));
 const DriverStopPage = lazy(() => import("@/pages/driver/DriverStopPage").then((m) => ({ default: m.DriverStopPage })));
 
 /** Cada página reserva espacio mientras carga, sin ocultar la navegación. */
@@ -57,6 +59,13 @@ function RequireSession({ roles }: { roles?: Role[] }) {
 
 const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
+  // Público: el cliente final sigue su pedido con el enlace del correo, sin cuenta
+  { path: "/seguimiento/:token", element: <DeferredPage><TrackingPage /></DeferredPage> },
+  {
+    // Cualquier rol con sesión: cambio obligatorio de la contraseña temporal
+    element: <RequireSession />,
+    children: [{ path: "/cambiar-contrasena", element: <DeferredPage><ChangePasswordPage /></DeferredPage> }],
+  },
   {
     element: <RequireSession roles={["admin", "dispatcher"]} />,
     children: [

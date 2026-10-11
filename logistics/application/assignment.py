@@ -15,6 +15,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 
+from logistics.application.notifications import later, on_driver_assigned, on_route_canceled
 from logistics.application.routing import parse_departure
 from logistics.domain.exceptions import PlanningError
 from logistics.models import Driver, Order, Route, Vehicle
@@ -182,6 +183,7 @@ def assign(route_id: int, payload: dict) -> dict:
     start, end = route.departure_at, route.finish_at
     weight = route_weight(route)
     suggested = False
+    previous_driver = route.driver_id
 
     if payload.get("vehicle_id"):
         vehicle = check_vehicle(payload["vehicle_id"], weight, start, end, route.pk)
@@ -202,6 +204,8 @@ def assign(route_id: int, payload: dict) -> dict:
         route.driver = None
 
     route.save(update_fields=["driver", "vehicle", "updated_at"])
+    if route.driver_id and route.driver_id != previous_driver:
+        later(on_driver_assigned, route.id)
     return _response(route, suggested)
 
 
@@ -218,6 +222,7 @@ def cancel(route_id: int, reason: str = "") -> dict:
     reason = (reason or "").strip()[:120]
     route.status = Route.Status.CANCELED
     route.save(update_fields=["status", "updated_at"])
+    later(on_route_canceled, route.id, route.driver_id)
     order_ids = list(route.stops.values_list("order_id", flat=True))
     Order.objects.filter(id__in=order_ids, status=Order.Status.ASSIGNED).update(
         status=Order.Status.PENDING, updated_at=timezone.now())

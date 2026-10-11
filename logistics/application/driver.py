@@ -9,7 +9,9 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from logistics.application.notifications import notify_delivery_safe
+from logistics.application.notifications import (
+    later, on_delivered, on_delivery_failed, on_route_completed, on_route_started,
+)
 from logistics.application.planning import route_payload
 from logistics.domain.exceptions import PlanningError
 from logistics.models import Driver, Order, Route, RouteStop
@@ -62,6 +64,7 @@ def _begin(route: Route) -> None:
     Order.objects.filter(
         route_stops__route=route, route_stops__status=RouteStop.Status.PENDING, status=Order.Status.ASSIGNED,
     ).update(status=Order.Status.IN_TRANSIT, updated_at=now)
+    later(on_route_started, route.id)
 
 
 @transaction.atomic
@@ -107,10 +110,8 @@ def update_stop(user, stop_id: int, payload: dict) -> dict:
         updated_at=now,
     )
 
-    # Solo las entregas exitosas avisan por correo. Si una entrega FALLA por ahora no se
-    # envía nada; aquí se puede agregar luego un aviso de "no pudimos entregar".
-    if status == RouteStop.Status.DELIVERED:
-        transaction.on_commit(lambda: notify_delivery_safe(stop.id))
+    # Avisos por correo después del commit (nunca rompen la entrega)
+    later(on_delivered if status == RouteStop.Status.DELIVERED else on_delivery_failed, stop.id)
 
     if route.status == Route.Status.PLANNED:
         _begin(route)
@@ -118,4 +119,5 @@ def update_stop(user, stop_id: int, payload: dict) -> dict:
         route.status = Route.Status.COMPLETED
         route.completed_at = now
         route.save(update_fields=["status", "completed_at", "updated_at"])
+        later(on_route_completed, route.id)
     return {"route": route_payload(route), "stop_id": stop.id}

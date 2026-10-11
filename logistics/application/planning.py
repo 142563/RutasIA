@@ -15,6 +15,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from logistics.application import assignment
+from logistics.application.notifications import later, on_route_created
 from logistics.application.orders import app_orders, node_ref
 from logistics.application.routing import avoid_unpaved, get_graph, parse_departure, roads_along
 from logistics.domain.exceptions import PlanningError
@@ -219,6 +220,7 @@ def create_route(payload: dict, user) -> dict:
     ])
     Order.objects.filter(id__in=[o.id for o in req["orders"]]).update(
         status=Order.Status.ASSIGNED, updated_at=timezone.now())
+    later(on_route_created, route.id)
     return {"route": route_payload(route)}
 
 

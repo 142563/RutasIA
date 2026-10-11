@@ -1,0 +1,9 @@
+{% autoescape off %}Hola {{ recipient }},
+
+Tu pedido {{ code }} fue entregado el {{ when }} en {{ address }}.
+
+Lo entregó {{ driver_name }}. ¡Gracias por tu confianza!
+{% if tracking_url %}
+Detalle: {{ tracking_url }}
+{% endif %}
+enruta{% endautoescape %}

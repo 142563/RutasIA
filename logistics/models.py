@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import secrets
 import string
 from decimal import Decimal
 from django.contrib.auth.models import User
@@ -61,6 +62,9 @@ class UserProfile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.DISPATCHER)
+    # Cuenta creada con contraseña temporal (enviada por correo): debe cambiarla al entrar (A2, RUT-70)
+    must_change_password = models.BooleanField(default=False)
+    temp_password_expires_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self) -> str:
         return f"{self.user.username} ({self.get_role_display()})"
@@ -156,6 +160,11 @@ class Vehicle(TimestampedModel):
         return f"{self.plate} - {self.model}"
 
 
+def new_tracking_token() -> str:
+    """22 caracteres al azar (128 bits): imposible de adivinar recorriendo códigos."""
+    return secrets.token_urlsafe(16)
+
+
 class Order(TimestampedModel):
     class Status(models.TextChoices):
         PENDING = "pending", "Pendiente"
@@ -187,6 +196,8 @@ class Order(TimestampedModel):
     phone = models.CharField(max_length=30, blank=True)
     # Correo del cliente: se le avisa cuando su pedido es entregado (opcional)
     recipient_email = models.EmailField(blank=True)
+    # Enlace público de seguimiento (/seguimiento/<token>): no adivinable, sin sesión (A3, RUT-71)
+    tracking_token = models.CharField(max_length=32, unique=True, default=new_tracking_token, editable=False)
     address = models.CharField(max_length=255, blank=True)
     reference = models.CharField(max_length=255, blank=True, help_text="Referencias para encontrar la dirección.")
     place_id = models.CharField(max_length=255, blank=True, help_text="Google Places (cuando haya key del navegador).")
@@ -637,3 +648,39 @@ class RerouteProposal(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.route.code}: {self.summary or self.get_status_display()}"
+
+
+class NotificationLog(models.Model):
+    """Bitácora de cada correo: auditoría, "Avisos enviados" en la interfaz y no repetir avisos.
+
+    `dedupe_key` identifica evento + objeto + destinatario: si ya hay uno ENVIADO con esa
+    llave, no se vuelve a mandar. La bienvenida guarda solo el asunto (el cuerpo trae la contraseña).
+    """
+
+    class Status(models.TextChoices):
+        SENT = "sent", "Enviado"
+        FAILED = "failed", "Falló"
+        SKIPPED = "skipped", "Sin enviar"
+
+    class Audience(models.TextChoices):
+        CUSTOMER = "customer", "Cliente"
+        STAFF = "staff", "Personal"
+
+    event = models.CharField(max_length=32)
+    audience = models.CharField(max_length=10, choices=Audience.choices)
+    recipient = models.EmailField(max_length=254)
+    subject = models.CharField(max_length=200, blank=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True, blank=True, related_name="notifications")
+    route = models.ForeignKey(Route, on_delete=models.SET_NULL, null=True, blank=True, related_name="notifications")
+    status = models.CharField(max_length=10, choices=Status.choices)
+    provider_id = models.CharField(max_length=80, blank=True, help_text="Id del correo en Resend.")
+    error = models.CharField(max_length=300, blank=True)
+    dedupe_key = models.CharField(max_length=160, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"{self.event} → {self.recipient} ({self.get_status_display()})"

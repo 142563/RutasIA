@@ -12,6 +12,7 @@ from django.core.validators import validate_email
 from django.db.models import Count, Q
 from django.utils import timezone
 
+from logistics.application.notifications import later, on_order_received
 from logistics.domain.exceptions import PlanningError
 from logistics.domain.regions import region_of
 from logistics.models import GT_LAT_MAX, GT_LAT_MIN, GT_LON_MAX, GT_LON_MIN, Depot, Node, Order
@@ -160,6 +161,7 @@ def create_order(payload: dict) -> dict:
         package_count=packages,
         priority=priority,
     )
+    later(on_order_received, order.id)
     return {"order": order_payload(order)}
 
 

@@ -2,6 +2,7 @@ from django.urls import path
 from logistics.presentation import (
     app_views, assignment_views, dispatch_views, driver_views, fleet_views, incident_views, live_views, orders_views, routing_views,
 )
+from logistics.presentation import notification_views, password_views, tracking_views
 
 urlpatterns = [
     # Sesión y configuración de la aplicación React
@@ -47,4 +48,8 @@ urlpatterns = [
          name="api-traffic-incident-resolve"),
     path("api/reroutes/<int:proposal_id>/decision/", incident_views.api_reroute_decision,
          name="api-reroute-decision"),
+    # Avisos por correo (épica RUT-68): cambio de contraseña, seguimiento público y bitácora
+    path("api/auth/password/", password_views.api_password_change, name="api-auth-password"),
+    path("api/public/tracking/<str:token>/", tracking_views.api_public_tracking, name="api-public-tracking"),
+    path("api/v2/notifications/", notification_views.api_notifications, name="api-v2-notifications"),
 ]

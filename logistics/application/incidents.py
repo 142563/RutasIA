@@ -19,6 +19,9 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from logistics.application.notifications import (
+    later, on_incident_reported, on_reroute_approved, on_reroute_pending,
+)
 from logistics.application.planning import route_payload
 from logistics.application.routing import get_graph, parse_departure, roads_along
 from logistics.domain.exceptions import PlanningError
@@ -286,6 +289,7 @@ def create_incident(payload: dict, user) -> dict:
             note=note, reported_by=user if getattr(user, "is_authenticated", False) else None, route=route,
         )
         incident.edges.set(edges)
+        later(on_incident_reported, incident.id)
         result = recompute_routes(incident=incident, now=max(now, starts_at))
     return {"incident": incident_payload(incident), **result}
 
@@ -422,6 +426,7 @@ def recompute_routes(incident: Incident | None = None, now: datetime | None = No
                 route=route, incident=incident, current_minutes=current_total, proposed_minutes=proposed_total,
                 proposed_legs=new_legs, summary=_summary(graph, legs, new_legs, saved, blocked_now),
             )
+            later(on_reroute_pending, proposal.id)
         summary["proposals"].append(proposal_payload(proposal))
     return summary
 
@@ -463,6 +468,7 @@ def decide_reroute(proposal_id: int, payload: dict, user, role: str) -> dict:
         if decision == "accept":
             _apply_proposal(route, proposal)
             proposal.status = RerouteProposal.Status.ACCEPTED
+            later(on_reroute_approved, proposal.id)
         else:
             proposal.status = RerouteProposal.Status.KEPT
         proposal.decided_by = user
