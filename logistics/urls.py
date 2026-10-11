@@ -1,10 +1,12 @@
 from django.urls import path
+from logistics.presentation.csp_views import api_csp_report
 from logistics.presentation import (
     app_views, assignment_views, dispatch_views, driver_views, fleet_views, incident_views, live_views, orders_views, routing_views,
 )
 from logistics.presentation import notification_views, password_views, tracking_views
 
 urlpatterns = [
+    path("api/csp-report/", api_csp_report, name="api-csp-report"),
     # Sesión y configuración de la aplicación React
     path("api/auth/csrf/", app_views.api_csrf, name="api-auth-csrf"),
     path("api/auth/login/", app_views.api_login, name="api-auth-login"),
