@@ -1,0 +1,8 @@
+{% autoescape off %}{{ reporter }} reportó: {{ kind }}{% if blocked %} (tramo bloqueado){% endif %}.
+
+{% if note %}Nota: {{ note }}
+{% endif %}{{ when }}{% if route_code %} · desde la ruta {{ route_code }}{% endif %}{% if affected_routes %} · {{ affected_routes }} ruta{{ affected_routes|pluralize }} con recálculo propuesto{% endif %}.
+
+Abrir enruta: {{ url }}
+
+enruta{% endautoescape %}

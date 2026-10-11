@@ -1,0 +1,9 @@
+{% extends "emails/base.html" %}
+{% block title %}{{ subject }}{% endblock %}
+{% block heading %}Incidente reportado{% endblock %}
+{% block body %}
+<p style="margin:0 0 12px">{{ reporter }} reportó: <strong>{{ kind }}</strong>{% if blocked %} (tramo bloqueado){% endif %}.</p>
+{% if note %}<p style="margin:0 0 12px">Nota: {{ note }}</p>{% endif %}
+<p style="margin:0">{{ when }}{% if route_code %} · desde la ruta {{ route_code }}{% endif %}{% if affected_routes %} · {{ affected_routes }} ruta{{ affected_routes|pluralize }} con recálculo propuesto{% endif %}.</p>
+{% endblock %}
+{% block action %}{% include "emails/_button.html" with url=url label="Abrir enruta" %}{% endblock %}

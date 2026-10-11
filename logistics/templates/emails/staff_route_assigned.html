@@ -1,0 +1,9 @@
+{% extends "emails/base.html" %}
+{% block title %}{{ subject }}{% endblock %}
+{% block heading %}Tienes una nueva ruta{% endblock %}
+{% block body %}
+<p style="margin:0 0 12px">Se te asignó la ruta <strong>{{ code }}</strong>.</p>
+<p style="margin:0 0 12px">Sale el {{ day }} a las {{ clock }} desde {{ depot }}.</p>
+<p style="margin:0">{{ stops }} parada{{ stops|pluralize }} · {{ km }} km · unos {{ minutes }} min en total.</p>
+{% endblock %}
+{% block action %}{% include "emails/_button.html" with url=url label="Ver mi ruta" %}{% endblock %}

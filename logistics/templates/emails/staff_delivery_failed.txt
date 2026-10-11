@@ -1,0 +1,8 @@
+{% autoescape off %}El pedido {{ order_code }} para {{ recipient }} ({{ address }}) no se entregó.
+
+Motivo: {{ reason }}
+Ruta {{ route_code }} · conductor: {{ driver_name }} · {{ when }}.
+
+Ver la ruta: {{ url }}
+
+enruta{% endautoescape %}

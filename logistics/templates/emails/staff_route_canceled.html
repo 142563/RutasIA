@@ -1,0 +1,8 @@
+{% extends "emails/base.html" %}
+{% block title %}{{ subject }}{% endblock %}
+{% block heading %}Se canceló tu ruta{% endblock %}
+{% block body %}
+<p style="margin:0 0 12px">La ruta <strong>{{ code }}</strong> que salía el {{ day }} a las {{ clock }} desde {{ depot }} se canceló.</p>
+<p style="margin:0">No necesitas hacer nada con ella.</p>
+{% endblock %}
+{% block action %}{% include "emails/_button.html" with url=url label="Ver mis rutas" %}{% endblock %}

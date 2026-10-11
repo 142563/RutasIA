@@ -1,0 +1,9 @@
+{% extends "emails/base.html" %}
+{% block title %}{{ subject }}{% endblock %}
+{% block heading %}Una entrega no se pudo hacer{% endblock %}
+{% block body %}
+<p style="margin:0 0 12px">El pedido <strong>{{ order_code }}</strong> para {{ recipient }} ({{ address }}) no se entregó.</p>
+<p style="margin:0 0 12px">Motivo: {{ reason }}</p>
+<p style="margin:0">Ruta {{ route_code }} · conductor: {{ driver_name }} · {{ when }}.</p>
+{% endblock %}
+{% block action %}{% include "emails/_button.html" with url=url label="Ver la ruta" %}{% endblock %}
