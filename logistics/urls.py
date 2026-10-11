@@ -38,6 +38,7 @@ urlpatterns = [
     # Vista del conductor (solo sus rutas)
     path("api/driver/today/", driver_views.api_driver_today, name="api-driver-today"),
     path("api/driver/position/", position_views.api_driver_position, name="api-driver-position"),
+    path("api/driver/routes/<int:route_id>/map/", driver_views.api_driver_route_map, name="api-driver-route-map"),
     path("api/driver/routes/<int:route_id>/start/", driver_views.api_driver_route_start, name="api-driver-route-start"),
     path("api/driver/stops/<int:stop_id>/", driver_views.api_driver_stop_update, name="api-driver-stop-update"),
     # Motor de rutas nuevo (grafo nacional con tráfico)

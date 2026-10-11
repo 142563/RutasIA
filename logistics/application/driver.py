@@ -14,7 +14,7 @@ from logistics.application.notifications import (
 )
 from logistics.application.planning import route_payload
 from logistics.domain.exceptions import PlanningError
-from logistics.models import Driver, Order, Route, RouteStop
+from logistics.models import Driver, Edge, Node, Order, Route, RouteStop
 
 REASON_MAX = 120
 
@@ -54,6 +54,38 @@ def today_routes(user) -> dict:
         "date": today.isoformat(),
         "routes": [route_payload(r) for r in routes],
     }
+
+
+def route_map(user, route_id: int) -> dict:
+    """Lo mínimo para dibujar la ruta del conductor dentro de la app (RUT-78).
+
+    Solo nodos y geometría de los tramos de SU ruta: las APIs del motor siguen
+    restringidas a despacho (RUT-86). Cada tramo `i` llega a la parada `i + 1`.
+    """
+    driver = driver_for(user)
+    route = _own_routes(driver).filter(pk=route_id).first()
+    if route is None:
+        raise NotFoundError("La ruta no existe.")
+    legs = [
+        {"to_sequence": i + 1, "nodes": [c for c in leg.get("nodes", []) if isinstance(c, str)]}
+        for i, leg in enumerate(route.legs or []) if isinstance(leg, dict)
+    ]
+    codes = {code for leg in legs for code in leg["nodes"]}
+    pairs = {(a, b) for leg in legs for a, b in zip(leg["nodes"], leg["nodes"][1:])}
+    nodes = [
+        {"code": n.code, "name": n.name, "kind": n.kind, "lat": n.latitude, "lng": n.longitude}
+        for n in Node.objects.filter(code__in=codes)
+    ]
+    edges = []
+    if pairs:
+        wanted = Q()
+        for a, b in pairs:
+            wanted |= Q(origin__code=a, destination__code=b)
+        edges = [
+            {"from": e.origin.code, "to": e.destination.code, "polyline": e.polyline}
+            for e in Edge.objects.filter(wanted, is_active=True).select_related("origin", "destination")
+        ]
+    return {"route_id": route.id, "legs": legs, "nodes": nodes, "edges": edges}
 
 
 def _begin(route: Route) -> None:

@@ -27,7 +27,8 @@ const SettingsPage = lazy(() => import("@/pages/settings/SettingsPage").then((m)
 const DriverTodayPage = lazy(() => import("@/pages/driver/DriverTodayPage").then((m) => ({ default: m.DriverTodayPage })));
 const ChangePasswordPage = lazy(() => import("@/pages/account/ChangePasswordPage").then((m) => ({ default: m.ChangePasswordPage })));
 const TrackingPage = lazy(() => import("@/pages/tracking/TrackingPage").then((m) => ({ default: m.TrackingPage })));
-const DriverStopPage = lazy(() => import("@/pages/driver/DriverStopPage").then((m) => ({ default: m.DriverStopPage })));
+const DriverNavigatePage = lazy(() => import("@/pages/driver/DriverNavigatePage").then((m) => ({ default: m.DriverNavigatePage })));
+const DriverStopPage =lazy(() => import("@/pages/driver/DriverStopPage").then((m) => ({ default: m.DriverStopPage })));
 const RoutePrintPage = lazy(() => import("@/pages/routes/RoutePrintPage").then((m) => ({ default: m.RoutePrintPage })));
 
 /** Cada página reserva espacio mientras carga, sin ocultar la navegación. */
@@ -109,6 +110,8 @@ const router = createBrowserRouter([
     element: <RequireSession roles={["driver"]} />,
     children: [
       { path: "/conductor", element: <DeferredPage><DriverTodayPage /></DeferredPage> },
+      { path: "/conductor/navegar", element: <DeferredPage><DriverNavigatePage /></DeferredPage> },
+      { path: "/conductor/navegar/:stopId", element: <DeferredPage><DriverNavigatePage /></DeferredPage> },
       { path: "/conductor/paradas/:stopId", element: <DeferredPage><DriverStopPage /></DeferredPage> },
     ],
   },

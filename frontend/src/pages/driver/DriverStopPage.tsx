@@ -134,7 +134,7 @@ export function DriverStopPage() {
 
         <div className="grid grid-cols-2 gap-3">
           <ActionLink href={tel} icon={<PhoneIcon />} label="Llamar" />
-          <ActionLink href={nav} icon={<NavigationIcon />} label="Navegar" external />
+          <ActionLink href={nav ? `/conductor/navegar/${stop.id}` : null} icon={<NavigationIcon />} label="Navegar" internal />
         </div>
 
         {!pending ? (
@@ -249,7 +249,7 @@ const swap = {
   exit: { opacity: 0, y: -6, transition: { duration: 0.12 } },
 };
 
-function ActionLink({ href, icon, label, external }: { href: string | null; icon: React.ReactNode; label: string; external?: boolean }) {
+function ActionLink({ href, icon, label, internal }: { href: string | null; icon: React.ReactNode; label: string; internal?: boolean }) {
   if (!href) {
     return (
       <Button variant="outline" className="h-14 rounded-xl text-base" disabled>
@@ -260,10 +260,11 @@ function ActionLink({ href, icon, label, external }: { href: string | null; icon
   }
   return (
     <Button asChild variant="outline" className="h-14 rounded-xl text-base">
-      <a href={href} {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
-        {icon}
-        {label}
-      </a>
+      {internal ? (
+        <Link to={href}>{icon}{label}</Link>
+      ) : (
+        <a href={href}>{icon}{label}</a>
+      )}
     </Button>
   );
 }

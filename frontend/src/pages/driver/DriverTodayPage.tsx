@@ -171,10 +171,10 @@ function NextStopCard({ stop, total }: { stop: DriverStop; total: number }) {
       </div>
 
       <div className={cn("grid gap-2.5", nav ? "grid-cols-[1.4fr_1fr]" : "grid-cols-1")}>
-        {/* Un toque para salir manejando: abre Google Maps con el destino */}
+        {/* Un toque para salir manejando: la navegación se queda dentro de enruta (RUT-78) */}
         {nav ? (
           <Button asChild className="h-14 rounded-xl text-base">
-            <a href={nav} target="_blank" rel="noreferrer"><NavigationIcon className="fill-current" aria-hidden /> Navegar</a>
+            <Link to={`/conductor/navegar/${stop.id}`}><NavigationIcon className="fill-current" aria-hidden /> Navegar</Link>
           </Button>
         ) : null}
         <Button asChild variant={nav ? "outline" : "default"} className="h-14 rounded-xl text-base">
