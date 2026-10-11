@@ -12,9 +12,12 @@ def _parse_json(request: HttpRequest) -> dict:
     if not request.body:
         return {}
     try:
-        return json.loads(request.body.decode("utf-8"))
+        payload = json.loads(request.body.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError):
         raise PlanningError("JSON inválido en la solicitud.")
+    if not isinstance(payload, dict):
+        raise PlanningError("JSON inválido en la solicitud: envía un objeto.")
+    return payload
 
 
 def _ok(payload: dict, status: int = 200) -> JsonResponse:

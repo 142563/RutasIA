@@ -61,6 +61,15 @@ class SessionApiTests(TestCase):
         response = self.post("api-auth-login", {"username": "despachador", "password": "clave-segura-123"})
         self.assertEqual(response.status_code, 403)
 
+    def test_login_rejects_non_object_json_without_a_session(self):
+        token = self.csrf_token()
+        for payload in ([], None, 1, True, "texto"):
+            with self.subTest(payload=payload):
+                response = self.post("api-auth-login", payload, token)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("objeto", response.json()["error"])
+                self.assertEqual(self.client.get(reverse("api-auth-session")).status_code, 401)
+
     def test_api_redirect_to_login_becomes_401_json(self):
         response = self.client.get(reverse("api-routing-nodes"))
         self.assertEqual(response.status_code, 401)
@@ -99,6 +108,41 @@ class DemoLoginTests(TestCase):
     def test_demo_login_never_allows_admin(self):
         with self.settings(DEMO_LOGIN=True):
             self.assertEqual(self.post("admin").status_code, 400)
+
+    @override_settings(DEMO_LOGIN=True)
+    def test_demo_login_rejects_promoted_or_missing_role(self):
+        for requested in ("dispatcher", "driver"):
+            account = User.objects.get(username={"dispatcher": "despachador", "driver": "conductor"}[requested])
+            for role in ("admin", "driver" if requested == "dispatcher" else "dispatcher"):
+                with self.subTest(requested=requested, role=role):
+                    UserProfile.objects.filter(user=account).update(role=role)
+                    self.assertEqual(self.post(requested).status_code, 403)
+                    self.assertEqual(self.client.get(reverse("api-auth-session")).status_code, 401)
+            account.profile.delete()
+            self.assertEqual(self.post(requested).status_code, 403)
+
+    @override_settings(DEMO_LOGIN=True)
+    def test_demo_login_rejects_staff_and_superusers(self):
+        account = User.objects.get(username="despachador")
+        for flag in ("is_staff", "is_superuser"):
+            with self.subTest(flag=flag):
+                account.is_staff = flag == "is_staff"
+                account.is_superuser = flag == "is_superuser"
+                account.save()
+                self.assertEqual(self.post("dispatcher").status_code, 403)
+                self.assertEqual(self.client.get(reverse("api-auth-session")).status_code, 401)
+
+    @override_settings(DEMO_LOGIN=True)
+    def test_demo_login_requires_csrf_and_rejects_invalid_json(self):
+        client = Client(enforce_csrf_checks=True)
+        response = client.post(reverse("api-auth-demo"), json.dumps({"role": "dispatcher"}), content_type="application/json")
+        self.assertEqual(response.status_code, 403)
+        client.get(reverse("api-auth-csrf"))
+        for payload in ([], None, 42, True, "texto"):
+            response = client.post(reverse("api-auth-demo"), json.dumps(payload), content_type="application/json",
+                                   HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value)
+            self.assertEqual(response.status_code, 400)
+        self.assertEqual(client.get(reverse("api-auth-session")).status_code, 401)
 
 
 class RoleTests(TestCase):
