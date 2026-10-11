@@ -87,6 +87,12 @@ class PlanningApiTests(TestCase):
 
         listed = self.client.get(reverse("api-v2-routes")).json()["routes"]
         self.assertEqual(listed[0]["code"], route.code)
+        # El mapa dibuja el primer y el último tramo hasta los puntos reales (bodega y pedidos)
+        self.assertEqual(listed[0]["depot_lat"], self.depot.latitude)
+        self.assertEqual(listed[0]["depot_lng"], self.depot.longitude)
+        for stop in listed[0]["stops"]:
+            order = Order.objects.get(code=stop["order_code"])
+            self.assertEqual((stop["lat"], stop["lng"]), (order.latitude, order.longitude))
 
         again = self.plan(ids)
         self.assertEqual(again.status_code, 400)

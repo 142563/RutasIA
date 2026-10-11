@@ -9,7 +9,7 @@ import { ErrorNote, StatusDot } from "@/components/ui/misc";
 import {
   formatDiff, parseDataSource, ROUTE_STATUS, TIMING, useRouteDetail, type RouteDetail, type RouteStopRow,
 } from "@/lib/dispatch";
-import { joinLegNodes } from "@/lib/roads";
+import { joinLegNodes, routeConnectors } from "@/lib/roads";
 import { useNetwork } from "@/lib/queries";
 import { useVehicleTracking } from "@/lib/positions";
 import { formatClock, formatKm, formatMinutes } from "@/lib/format";
@@ -78,6 +78,8 @@ function StopItem({ stop, last, current }: { stop: RouteStopRow; last: boolean; 
   );
 }
 
+const ROUTE_LINE = "#2f4bd8";
+
 /** Mapa de la ruta: el camino lo decidió nuestro A*; Google solo dibuja la carretera entre esos nodos. */
 function RouteMap({ detail }: { detail: RouteDetail }) {
   const network = useNetwork();
@@ -87,17 +89,28 @@ function RouteMap({ detail }: { detail: RouteDetail }) {
   if (!network.data) return <Skeleton className="aspect-[4/3] w-full rounded-xl" />;
   const byCode = new Map(network.data.nodes.map((n) => [n.code, n]));
   const markers: MapMarker[] = [];
+  // El pedido se marca en su punto REAL (no en el nodo más cercano); si no trae coordenadas, en el nodo
   detail.route.stops.forEach((s) => {
     const node = s.node ? byCode.get(s.node.code) : undefined;
-    if (node) markers.push({ id: `s${s.id}`, kind: "stop", lat: node.lat, lng: node.lng, label: String(s.sequence) });
+    const at = s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : node;
+    if (at) markers.push({ id: `s${s.id}`, kind: "stop", lat: at.lat, lng: at.lng, label: String(s.sequence) });
   });
-  const fitTo = codes.map((c) => byCode.get(c)).filter((n): n is NonNullable<typeof n> => !!n).map((n) => ({ lat: n.lat, lng: n.lng }));
+  const depot = detail.route.depot_lat != null && detail.route.depot_lng != null ? { lat: detail.route.depot_lat, lng: detail.route.depot_lng } : null;
+  const connectors = routeConnectors(
+    depot, byCode.get(codes[0]) ?? null,
+    detail.route.stops.map((s) => ({ id: s.id, lat: s.lat ?? null, lng: s.lng ?? null, node: s.node ? byCode.get(s.node.code) ?? null : null })),
+  ).map((c) => ({ ...c, color: ROUTE_LINE }));
+  const stopCodes = detail.route.stops.flatMap((s) => (s.node ? [s.node.code] : []));
+  const fitTo = [
+    ...codes.map((c) => byCode.get(c)).filter((n): n is NonNullable<typeof n> => !!n).map((n) => ({ lat: n.lat, lng: n.lng })),
+    ...markers, ...connectors.map((c) => c.from), ...connectors.map((c) => c.to),
+  ];
   return (
     <section aria-label="Mapa de la ruta" className="min-w-0">
       <div className="overflow-hidden rounded-xl border border-line bg-surface p-1.5 shadow-card">
         <NetworkMap nodes={network.data.nodes} edges={network.data.edges} labels="none" width={720} height={560}
           vehicles={gps.vehicles}
-          paths={[{ codes, color: "#2f4bd8", width: 4.5, followRoads: true }]} markers={markers} fitTo={fitTo}
+          paths={[{ codes, color: ROUTE_LINE, width: 4.5, followRoads: true, stopCodes }]} connectors={connectors} markers={markers} fitTo={fitTo}
           ariaLabel="Mapa de la ruta con sus paradas" />
       </div>
       {detail.route.status === "in_progress" ? <p className="mt-2 text-xs text-ink-2" role="status">{gps.failed ? "No se pudo actualizar el GPS. Se reintentará." : gps.vehicles.length ? `Último GPS ${new Date(gps.vehicles[0].position.recorded_at).toLocaleString("es-GT")} · actualización cada 10 s` : "Esperando que el conductor comparta su ubicación."}</p> : null}
