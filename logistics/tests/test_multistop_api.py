@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
+from logistics.models import UserProfile
 
 from logistics.routing.build import build_estimated, estimated_graph_from_seed
 from logistics.routing.calibration import calibrate_synthetic
@@ -79,6 +80,7 @@ class RoutingApiTests(TestCase):
         build_estimated()
         calibrate_synthetic()
         cls.user = User.objects.create_user(username="despachador", password="clave-de-prueba-123")
+        UserProfile.objects.create(user=cls.user, role=UserProfile.Role.DISPATCHER)
 
     def setUp(self):
         invalidate_graph()  # el grafo en memoria no debe venir de otra prueba

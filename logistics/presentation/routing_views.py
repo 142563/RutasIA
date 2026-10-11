@@ -7,7 +7,10 @@ from django.views.decorators.http import require_GET, require_POST
 
 from logistics.application import routing as service
 from logistics.domain.exceptions import PlanningError
-from logistics.presentation.serializers import _error, _ok, _parse_json
+from logistics.models import UserProfile
+from logistics.presentation.serializers import _error, _ok, _parse_json, _require_role
+
+DISPATCH_ROLES = (UserProfile.Role.ADMIN, UserProfile.Role.DISPATCHER)
 
 
 def _run(use_case, *args):
@@ -20,6 +23,9 @@ def _run(use_case, *args):
 @login_required
 @require_GET
 def api_routing_nodes(request: HttpRequest):
+    denied = _require_role(request, *DISPATCH_ROLES)
+    if denied:
+        return denied
     return _run(service.nodes)
 
 
@@ -27,6 +33,9 @@ def _post(use_case):
     @login_required
     @require_POST
     def view(request: HttpRequest):
+        denied = _require_role(request, *DISPATCH_ROLES)
+        if denied:
+            return denied
         try:
             payload = _parse_json(request)
         except PlanningError as exc:
@@ -46,10 +55,16 @@ api_routes_optimize = _post(service.optimize)
 @login_required
 @require_GET
 def api_routing_best_departure(request: HttpRequest):
+    denied = _require_role(request, *DISPATCH_ROLES)
+    if denied:
+        return denied
     return _run(service.best_departure, request.GET)
 
 
 @login_required
 @require_GET
 def api_traffic_profile(request: HttpRequest):
+    denied = _require_role(request, *DISPATCH_ROLES)
+    if denied:
+        return denied
     return _run(service.traffic_profile, request.GET)
