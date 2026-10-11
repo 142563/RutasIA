@@ -55,6 +55,7 @@ export function useDriverToday() {
     queryFn: () => api<DriverToday>("/api/driver/today/"),
     // El despachador puede reasignar rutas: se refresca al volver a la app
     refetchOnWindowFocus: true,
+    refetchInterval: 10_000,
     retry: false,
   });
 }

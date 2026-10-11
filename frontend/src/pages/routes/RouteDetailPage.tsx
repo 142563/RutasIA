@@ -10,6 +10,7 @@ import {
 } from "@/lib/dispatch";
 import { joinLegNodes } from "@/lib/roads";
 import { useNetwork } from "@/lib/queries";
+import { useVehicleTracking } from "@/lib/positions";
 import { formatClock, formatKm, formatMinutes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AssignmentSection } from "./AssignmentSection";
@@ -79,6 +80,7 @@ function StopItem({ stop, last, current }: { stop: RouteStopRow; last: boolean; 
 /** Mapa de la ruta: el camino lo decidió nuestro A*; Google solo dibuja la carretera entre esos nodos. */
 function RouteMap({ detail }: { detail: RouteDetail }) {
   const network = useNetwork();
+  const gps = useVehicleTracking([detail.route]);
   const codes = React.useMemo(() => joinLegNodes(detail.legs), [detail.legs]);
   if (codes.length < 2) return null;
   if (!network.data) return <Skeleton className="aspect-[4/3] w-full rounded-xl" />;
@@ -93,9 +95,11 @@ function RouteMap({ detail }: { detail: RouteDetail }) {
     <section aria-label="Mapa de la ruta">
       <div className="overflow-hidden rounded-xl border border-line bg-surface p-1.5 shadow-card">
         <NetworkMap nodes={network.data.nodes} edges={network.data.edges} labels="none" width={720} height={560}
+          vehicles={gps.vehicles}
           paths={[{ codes, color: "#2f4bd8", width: 4.5, followRoads: true }]} markers={markers} fitTo={fitTo}
           ariaLabel="Mapa de la ruta con sus paradas" />
       </div>
+      {detail.route.status === "in_progress" ? <p className="mt-2 text-xs text-ink-2" role="status">{gps.failed ? "No se pudo actualizar el GPS. Se reintentará." : gps.vehicles.length ? `Último GPS ${new Date(gps.vehicles[0].position.recorded_at).toLocaleString("es-GT")} · actualización cada 10 s` : "Esperando que el conductor comparta su ubicación."}</p> : null}
     </section>
   );
 }

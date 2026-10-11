@@ -1,6 +1,36 @@
 import { animate, motion, useInView, useReducedMotion, type HTMLMotionProps, type Variants } from "motion/react";
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import type { LatLng } from "@/lib/geo";
+import { interpolatePosition } from "@/lib/positionMath";
+
+/** Movimiento del GPS entre lecturas, sin extrapolar y respetando movimiento reducido. */
+export function useAnimatedPosition(target: LatLng, sampleKey: string): LatLng {
+  const reduce = useReducedMotion();
+  const [point, setPoint] = React.useState(target);
+  const current = React.useRef(target);
+  React.useEffect(() => {
+    const from = current.current;
+    if (reduce) {
+      current.current = target;
+      setPoint(target);
+      return;
+    }
+    const start = performance.now();
+    let frame = 0;
+    function step(now: number) {
+      const progress = Math.min(1, (now - start) / 1200);
+      const next = interpolatePosition(from, target, progress);
+      current.current = next;
+      setPoint(next);
+      if (progress < 1) frame = requestAnimationFrame(step);
+    }
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.lat, target.lng, sampleKey, reduce]);
+  return reduce ? target : point;
+}
 
 /*
  Primitivas de animación compartidas. Reglas (design-system/enruta/MASTER.md):

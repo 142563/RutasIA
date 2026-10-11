@@ -8,6 +8,7 @@ import { useTheme } from "@/lib/theme";
 import type { GraphEdge, GraphNode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { pickMarker } from "./markerPick";
+import { useAnimatedPosition } from "@/components/ui/motion";
 
 /**
  Mapa de la red vial nacional.
@@ -45,7 +46,16 @@ export interface MapMarker extends LatLng {
   label?: string;
 }
 
+export interface MapVehicle {
+  id: string;
+  label: string;
+  position: LatLng & { recorded_at: string };
+  trace?: LatLng[];
+}
+
 export interface NetworkMapProps {
+  /** GPS del vehículo y traza observada: independientes del camino planificado. */
+  vehicles?: MapVehicle[];
   nodes: GraphNode[];
   edges: GraphEdge[];
   width?: number;
@@ -213,6 +223,8 @@ function MapLayers({ props, toXY, opts }: { props: NetworkMapProps; toXY: ToXY; 
 
       {children?.(toXY)}
 
+      {(props.vehicles ?? []).map((vehicle) => <VehicleLayer key={vehicle.id} vehicle={vehicle} toXY={toXY} />)}
+
       {/* Marcadores, distinguibles por forma: bodega (cuadro), parada (círculo numerado),
           pedido (rombo) y punto elegido (anillo). Aparecen con un pop en cascada. */}
       <g fontFamily="var(--font-mono)" fontSize={10} fontWeight={600}>
@@ -280,6 +292,26 @@ function MapLayers({ props, toXY, opts }: { props: NetworkMapProps; toXY: ToXY; 
         );
       })}
     </>
+  );
+}
+
+function VehicleLayer({ vehicle, toXY }: { vehicle: MapVehicle; toXY: ToXY }) {
+  const point = useAnimatedPosition(vehicle.position, vehicle.position.recorded_at);
+  const [x, y] = toXY(point);
+  const points = (vehicle.trace ?? []).map(toXY).map(([a, b]) => `${a},${b}`).join(" ");
+  const title = `${vehicle.label} · Último GPS ${new Date(vehicle.position.recorded_at).toLocaleTimeString("es-GT")}`;
+  return (
+    <g role="img" aria-label={title}>
+      <title>{title}</title>
+      <polyline points={points} fill="none" stroke="var(--color-delivery)" strokeWidth={1.5} strokeOpacity={0.6} />
+      <g transform={`translate(${x},${y})`}>
+        <circle r={14} fill="var(--color-surface)" stroke="var(--color-delivery)" strokeWidth={2} />
+        <path d="M-8 -5H2V5H-8ZM2 -2H6L9 1V5H2" fill="none" stroke="var(--color-delivery)" strokeWidth={1.8} strokeLinejoin="round" />
+        <circle cx={-5} cy={6} r={2} fill="var(--color-delivery)" /><circle cx={6} cy={6} r={2} fill="var(--color-delivery)" />
+        <text x={18} y={4} fontSize={10} fill="var(--color-ink)" stroke="var(--color-surface)" strokeWidth={3}
+          style={{ paintOrder: "stroke" }}>{vehicle.label}</text>
+      </g>
+    </g>
   );
 }
 

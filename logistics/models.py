@@ -118,6 +118,7 @@ class Driver(TimestampedModel):
     name = models.CharField(max_length=120)
     phone = models.CharField(max_length=20, blank=True)
     license_number = models.CharField(max_length=30, unique=True)
+    last_position_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -564,6 +565,35 @@ class RouteStop(models.Model):
 
     def __str__(self) -> str:
         return f"{self.route.code} #{self.sequence} {self.order.code}"
+
+
+class VehiclePosition(models.Model):
+    """Posición reportada durante una ruta en curso, nunca fuera de ella."""
+
+    class Source(models.TextChoices):
+        PHONE = "phone", "Celular"
+        TRACKER = "tracker", "Dispositivo"
+
+    route = models.ForeignKey(Route, on_delete=models.CASCADE, related_name="positions")
+    driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name="positions")
+    lat = models.FloatField()
+    lng = models.FloatField()
+    speed_kmh = models.FloatField(null=True, blank=True)
+    heading = models.FloatField(null=True, blank=True)
+    accuracy_m = models.FloatField(null=True, blank=True)
+    recorded_at = models.DateTimeField(default=timezone.now)
+    source = models.CharField(max_length=7, choices=Source.choices, default=Source.PHONE)
+
+    class Meta:
+        ordering = ["recorded_at", "id"]
+        indexes = [models.Index(fields=["route", "recorded_at"], name="position_route_time")]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(lat__gte=-90, lat__lte=90), name="position_lat_range"),
+            models.CheckConstraint(condition=models.Q(lng__gte=-180, lng__lte=180), name="position_lng_range"),
+            models.CheckConstraint(condition=models.Q(speed_kmh__isnull=True) | models.Q(speed_kmh__gte=0, speed_kmh__lte=300), name="position_speed_range"),
+            models.CheckConstraint(condition=models.Q(heading__isnull=True) | models.Q(heading__gte=0, heading__lt=360), name="position_heading_range"),
+            models.CheckConstraint(condition=models.Q(accuracy_m__isnull=True) | models.Q(accuracy_m__gte=0, accuracy_m__lte=100000), name="position_accuracy_range"),
+        ]
 
 
 class Incident(TimestampedModel):

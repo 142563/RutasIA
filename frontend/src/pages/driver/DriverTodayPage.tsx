@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { AlternativeRouteNotice } from "./AlternativeRouteNotice";
 import { AnimatedCheck, DriverHeader, DriverPage, ProgressBar } from "./parts";
 import { ReportIncident } from "./ReportIncident";
+import { LocationSharing } from "./LocationSharing";
 
 /** Conductor · Mi ruta de hoy (docs/prototipo/Conductor-Hoy.dc.html). Móvil primero, sin AppShell. */
 export function DriverTodayPage() {
@@ -94,6 +95,7 @@ function RouteSection({ route }: { route: DriverRoute }) {
       </Card>
 
       <AlternativeRouteNotice route={route} />
+      <LocationSharing routeId={route.id} active={inProgress} />
 
       {route.status === "planned" ? (
         <Button className="h-14 rounded-xl text-base" onClick={onStart} disabled={start.isPending}>
