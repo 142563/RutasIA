@@ -1,0 +1,10 @@
+{% extends "emails/base.html" %}
+{% block title %}{{ subject }}{% endblock %}
+{% block heading %}Ruta terminada{% endblock %}
+{% block body %}
+<p style="margin:0 0 12px">{{ driver_name }} terminó la ruta <strong>{{ code }}</strong>.</p>
+<p style="margin:0 0 12px">Entregados: {{ delivered }} de {{ total }}. No entregados: {{ failed_count }}.</p>
+{% if failed %}<ul style="margin:0 0 12px;padding-left:18px">{% for s in failed %}<li>{{ s.code }} · {{ s.recipient }}: {{ s.reason }}</li>{% endfor %}</ul>{% endif %}
+<p style="margin:0">Tiempo: {% if real_minutes is not None %}{{ real_minutes }} min reales contra {% endif %}{{ estimated_minutes }} min estimados.</p>
+{% endblock %}
+{% block action %}{% include "emails/_button.html" with url=url label="Ver el detalle" %}{% endblock %}

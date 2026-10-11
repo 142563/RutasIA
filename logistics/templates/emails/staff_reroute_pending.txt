@@ -1,0 +1,8 @@
+{% autoescape off %}En la ruta {{ code }} ({{ driver_name }}) el motor propone otro camino.
+
+{{ summary }}
+Ahorra unos {{ saved }} min respecto a la ruta actual.
+
+Revisar la propuesta: {{ url }}
+
+enruta{% endautoescape %}

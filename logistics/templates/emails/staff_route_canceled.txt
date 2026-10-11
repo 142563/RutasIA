@@ -1,0 +1,7 @@
+{% autoescape off %}La ruta {{ code }} que salía el {{ day }} a las {{ clock }} desde {{ depot }} se canceló.
+
+No necesitas hacer nada con ella.
+
+Ver mis rutas: {{ url }}
+
+enruta{% endautoescape %}

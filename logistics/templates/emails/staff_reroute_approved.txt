@@ -1,0 +1,7 @@
+{% autoescape off %}Se aplicó un cambio en la ruta {{ code }}.
+
+{{ summary }}
+
+Ver mi ruta: {{ url }}
+
+enruta{% endautoescape %}

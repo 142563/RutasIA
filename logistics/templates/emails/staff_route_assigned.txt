@@ -1,0 +1,8 @@
+{% autoescape off %}Se te asignó la ruta {{ code }}.
+
+Sale el {{ day }} a las {{ clock }} desde {{ depot }}.
+{{ stops }} parada{{ stops|pluralize }} · {{ km }} km · unos {{ minutes }} min en total.
+
+Ver mi ruta: {{ url }}
+
+enruta{% endautoescape %}

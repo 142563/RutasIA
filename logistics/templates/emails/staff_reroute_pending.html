@@ -1,0 +1,9 @@
+{% extends "emails/base.html" %}
+{% block title %}{{ subject }}{% endblock %}
+{% block heading %}Hay un recálculo por aprobar{% endblock %}
+{% block body %}
+<p style="margin:0 0 12px">En la ruta <strong>{{ code }}</strong> ({{ driver_name }}) el motor propone otro camino.</p>
+<p style="margin:0 0 12px">{{ summary }}</p>
+<p style="margin:0">Ahorra unos {{ saved }} min respecto a la ruta actual.</p>
+{% endblock %}
+{% block action %}{% include "emails/_button.html" with url=url label="Revisar la propuesta" %}{% endblock %}

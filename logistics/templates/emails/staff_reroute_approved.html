@@ -1,0 +1,8 @@
+{% extends "emails/base.html" %}
+{% block title %}{{ subject }}{% endblock %}
+{% block heading %}Tu ruta cambió{% endblock %}
+{% block body %}
+<p style="margin:0 0 12px">Se aplicó un cambio en la ruta <strong>{{ code }}</strong>.</p>
+<p style="margin:0">{{ summary }}</p>
+{% endblock %}
+{% block action %}{% include "emails/_button.html" with url=url label="Ver mi ruta" %}{% endblock %}

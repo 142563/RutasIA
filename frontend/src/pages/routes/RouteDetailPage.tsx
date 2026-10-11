@@ -3,6 +3,7 @@ import * as React from "react";
 import { Link, useParams } from "react-router";
 import { NetworkMap, type MapMarker } from "@/components/map/NetworkMap";
 import { DataSourceNote } from "@/components/DataSourceNote";
+import { NotificationsSent } from "@/components/NotificationsSent";
 import { AnimatedNumber, Skeleton, Stagger, StaggerItem } from "@/components/ui/motion";
 import { ErrorNote, StatusDot } from "@/components/ui/misc";
 import {
@@ -224,6 +225,7 @@ export function RouteDetailPage() {
                 </ul>
               )}
             </section>
+            <NotificationsSent filter={{ route: route.id }} />
             <section aria-label="Tramos">
               <details className="group">
                 <summary className="mb-3 flex cursor-pointer list-none items-center gap-1.5 text-sm font-semibold">

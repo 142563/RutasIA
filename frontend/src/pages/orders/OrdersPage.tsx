@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ChevronRightIcon, MapPinIcon, PackageIcon, PlusIcon, RouteIcon, SearchIcon, XIcon } from "lucide-react";
 import * as React from "react";
 import { useNavigate } from "react-router";
+import { NotificationsSent } from "@/components/NotificationsSent";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { EmptyState, ErrorNote, PageHeader, StatusDot } from "@/components/ui/misc";
@@ -67,14 +68,17 @@ function Detail({ order }: { order: Order }) {
     ["Coordenadas", <span className="num">{order.latitude.toFixed(4)}, {order.longitude.toFixed(4)}</span>],
   ];
   return (
-    <dl className="grid gap-x-8 gap-y-3 px-6 pb-4 pt-1 sm:grid-cols-2 sm:pl-[60px] lg:grid-cols-3 lg:pl-[68px] lg:pr-8">
-      {items.map(([k, v]) => (
-        <div key={k} className="min-w-0">
-          <dt className="text-xs text-ink-2">{k}</dt>
-          <dd className="mt-0.5 break-words text-[13px] text-ink-3">{v}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className="px-6 pb-4 pt-1 sm:pl-[60px] lg:pl-[68px] lg:pr-8">
+      <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map(([k, v]) => (
+          <div key={k} className="min-w-0">
+            <dt className="text-xs text-ink-2">{k}</dt>
+            <dd className="mt-0.5 break-words text-[13px] text-ink-3">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="mt-4"><NotificationsSent filter={{ order: order.id }} /></div>
+    </div>
   );
 }
 
