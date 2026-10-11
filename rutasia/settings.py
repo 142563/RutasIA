@@ -100,6 +100,8 @@ ALLOWED_HOSTS = _env_list(
     default="127.0.0.1,localhost,testserver,.onrender.com",
 )
 CSRF_TRUSTED_ORIGINS = _env_list("CSRF_TRUSTED_ORIGINS", default="")
+# Vacío ignora X-Forwarded-For; configura únicamente los CIDR de proxies verificados.
+LOGIN_TRUSTED_PROXY_CIDRS = _env_list("LOGIN_TRUSTED_PROXY_CIDRS", default="")
 
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 # AdvancedMarkerElement exige un Map ID. DEMO_MAP_ID funciona para desarrollo;

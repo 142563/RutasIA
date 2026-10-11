@@ -606,6 +606,15 @@ class Incident(TimestampedModel):
         return f"{self.get_kind_display()} ({effect})"
 
 
+class LoginAttempt(models.Model):
+    """Contadores de fallos compartidos; guarda identificadores con HMAC, no credenciales."""
+
+    key = models.CharField(max_length=80, unique=True)
+    failures = models.JSONField(default=list)
+    blocked_until = models.DateTimeField(null=True, blank=True)
+    touched_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+
 class RerouteProposal(TimestampedModel):
     """Ruta alternativa que A* propone a un conductor por un incidente.
 

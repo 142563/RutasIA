@@ -19,9 +19,11 @@ from django.contrib import admin
 from django.urls import include, path, re_path
 
 from logistics.presentation.app_views import spa
+from logistics.presentation.login_views import LimitedLoginView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("accounts/login/", LimitedLoginView.as_view(), name="login"),
     path("accounts/", include("django.contrib.auth.urls")),
     path("", include("logistics.urls")),
     # Aplicación React: cualquier otra ruta la resuelve el router del cliente

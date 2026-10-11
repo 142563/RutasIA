@@ -7,13 +7,14 @@ sesión de Django con su protección CSRF: el cliente pide la cookie en
 from __future__ import annotations
 
 from django.conf import settings
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
 from logistics.domain.exceptions import PlanningError
+from logistics.application.login_limits import LoginRateLimited, authenticate_with_limits
 from logistics.models import UserProfile
 from logistics.presentation.serializers import _error, _ok, _parse_json, role_for
 
@@ -43,9 +44,12 @@ def api_login(request: HttpRequest):
         payload = _parse_json(request)
     except PlanningError as exc:
         return _error(str(exc))
-    user = authenticate(
-        request, username=str(payload.get("username", "")).strip(), password=str(payload.get("password", ""))
-    )
+    try:
+        user = authenticate_with_limits(
+            request, username=str(payload.get("username", "")).strip(), password=str(payload.get("password", ""))
+        )
+    except LoginRateLimited as exc:
+        return _error(str(exc), 429)
     if user is None:
         return _error("Usuario o contraseña incorrectos.", 400)
     login(request, user)
