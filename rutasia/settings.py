@@ -130,6 +130,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "rutasia.csp.ContentSecurityPolicyMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
