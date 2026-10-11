@@ -1,8 +1,9 @@
-{% autoescape off %}El pedido {{ order_code }} para {{ recipient }} ({{ address }}) no se entregó.
+{% autoescape off %}ESTADO: {{ status_label }}
 
-Motivo: {{ reason }}
-Ruta {{ route_code }} · conductor: {{ driver_name }} · {{ when }}.
+El pedido {{ order_code }} no se entregó en la ruta {{ route_code }}. Conviene contactar al cliente para reprogramar.
 
+{% for label, value in details %}{{ label }}: {{ value }}
+{% endfor %}
 Ver la ruta: {{ url }}
 
 enruta{% endautoescape %}

@@ -50,7 +50,10 @@ def notify_route_assigned(route_id: int) -> list[str]:
         "code": route.code, "day": format_day(route.departure_at), "clock": format_clock(route.departure_at),
         "depot": route.depot.name, "stops": stops, "km": round(route.total_km, 1),
         "minutes": round(route.driving_minutes + route.service_min * stops),
-        "url": site_url("conductor"),
+        "url": site_url("conductor"), "status_label": "Nueva ruta",
+        "details": [("Ruta", route.code), ("Salida", f"{format_day(route.departure_at)}, {format_clock(route.departure_at)}"),
+                    ("Desde", route.depot.name), ("Paradas", f"{stops} parada{'' if stops == 1 else 's'}"), ("Distancia", f"{round(route.total_km, 1)} km".replace(".", ",")),
+                    ("Tiempo estimado", f"{round(route.driving_minutes + route.service_min * stops)} min")],
     }, f"route:{route.id}", route=route))
 
 
@@ -65,7 +68,9 @@ def notify_route_canceled(route_id: int, driver_id: int | None) -> list[str]:
     subject = f"Ruta cancelada: {route.code}"
     return dispatch(_messages(Event.ROUTE_CANCELED, users, subject, "staff_route_canceled", {
         "code": route.code, "day": format_day(route.departure_at), "clock": format_clock(route.departure_at),
-        "depot": route.depot.name,
+        "depot": route.depot.name, "url": site_url("conductor"), "status_label": "Cancelada",
+        "details": [("Ruta", route.code), ("Salía", f"{format_day(route.departure_at)}, {format_clock(route.departure_at)}"),
+                    ("Desde", route.depot.name)],
     }, f"route:{route.id}", route=route))
 
 
@@ -82,7 +87,11 @@ def notify_delivery_failed(stop_id: int) -> list[str]:
         "order_code": order.code, "recipient": order.recipient, "address": order.address,
         "reason": stop.reason or "Sin motivo indicado", "route_code": route.code,
         "driver_name": route.driver.name if route.driver else "sin conductor",
-        "when": format_moment(timezone.now()), "url": _route_url(route),
+        "when": format_moment(timezone.now()), "url": _route_url(route), "status_label": "No entregado",
+        "details": [("Pedido", order.code), ("Cliente", order.recipient), ("Dirección", order.address),
+                    ("Motivo", stop.reason or "Sin motivo indicado"), ("Ruta", route.code),
+                    ("Conductor", route.driver.name if route.driver else "sin conductor"),
+                    ("Hora", format_moment(timezone.now()))],
     }, f"stop:{stop.id}", route=route, order_id=order.id))
 
 
@@ -107,7 +116,11 @@ def notify_route_completed(route_id: int) -> list[str]:
         "delivered": len(delivered), "total": len(stops), "failed_count": len(failed),
         "failed": [{"code": s.order.code, "recipient": s.order.recipient, "reason": s.reason or "Sin motivo indicado"}
                    for s in failed],
-        "real_minutes": real, "estimated_minutes": estimated, "url": _route_url(route),
+        "real_minutes": real, "estimated_minutes": estimated, "url": _route_url(route), "status_label": "Terminada",
+        "details": [("Ruta", route.code), ("Conductor", route.driver.name if route.driver else "sin conductor"),
+                    ("Entregados", f"{len(delivered)} de {len(stops)}"), ("No entregados", str(len(failed))),
+                    ("Tiempo", f"{real} min reales contra {estimated} min estimados" if real is not None
+                     else f"{estimated} min estimados")],
     }, f"route:{route.id}", route=route))
 
 
@@ -118,13 +131,18 @@ def notify_incident_reported(incident_id: int) -> list[str]:
         return []
     users = staff_recipients(Event.INCIDENT_REPORTED, route=incident.route)
     kind = incident.get_kind_display()
+    affected = incident.reroutes.values("route_id").distinct().count()
     subject = f"Incidente reportado: {kind}"
     return dispatch(_messages(Event.INCIDENT_REPORTED, users, subject, "staff_incident_reported", {
         "kind": kind, "blocked": incident.blocked, "note": incident.note,
         "reporter": _person(incident.reported_by),
         "route_code": incident.route.code if incident.route else "",
-        "affected_routes": incident.reroutes.values("route_id").distinct().count(),
-        "when": format_moment(incident.starts_at), "url": site_url(""),
+        "affected_routes": affected,
+        "when": format_moment(incident.starts_at), "url": site_url(""), "status_label": "Acción requerida",
+        "details": [("Incidente", kind), ("Tramo", "Tramo bloqueado" if incident.blocked else "Sin bloqueo"),
+                    ("Reportó", _person(incident.reported_by)), ("Hora", format_moment(incident.starts_at))]
+                   + ([("Ruta", incident.route.code)] if incident.route else [])
+                   + ([("Rutas afectadas", str(affected))] if affected else []),
     }, f"incident:{incident.id}", route=incident.route))
 
 
@@ -140,7 +158,10 @@ def notify_reroute_pending(proposal_id: int) -> list[str]:
     return dispatch(_messages(Event.REROUTE_PENDING, users, subject, "staff_reroute_pending", {
         "code": route.code, "summary": proposal.summary or "Hay una ruta alternativa",
         "saved": round(proposal.minutes_saved), "driver_name": route.driver.name if route.driver else "sin conductor",
-        "url": _route_url(route),
+        "url": _route_url(route), "status_label": "Acción requerida",
+        "details": [("Ruta", route.code), ("Conductor", route.driver.name if route.driver else "sin conductor"),
+                    ("Propuesta", proposal.summary or "Hay una ruta alternativa"),
+                    ("Ahorro estimado", f"{round(proposal.minutes_saved)} min")],
     }, f"proposal:{proposal.id}", route=route))
 
 
@@ -154,5 +175,6 @@ def notify_reroute_approved(proposal_id: int) -> list[str]:
     subject = "Tu ruta cambió"
     return dispatch(_messages(Event.REROUTE_APPROVED, users, subject, "staff_reroute_approved", {
         "code": route.code, "summary": proposal.summary or "Se aplicó una ruta alternativa",
-        "url": site_url("conductor"),
+        "url": site_url("conductor"), "status_label": "Ruta actualizada",
+        "details": [("Ruta", route.code), ("Cambio", proposal.summary or "Se aplicó una ruta alternativa")],
     }, f"proposal:{proposal.id}", route=route))

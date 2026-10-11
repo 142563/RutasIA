@@ -1,8 +1,9 @@
-{% autoescape off %}En la ruta {{ code }} ({{ driver_name }}) el motor propone otro camino.
+{% autoescape off %}ESTADO: {{ status_label }}
 
-{{ summary }}
-Ahorra unos {{ saved }} min respecto a la ruta actual.
+En la ruta {{ code }} el motor propone otro camino. No se aplica hasta que lo apruebes.
 
+{% for label, value in details %}{{ label }}: {{ value }}
+{% endfor %}
 Revisar la propuesta: {{ url }}
 
 enruta{% endautoescape %}

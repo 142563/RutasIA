@@ -1,9 +1,11 @@
 {% extends "emails/base.html" %}
 {% block title %}{{ subject }}{% endblock %}
+{% block preheader %}{{ driver_name }} ya va hacia ti. Llegada estimada: {{ window_from }} a {{ window_to }}.{% endblock %}
+{% block accent %}#2563eb{% endblock %}
 {% block heading %}Tu pedido va en camino{% endblock %}
+{% block lead %}Hola {{ recipient }}, tu pedido ya salió. Procura que alguien pueda recibirlo en la dirección indicada.{% endblock %}
 {% block body %}
-<p style="margin:0 0 12px">Hola {{ recipient }},</p>
-<p style="margin:0 0 12px">{{ driver_name }} salió con tu pedido <strong>{{ code }}</strong>. Lo esperamos en {{ address }} entre las <strong>{{ window_from }}</strong> y las <strong>{{ window_to }}</strong>.</p>
-<p style="margin:0">El horario es estimado y puede variar según el tráfico.</p>
+<div style="margin:6px 0 14px;padding:14px 16px;background:#eff4ff;border:1px solid #d6e2ff;border-radius:10px"><p style="margin:0 0 2px;font-size:12px;color:#3f4147;text-transform:uppercase;letter-spacing:0.3px">Llegada estimada</p><p style="margin:0;font-size:18px;font-weight:700;color:#111113">Entre {{ window_from }} y {{ window_to }}</p><p style="margin:2px 0 0;font-size:13px;color:#3f4147">El horario puede variar según el tráfico</p></div>{% include "emails/_steps.html" with current=2 %}{% include "emails/_details.html" with rows=details %}
 {% endblock %}
 {% block action %}{% if tracking_url %}{% include "emails/_button.html" with url=tracking_url label="Seguir mi pedido" %}{% endif %}{% endblock %}
+{% block reason %}Recibes este correo porque registraron un envío a tu nombre con este correo.{% endblock %}

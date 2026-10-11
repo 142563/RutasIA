@@ -76,7 +76,8 @@ def notify_order_received(order_id: int) -> list[str]:
     count = order.package_count
     return dispatch([_message(
         Event.ORDER_RECEIVED, order, None, f"Recibimos tu pedido {order.code}", "order_received",
-        {"packages": f"{count} bulto" if count == 1 else f"{count} bultos"})])
+        {"packages": f"{count} bulto" if count == 1 else f"{count} bultos", "status_label": "Recibido",
+         "details": [("Pedido", order.code), ("Bultos", f"{count}"), ("Dirección", order.address)]})])
 
 
 def _route_stops(route_id: int, only_pending: bool = False) -> list[RouteStop]:
@@ -86,13 +87,21 @@ def _route_stops(route_id: int, only_pending: bool = False) -> list[RouteStop]:
     return [s for s in stops if _reachable(s.order)]
 
 
+def _scheduled_context(s: RouteStop) -> dict:
+    window = _window(s.eta)
+    day = format_day(s.eta)
+    return {"day": day, **window, "status_label": "Programado", "details": [
+        ("Pedido", s.order.code), ("Llegada estimada", f"{day}, {window['window_from']} a {window['window_to']}"),
+        ("Dirección", s.order.address)]}
+
+
 def notify_route_scheduled(route_id: int) -> list[str]:
     """Ruta creada → a cada cliente: el día y la ventana estimada de llegada (un solo envío en lote)."""
     if not customer_gets(Event.ROUTE_ASSIGNED):
         return []
     messages = [
         _message(Event.ROUTE_ASSIGNED, s.order, route_id, f"Tu pedido {s.order.code} llegará el {format_day(s.eta)}",
-                 "route_scheduled", {"day": format_day(s.eta), **_window(s.eta)}, with_route_key=True)
+                 "route_scheduled", _scheduled_context(s), with_route_key=True)
         for s in _route_stops(route_id)
     ]
     return dispatch(messages)
@@ -105,10 +114,13 @@ def notify_route_started(route_id: int) -> list[str]:
     messages = []
     for s in _route_stops(route_id, only_pending=True):
         driver = s.route.driver
+        window = _window(s.eta)
         first_name = driver.name.split()[0] if driver and driver.name.strip() else "Nuestro conductor"
         messages.append(_message(
             Event.ROUTE_STARTED, s.order, route_id, f"Tu pedido {s.order.code} va en camino", "route_started",
-            {"driver_name": first_name, **_window(s.eta)}, with_route_key=True))
+            {"driver_name": first_name, **window, "status_label": "En camino", "details": [
+                ("Pedido", s.order.code), ("Llegada estimada", f"{window['window_from']} a {window['window_to']}"),
+                ("Conductor", first_name), ("Dirección", s.order.address)]}, with_route_key=True))
     return dispatch(messages)
 
 
@@ -120,6 +132,8 @@ def notify_delivery_failed(stop_id: int) -> list[str]:
     order = stop.order
     if not customer_gets(Event.DELIVERY_FAILED) or not _reachable(order):
         return []
+    reason = (stop.reason or "no se pudo completar la entrega").rstrip(". ")
     return dispatch([_message(
         Event.DELIVERY_FAILED, order, stop.route_id, f"No pudimos entregar tu pedido {order.code}",
-        "delivery_failed", {"reason": (stop.reason or "no se pudo completar la entrega").rstrip(". ")})])
+        "delivery_failed", {"reason": reason, "status_label": "No entregado", "details": [
+            ("Pedido", order.code), ("Dirección", order.address), ("Motivo", reason)]})])

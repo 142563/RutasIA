@@ -1,10 +1,11 @@
 {% extends "emails/base.html" %}
 {% block title %}{{ subject }}{% endblock %}
+{% block preheader %}No pudimos entregarlo; nos pondremos en contacto para reprogramar.{% endblock %}
+{% block accent %}#b42318{% endblock %}
 {% block heading %}No pudimos entregar tu pedido{% endblock %}
+{% block lead %}Hola {{ recipient }}, lamentamos avisarte que la entrega no se pudo completar. Nos pondremos en contacto contigo para reprogramarla.{% endblock %}
 {% block body %}
-<p style="margin:0 0 12px">Hola {{ recipient }},</p>
-<p style="margin:0 0 12px">Lamentamos avisarte que no pudimos entregar tu pedido <strong>{{ code }}</strong> en {{ address }}.</p>
-<p style="margin:0 0 12px">Motivo: {{ reason }}.</p>
-<p style="margin:0">Nos pondremos en contacto contigo para reprogramar la entrega. Disculpa las molestias.</p>
+{% include "emails/_steps.html" with current=3 failed=True %}{% include "emails/_details.html" with rows=details %}
 {% endblock %}
 {% block action %}{% if tracking_url %}{% include "emails/_button.html" with url=tracking_url label="Seguir mi pedido" %}{% endif %}{% endblock %}
+{% block reason %}Recibes este correo porque registraron un envío a tu nombre con este correo.{% endblock %}

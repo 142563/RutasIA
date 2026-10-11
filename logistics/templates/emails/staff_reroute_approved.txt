@@ -1,7 +1,9 @@
-{% autoescape off %}Se aplicó un cambio en la ruta {{ code }}.
+{% autoescape off %}ESTADO: {{ status_label }}
 
-{{ summary }}
+Se aplicó un cambio en la ruta {{ code }}. Revísala antes de continuar.
 
+{% for label, value in details %}{{ label }}: {{ value }}
+{% endfor %}
 Ver mi ruta: {{ url }}
 
 enruta{% endautoescape %}

@@ -1,8 +1,9 @@
-{% autoescape off %}Se te asignó la ruta {{ code }}.
+{% autoescape off %}ESTADO: {{ status_label }}
 
-Sale el {{ day }} a las {{ clock }} desde {{ depot }}.
-{{ stops }} parada{{ stops|pluralize }} · {{ km }} km · unos {{ minutes }} min en total.
+Se te asignó la ruta {{ code }}. Revisa la salida y las paradas antes de salir.
 
+{% for label, value in details %}{{ label }}: {{ value }}
+{% endfor %}
 Ver mi ruta: {{ url }}
 
 enruta{% endautoescape %}

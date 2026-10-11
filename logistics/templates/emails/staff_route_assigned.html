@@ -1,9 +1,11 @@
 {% extends "emails/base.html" %}
 {% block title %}{{ subject }}{% endblock %}
+{% block preheader %}Sales el {{ day }} a las {{ clock }} desde {{ depot }}.{% endblock %}
+{% block accent %}#2563eb{% endblock %}
 {% block heading %}Tienes una nueva ruta{% endblock %}
+{% block lead %}Se te asignó la ruta {{ code }}. Revisa la salida y las paradas antes de salir.{% endblock %}
 {% block body %}
-<p style="margin:0 0 12px">Se te asignó la ruta <strong>{{ code }}</strong>.</p>
-<p style="margin:0 0 12px">Sale el {{ day }} a las {{ clock }} desde {{ depot }}.</p>
-<p style="margin:0">{{ stops }} parada{{ stops|pluralize }} · {{ km }} km · unos {{ minutes }} min en total.</p>
+{% include "emails/_details.html" with rows=details %}
 {% endblock %}
 {% block action %}{% include "emails/_button.html" with url=url label="Ver mi ruta" %}{% endblock %}
+{% block reason %}Recibes este correo porque eres conductor en enruta.{% endblock %}

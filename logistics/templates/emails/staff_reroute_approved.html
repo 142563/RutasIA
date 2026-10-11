@@ -1,8 +1,11 @@
 {% extends "emails/base.html" %}
 {% block title %}{{ subject }}{% endblock %}
+{% block preheader %}{{ summary }}{% endblock %}
+{% block accent %}#2563eb{% endblock %}
 {% block heading %}Tu ruta cambió{% endblock %}
+{% block lead %}Se aplicó un cambio en la ruta {{ code }}. Revísala antes de continuar.{% endblock %}
 {% block body %}
-<p style="margin:0 0 12px">Se aplicó un cambio en la ruta <strong>{{ code }}</strong>.</p>
-<p style="margin:0">{{ summary }}</p>
+{% include "emails/_details.html" with rows=details %}
 {% endblock %}
 {% block action %}{% include "emails/_button.html" with url=url label="Ver mi ruta" %}{% endblock %}
+{% block reason %}Recibes este correo porque eres conductor en enruta.{% endblock %}

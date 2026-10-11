@@ -1,9 +1,11 @@
-{% autoescape off %}Hola {{ recipient }},
+{% autoescape off %}ESTADO: {{ status_label }}
 
-Recibimos tu pedido {{ code }} ({{ packages }}) para entregarlo en {{ address }}.
+Hola {{ recipient }},
 
-Te avisaremos por este medio cuando tenga fecha de entrega.
-{% if tracking_url %}
+Ya registramos tu pedido {{ code }} ({{ packages }}) y lo estamos preparando. Te avisaremos apenas tenga fecha de entrega.
+
+{% for label, value in details %}{{ label }}: {{ value }}
+{% endfor %}{% if tracking_url %}
 Seguir mi pedido: {{ tracking_url }}
 {% endif %}
 enruta{% endautoescape %}
