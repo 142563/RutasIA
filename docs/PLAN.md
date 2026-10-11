@@ -503,3 +503,18 @@ Correo transaccional con Resend desde `enruta.world`. El **rol decide qué corre
 ### 14.3 Cómo trabajamos con Codex
 
 Las tarjetas con etiqueta **Codex** en el kanban traen su contexto completo. Codex trabaja en `codex/rut-<n>` desde `main` y deja la tarjeta en **"En revision"**; Claude (Opus) revisa, prueba, integra a `main` y la pasa a Hecho.
+
+---
+
+## 15. Seguridad (prioridad desde 2026-10-11, épica RUT-84)
+
+Es lo primero que pregunta un ingeniero en la defensa, así que se trata como requisito y no como extra. El documento vivo es **`docs/SEGURIDAD.md`**: arriba trae un resumen por capas (acceso, peticiones, transporte, secretos, datos, dependencias, infraestructura, operación) con el estado de cada medida, y abajo la auditoría técnica de Codex.
+
+Reglas para todo cambio (Claude, subagentes y Codex):
+- Roles verificados en el **backend**; nunca confiar en lo que oculta el frontend.
+- Ningún secreto en Git ni en el chat; llaves solo en variables de entorno y restringidas.
+- Datos mínimos hacia afuera (el seguimiento público no muestra teléfonos, direcciones completas ni coordenadas).
+- Ninguna contraseña ni cuerpo de correo en logs o bitácoras.
+- Si un cambio toca algo de seguridad, actualiza la tabla de `docs/SEGURIDAD.md` en el mismo commit.
+
+Pendientes priorizados: límite de intentos de login (RUT-85), permisos por rol en el motor (RUT-86), CSP (RUT-87), auditoría (RUT-88), privacidad (RUT-89), respaldos (RUT-90), cuentas de proveedores con 2FA y alertas de gasto (RUT-91), monitoreo (RUT-92), además de RUT-65/66/67 y la separación de bases (RUT-38).

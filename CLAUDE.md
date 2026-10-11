@@ -77,6 +77,8 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
   - Animaciones con Motion vía `src/components/ui/motion.tsx`, respetando "reducir movimiento".
   - Skill de diseño instalada: `.claude/skills/ui-ux-pro-max` (úsala para decisiones de UI).
 - Nunca commitear `.env`, keys ni la `DATABASE_URL`. Usa `.env.example` como plantilla.
+- **Seguridad (prioridad, §15 de `docs/PLAN.md`):** roles verificados en el backend, datos mínimos hacia afuera, nada de contraseñas ni cuerpos de correo en logs. Todo cambio que toque seguridad actualiza la tabla de `docs/SEGURIDAD.md` en el mismo commit.
 - Rama de trabajo: `dev`. **Mientras no haya deploy a producción, se trabaja directo en `dev`, sin pull requests**: pruebas en verde → commit → push a `dev`. Cuando el proyecto esté en producción, cada funcionalidad irá en su rama desde `dev` con PR hacia `dev`. `main` = lo que está en producción.
 - Antes de hacer commit: `python manage.py test` en verde (con `DATABASE_URL=` vacío para usar SQLite).
-- **Codex** también trabaja en el repo: tarjetas con etiqueta Codex en el kanban, rama `codex/rut-<n>` desde `main`, nunca merge directo; la tarjeta queda en "En revision" y Claude integra.
+- **Codex** también trabaja en el repo, en su propia copia (nunca en la carpeta de Claude): tarjetas con etiqueta Codex en el kanban, rama `codex/rut-<n>` desde `main`, nunca merge directo; la tarjeta queda en "En revision" y Claude integra.
+- **Push:** todo se integra con commit a `main`, pero **nadie hace push sin permiso de Julio** (Render despliega cada push a producción).
