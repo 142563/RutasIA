@@ -2,8 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
 import { api, ApiError } from "./api";
 import type { Role, User } from "./types";
-
-const SESSION_KEY = ["session"];
+import { replaceSession, SESSION_KEY } from "./sessionCache";
 
 async function fetchSession(): Promise<User | null> {
   try {
@@ -24,7 +23,7 @@ export function useLogin() {
   return useMutation({
     mutationFn: (credentials: { username: string; password: string }) =>
       api<{ user: User }>("/api/auth/login/", { method: "POST", body: credentials }),
-    onSuccess: (data) => client.setQueryData(SESSION_KEY, data.user),
+    onSuccess: (data) => replaceSession(client, data.user),
   });
 }
 
@@ -33,7 +32,7 @@ export function useDemoLogin() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (role: "dispatcher" | "driver") => api<{ user: User }>("/api/auth/demo/", { method: "POST", body: { role } }),
-    onSuccess: (data) => client.setQueryData(SESSION_KEY, data.user),
+    onSuccess: (data) => replaceSession(client, data.user),
   });
 }
 
@@ -41,10 +40,7 @@ export function useLogout() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: () => api("/api/auth/logout/", { method: "POST", body: {} }),
-    onSettled: () => {
-      client.clear();
-      client.setQueryData(SESSION_KEY, null);
-    },
+    onSettled: () => replaceSession(client, null),
   });
 }
 

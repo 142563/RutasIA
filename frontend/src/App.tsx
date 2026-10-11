@@ -7,6 +7,7 @@ import { ErrorNote, Spinner } from "@/components/ui/misc";
 import { setUnauthorizedHandler } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { UserContext, homeFor, useSession } from "@/lib/auth";
+import { replaceSession } from "@/lib/sessionCache";
 import type { Role } from "@/lib/types";
 import { DriverStopPage } from "@/pages/driver/DriverStopPage";
 import { DriverTodayPage } from "@/pages/driver/DriverTodayPage";
@@ -87,7 +88,7 @@ const router = createBrowserRouter([
 ]);
 
 setUnauthorizedHandler(() => {
-  queryClient.setQueryData(["session"], null);
+  replaceSession(queryClient, null);
 });
 
 export function App() {
