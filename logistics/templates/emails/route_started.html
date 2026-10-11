@@ -1,0 +1,9 @@
+{% extends "emails/base.html" %}
+{% block title %}{{ subject }}{% endblock %}
+{% block heading %}Tu pedido va en camino{% endblock %}
+{% block body %}
+<p style="margin:0 0 12px">Hola {{ recipient }},</p>
+<p style="margin:0 0 12px">{{ driver_name }} salió con tu pedido <strong>{{ code }}</strong>. Lo esperamos en {{ address }} entre las <strong>{{ window_from }}</strong> y las <strong>{{ window_to }}</strong>.</p>
+<p style="margin:0">El horario es estimado y puede variar según el tráfico.</p>
+{% endblock %}
+{% block action %}{% if tracking_url %}{% include "emails/_button.html" with url=tracking_url label="Seguir mi pedido" %}{% endif %}{% endblock %}

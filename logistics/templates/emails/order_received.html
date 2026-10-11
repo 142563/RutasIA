@@ -1,0 +1,9 @@
+{% extends "emails/base.html" %}
+{% block title %}{{ subject }}{% endblock %}
+{% block heading %}Recibimos tu pedido{% endblock %}
+{% block body %}
+<p style="margin:0 0 12px">Hola {{ recipient }},</p>
+<p style="margin:0 0 12px">Recibimos tu pedido <strong>{{ code }}</strong> ({{ packages }}) para entregarlo en {{ address }}.</p>
+<p style="margin:0">Te avisaremos por este medio cuando tenga fecha de entrega. Mientras tanto, puedes ver su estado en cualquier momento.</p>
+{% endblock %}
+{% block action %}{% if tracking_url %}{% include "emails/_button.html" with url=tracking_url label="Seguir mi pedido" %}{% endif %}{% endblock %}

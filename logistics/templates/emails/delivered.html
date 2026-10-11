@@ -7,5 +7,5 @@
 {% include "emails/_steps.html" with current=3 %}
 {% include "emails/_details.html" with rows=details %}
 {% endblock %}
-{% block action %}{% if tracking_url %}{% include "emails/_button.html" with url=tracking_url label="Ver el detalle del envío" %}{% endif %}{% endblock %}
+{% block action %}{% if tracking_url %}{% include "emails/_button.html" with url=tracking_url label="Seguir mi pedido" %}{% endif %}{% endblock %}
 {% block reason %}Recibes este correo porque registraron un envío a tu nombre con este correo.{% endblock %}

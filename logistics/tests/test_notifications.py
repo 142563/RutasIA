@@ -13,7 +13,10 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from logistics.application.notifications import Message, dispatch, format_moment, notify_delivered, safely
+from logistics.application.notifications import (
+    Message, dispatch, format_moment, notify_delivered, on_delivered, on_delivery_failed, on_order_received,
+    on_route_created, on_route_started, safely,
+)
 from logistics.application.notifications.recipients import staff_recipients
 from logistics.domain.notifications import Event
 from logistics.models import Depot, Driver, NotificationLog, Order, Route, RouteStop, UserProfile
@@ -45,7 +48,8 @@ class DeliveryEmailTests(TestCase):
         departure = timezone.now()
         route = Route.objects.create(
             depot=self.depot, driver=self.driver, departure_at=departure, driving_minutes=60, total_km=30,
-            finish_at=departure + timedelta(hours=2), created_by=creator)
+            finish_at=departure + timedelta(hours=2), created_by=creator,
+            status=Route.Status.IN_PROGRESS, started_at=departure)  # ya en curso: aquí solo se prueba la entrega
         stops = []
         for i in (1, 2):
             order = Order.objects.create(
@@ -126,12 +130,14 @@ class DeliveryEmailTests(TestCase):
             notify_delivered(stops[0].id)
         self.assertEqual(post.call_count, 1)
 
-    def test_failed_delivery_sends_nothing_yet(self):
+    def test_failed_delivery_notifies_the_customer(self):
+        # Desde A3 (RUT-71) el cliente recibe el aviso de «no entregado»; el correo del personal es de A2
         _, stops = self.make_route()
-        with mock.patch(POST) as post:
+        with mock.patch(POST, side_effect=ok_response) as post:
             response = self.mark(stops[0], status="failed", reason="No estaba")
         self.assertEqual(response.status_code, 200)
-        post.assert_not_called()
+        recipients = [c.kwargs["json"]["to"] for c in post.call_args_list]
+        self.assertIn(["cliente@example.com"], recipients)
 
     def test_format_moment_uses_guatemala_time(self):
         moment = datetime(2026, 10, 10, 20, 32, tzinfo=dt_timezone.utc)
@@ -236,3 +242,104 @@ class OrderEmailFieldTests(TestCase):
         self.assertEqual(response.json()["order"]["recipient_email"], "lucia@example.com")
         self.assertEqual(Order.objects.get().recipient_email, "lucia@example.com")
         self.assertEqual(self.create().json()["order"]["recipient_email"], "")
+
+
+@override_settings(RESEND_API_KEY="test", NOTIFY_FROM="enruta <entregas@enruta.world>", SITE_URL="https://enruta.test")
+class CustomerLifecycleEmailTests(TestCase):
+    """A3 (RUT-71): recibido, programado, en camino y no entregado, todos con el enlace de seguimiento."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.depot = Depot.objects.create(name="Bodega Test", latitude=14.6, longitude=-90.5)
+        cls.driver = Driver.objects.create(
+            user=make_user("ana", UserProfile.Role.DRIVER), name="Ana López Ruiz", license_number="A-2")
+
+    def make_order(self, email="cliente@example.com", demo=False, name="Cliente"):
+        return Order.objects.create(
+            recipient=name, address="Zona 1", latitude=14.6, longitude=-90.5, weight_kg=Decimal("5"),
+            package_count=2, recipient_email=email, is_demo=demo)
+
+    def make_route(self, orders, status=Route.Status.PLANNED):
+        departure = timezone.now()
+        route = Route.objects.create(
+            depot=self.depot, driver=self.driver, departure_at=departure, driving_minutes=60, total_km=30,
+            finish_at=departure + timedelta(hours=2), status=status)
+        stops = [RouteStop.objects.create(route=route, order=o, sequence=i, eta=departure + timedelta(minutes=30 * i))
+                 for i, o in enumerate(orders, 1)]
+        return route, stops
+
+    def run_event(self, fn, *args):
+        with mock.patch(POST, side_effect=ok_response) as post:
+            fn(*args)
+        return post
+
+    def test_order_received(self):
+        order = self.make_order()
+        post = self.run_event(on_order_received, order.id)
+        sent = post.call_args.kwargs["json"]
+        self.assertEqual(sent["to"], ["cliente@example.com"])
+        self.assertEqual(sent["subject"], f"Recibimos tu pedido {order.code}")
+        self.assertIn("2 bultos", sent["text"])
+        self.assertIn(f"https://enruta.test/seguimiento/{order.tracking_token}", sent["html"])
+        self.assertIn("Seguir mi pedido", sent["html"])
+
+    def test_order_received_skips_demo_and_missing_email(self):
+        for order in (self.make_order(demo=True), self.make_order(email="")):
+            self.run_event(on_order_received, order.id).assert_not_called()
+
+    def test_route_scheduled_goes_in_one_batch_with_window(self):
+        a, b = self.make_order(name="Ana"), self.make_order(email="otro@example.com", name="Beto")
+        route, _ = self.make_route([a, b])
+        post = self.run_event(on_route_created, route.id)
+        self.assertEqual(post.call_count, 1)
+        self.assertTrue(post.call_args.args[0].endswith("/emails/batch"))
+        sent = post.call_args.kwargs["json"]
+        self.assertEqual([m["to"] for m in sent], [["cliente@example.com"], ["otro@example.com"]])
+        self.assertTrue(sent[0]["subject"].startswith(f"Tu pedido {a.code} llegará el "))
+        self.assertIn("entre las", sent[0]["text"])
+        self.assertIn(a.tracking_token, sent[0]["html"])
+
+    def test_route_started_batches_only_pending_stops(self):
+        orders = [self.make_order(email=f"c{i}@example.com") for i in range(3)]
+        route, stops = self.make_route(orders, status=Route.Status.IN_PROGRESS)
+        RouteStop.objects.filter(pk=stops[2].pk).update(status=RouteStop.Status.DELIVERED)
+        post = self.run_event(on_route_started, route.id)
+        self.assertEqual(post.call_count, 1)
+        self.assertTrue(post.call_args.args[0].endswith("/emails/batch"))
+        sent = post.call_args.kwargs["json"]
+        self.assertEqual(len(sent), 2)
+        self.assertEqual(sent[0]["subject"], f"Tu pedido {orders[0].code} va en camino")
+        # Solo el nombre de pila del conductor, sin apellido ni teléfono
+        self.assertIn("Ana salió", sent[0]["text"])
+        self.assertNotIn("López", sent[0]["text"])
+
+    def test_route_started_dedupes_per_route(self):
+        route, _ = self.make_route([self.make_order()], status=Route.Status.IN_PROGRESS)
+        self.run_event(on_route_started, route.id).assert_called_once()
+        self.run_event(on_route_started, route.id).assert_not_called()
+
+    def test_delivery_failed_tells_reason_and_follow_up(self):
+        order = self.make_order()
+        _, stops = self.make_route([order], status=Route.Status.IN_PROGRESS)
+        RouteStop.objects.filter(pk=stops[0].pk).update(status=RouteStop.Status.FAILED, reason="No había nadie")
+        post = self.run_event(on_delivery_failed, stops[0].id)
+        customer = [c for c in post.call_args_list if c.kwargs["json"]["to"] == ["cliente@example.com"]]
+        self.assertEqual(len(customer), 1)
+        sent = customer[0].kwargs["json"]
+        self.assertEqual(sent["subject"], f"No pudimos entregar tu pedido {order.code}")
+        self.assertIn("Motivo: No había nadie", sent["text"])
+        self.assertIn("reprogramar", sent["text"])
+        self.assertIn(order.tracking_token, sent["text"])
+
+    def test_delivered_now_carries_tracking_link(self):
+        order = self.make_order()
+        _, stops = self.make_route([order], status=Route.Status.IN_PROGRESS)
+        RouteStop.objects.filter(pk=stops[0].pk).update(status=RouteStop.Status.DELIVERED, delivered_at=timezone.now())
+        post = self.run_event(on_delivered, stops[0].id)
+        self.assertIn(f"/seguimiento/{order.tracking_token}", post.call_args.kwargs["json"]["html"])
+
+    def test_demo_and_missing_email_never_get_route_emails(self):
+        orders = [self.make_order(demo=True), self.make_order(email="")]
+        route, _ = self.make_route(orders, status=Route.Status.IN_PROGRESS)
+        self.run_event(on_route_created, route.id).assert_not_called()
+        self.run_event(on_route_started, route.id).assert_not_called()

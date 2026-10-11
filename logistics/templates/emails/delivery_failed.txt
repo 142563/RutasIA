@@ -1,0 +1,11 @@
+{% autoescape off %}Hola {{ recipient }},
+
+Lamentamos avisarte que no pudimos entregar tu pedido {{ code }} en {{ address }}.
+
+Motivo: {{ reason }}.
+
+Nos pondremos en contacto contigo para reprogramar la entrega. Disculpa las molestias.
+{% if tracking_url %}
+Seguir mi pedido: {{ tracking_url }}
+{% endif %}
+enruta{% endautoescape %}
