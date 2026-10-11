@@ -8,6 +8,8 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 
 from logistics.domain.exceptions import PlanningError
@@ -251,6 +253,7 @@ def _user_payload(user: User) -> dict:
     return {
         "id": user.id, "username": user.username, "full_name": user.get_full_name(),
         "role": role, "role_label": UserProfile.Role(role).label, "is_active": user.is_active,
+        "email": user.email,
     }
 
 
@@ -258,6 +261,12 @@ def _write_user(payload: dict, user: User | None, actor: User) -> dict:
     creating = user is None
     username = _text(payload, "username", "El usuario", required=creating, max_len=150)
     full_name = _text(payload, "full_name", "El nombre completo")
+    email = _text(payload, "email", "El correo", max_len=254)
+    if email:
+        try:
+            validate_email(email)
+        except ValidationError:
+            raise PlanningError("Indica un correo válido.") from None
     role = payload.get("role") if "role" in payload else None
     if role is not None and role not in UserProfile.Role.values:
         raise PlanningError("El rol debe ser Administrador, Despachador o Conductor.")
@@ -290,6 +299,8 @@ def _write_user(payload: dict, user: User | None, actor: User) -> dict:
         if full_name is not None:
             first, _, last = full_name.partition(" ")
             user.first_name, user.last_name = first, last
+        if email is not None:
+            user.email = email
         if active is not None:
             user.is_active = active
         if password and not creating:

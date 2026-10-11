@@ -62,6 +62,7 @@ const TABS = {
     columns: [
       { header: "Usuario", cell: (u) => <span className="font-medium">{u.username}</span> },
       { header: "Nombre", cell: (u) => (u.full_name ? u.full_name : dim("—")) },
+      { header: "Correo", cell: (u) => (u.email ? <span title={u.email}>{u.email}</span> : dim("Sin correo")) },
       { header: "Rol", cell: (u) => u.role_label },
     ],
   } satisfies TabConfig<"users">,

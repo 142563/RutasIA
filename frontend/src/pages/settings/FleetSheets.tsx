@@ -246,7 +246,7 @@ export function VehicleSheet({ item, onDone }: { item: FleetVehicle | null; onDo
 // --- usuario -----------------------------------------------------------------
 
 export function UserSheet({ item, onDone }: { item: FleetUser | null; onDone: () => void }) {
-  const [form, setForm] = React.useState({ username: item?.username ?? "", full_name: item?.full_name ?? "", password: "" });
+  const [form, setForm] = React.useState({ username: item?.username ?? "", full_name: item?.full_name ?? "", email: item?.email ?? "", password: "" });
   const [role, setRole] = React.useState<Role>(item?.role ?? "dispatcher");
   const [submitted, setSubmitted] = React.useState(false);
   const errors = {
@@ -256,7 +256,7 @@ export function UserSheet({ item, onDone }: { item: FleetUser | null; onDone: ()
 
   function build() {
     if (errors.username || errors.password) return null;
-    const body: Record<string, unknown> = { username: form.username.trim(), full_name: form.full_name.trim(), role };
+    const body: Record<string, unknown> = { username: form.username.trim(), full_name: form.full_name.trim(), email: form.email.trim(), role };
     if (form.password) body.password = form.password;
     return body;
   }
@@ -270,6 +270,9 @@ export function UserSheet({ item, onDone }: { item: FleetUser | null; onDone: ()
       </Field>
       <Field label="Nombre completo" htmlFor="u-name">
         <Input id="u-name" value={form.full_name} onChange={set(setForm, "full_name")} />
+      </Field>
+      <Field label="Correo" htmlFor="u-email" hint="Opcional. Aquí recibirás los avisos de entrega de las rutas que crees.">
+        <Input id="u-email" type="email" autoComplete="email" maxLength={254} value={form.email} onChange={set(setForm, "email")} />
       </Field>
       <Field label="Rol" htmlFor="u-role" hint="Administrador: todo. Despachador: pedidos y rutas. Conductor: solo su ruta en el celular.">
         <Select id="u-role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
