@@ -10,6 +10,8 @@ import { Field, Input, Textarea } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/misc";
 import { SheetContent } from "@/components/ui/sheet";
 import type { LatLng } from "@/lib/geo";
+import { geocodeAddress, shouldGeocode, type LocationSource } from "@/lib/geocode";
+import { useGoogleMaps } from "@/lib/googleMaps";
 import { PRIORITIES, useCreateOrder } from "@/lib/orders";
 import { useNetwork } from "@/lib/queries";
 import type { Priority } from "@/lib/types";
@@ -23,6 +25,33 @@ export function NewOrderSheet({ onDone }: { onDone: (createdCode?: string) => vo
   const [priority, setPriority] = React.useState<Priority>("normal");
   const [location, setLocation] = React.useState<(LatLng & { label: string }) | null>(null);
   const [placeId, setPlaceId] = React.useState("");
+  // Cómo se fijó el punto y para qué texto: decide si al salir del campo se vuelve a geocodificar
+  const [source, setSource] = React.useState<LocationSource | null>(null);
+  // Punto al que se acerca el mapa (no cambia con cada clic del usuario sobre el mapa)
+  const [focusPoint, setFocusPoint] = React.useState<LatLng | null>(null);
+  const [geoState, setGeoState] = React.useState<"idle" | "searching" | "notfound">("idle");
+  const google = useGoogleMaps();
+  const latest = React.useRef({ address: "", source: null as LocationSource | null, locatedFor: "" });
+
+  function placeAt(point: LatLng, label: string, how: LocationSource, text: string) {
+    setLocation({ lat: point.lat, lng: point.lng, label });
+    setSource(how);
+    latest.current = { ...latest.current, source: how, locatedFor: text };
+    if (how !== "map") setFocusPoint({ lat: point.lat, lng: point.lng });
+  }
+
+  async function geocodeTyped(text: string) {
+    const now = latest.current;
+    if (google.status !== "ready" || !shouldGeocode({ address: text, source: now.source, locatedFor: now.locatedFor })) return;
+    setGeoState("searching");
+    const found = await geocodeAddress(text.trim());
+    // Si mientras tanto la persona cambió el texto o fijó el punto a mano, no se pisa
+    const after = latest.current;
+    if (after.address.trim() !== text.trim() || after.source === "node" || after.source === "map") { setGeoState("idle"); return; }
+    if (!found) { setGeoState("notfound"); return; }
+    setGeoState("idle");
+    placeAt(found, found.address, "geocode", text);
+  }
   const [submitted, setSubmitted] = React.useState(false);
 
   const set = (key: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -62,6 +91,10 @@ export function NewOrderSheet({ onDone }: { onDone: (createdCode?: string) => vo
           setForm(EMPTY);
           setLocation(null);
           setPlaceId("");
+          setSource(null);
+          setFocusPoint(null);
+          setGeoState("idle");
+          latest.current = { address: "", source: null, locatedFor: "" };
           setPriority("normal");
           setSubmitted(false);
           onDone(order.code);
@@ -88,20 +121,27 @@ export function NewOrderSheet({ onDone }: { onDone: (createdCode?: string) => vo
           <h3 className="text-xs font-medium uppercase tracking-wide text-ink-2">Entrega</h3>
           <Field label="Dirección de entrega" htmlFor="address" error={show("address")}>
             <AddressAutocomplete id="address" value={form.address} invalid={!!show("address")} placeholder="5a avenida 10-20, zona 1"
-              onChange={(text) => { setForm((f) => ({ ...f, address: text })); setPlaceId(""); }}
+              onChange={(text) => {
+                latest.current = { ...latest.current, address: text };
+                setForm((f) => ({ ...f, address: text }));
+                setPlaceId("");
+                setGeoState("idle");
+              }}
+              onSettle={(text) => void geocodeTyped(text)}
               onPlace={(place) => {
                 // Google dio dirección, coordenadas y place_id: se llena todo; el mapa y el municipio quedan como respaldo
+                latest.current = { ...latest.current, address: place.address };
                 setForm((f) => ({ ...f, address: place.address }));
                 setPlaceId(place.placeId);
-                setLocation({ lat: place.lat, lng: place.lng, label: place.address });
+                placeAt(place, place.address, "place", place.address);
               }} />
           </Field>
           <Field label="Ubicación" htmlFor="node-search" error={show("location")}
-            hint="Se llena sola al elegir una dirección sugerida. Si no la encuentras, busca el municipio o haz clic en el mapa.">
+            hint="Se llena sola al escribir la dirección. Si no se ubica bien, busca el municipio o haz clic en el mapa.">
             {network.data ? (
               <>
                 <NodeSearch id="node-search" nodes={network.data.nodes}
-                  onSelect={(node) => setLocation({ lat: node.lat, lng: node.lng, label: node.name })} />
+                  onSelect={(node) => placeAt({ lat: node.lat, lng: node.lng }, node.name, "node", form.address)} />
                 <div className="rounded-lg border border-line bg-bg">
                   <NetworkMap
                     nodes={network.data.nodes}
@@ -109,13 +149,20 @@ export function NewOrderSheet({ onDone }: { onDone: (createdCode?: string) => vo
                     width={400}
                     height={300}
                     labels="none"
-                    onPick={(p) => setLocation({ ...p, label: `${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}` })}
+                    fitTo={focusPoint && google.status === "ready" ? [focusPoint] : undefined}
+                    onPick={(p) => placeAt(p, `${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`, "map", form.address)}
                     markers={location ? [{ id: "pick", kind: "pick", lat: location.lat, lng: location.lng }] : []}
                     ariaLabel="Haz clic para marcar el punto de entrega"
                   />
                 </div>
+                {geoState === "searching" ? <p className="text-xs text-ink-2" role="status">Buscando la dirección…</p> : null}
+                {geoState === "notfound" ? <p className="text-xs text-ink-2" role="status">No pudimos ubicar esa dirección. Elige el municipio o haz clic en el mapa.</p> : null}
+                {google.status === "unavailable" ? <p className="text-xs text-ink-2" role="status">Google Maps no está disponible, así que la dirección no se ubica sola. Elige el municipio o haz clic en el mapa.</p> : null}
                 {location ? (
-                  <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-1.5 text-xs text-ok"><CheckIcon className="size-3.5" /> Ubicación elegida: {location.label}</motion.p>
+                  <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="flex items-start gap-1.5 text-xs text-ok"><CheckIcon className="mt-0.5 size-3.5 shrink-0" />
+                    <span>{source === "map" || source === "node" ? "Ubicación elegida" : "Ubicado"}: {location.label}
+                      {source === "place" || source === "geocode" ? <span className="text-ink-2"> · ¿No es aquí? Haz clic en el mapa para corregir.</span> : null}</span>
+                  </motion.p>
                 ) : null}
               </>
             ) : (

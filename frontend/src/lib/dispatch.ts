@@ -36,6 +36,9 @@ export interface RouteStopRow {
   recipient: string;
   phone: string;
   address: string;
+  /** Coordenadas reales del pedido (pueden no coincidir con las de su nodo). */
+  lat?: number | null;
+  lng?: number | null;
   node: NodeRef | null;
   eta: string;
   status: StopStatus;
@@ -53,6 +56,8 @@ export interface RouteRow {
   status_label: string;
   criterion: "time" | "distance";
   depot: string;
+  depot_lat?: number | null;
+  depot_lng?: number | null;
   driver: string | null;
   vehicle: string | null;
   departure_at: string;

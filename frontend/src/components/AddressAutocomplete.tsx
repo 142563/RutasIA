@@ -11,12 +11,14 @@ import { cn } from "@/lib/utils";
  sigue funcionando igual. Al elegir una sugerencia se entrega la dirección formateada, lat/lng
  y place_id. Una sesión de Places (token) agrupa las teclas y la elección para no gastar de más.
 */
-export function AddressAutocomplete({ id, value, onChange, onPlace, invalid, placeholder }: {
+export function AddressAutocomplete({ id, value, onChange, onPlace, onSettle, invalid, placeholder }: {
   id?: string;
   value: string;
   /** Texto escrito a mano (también se llama al elegir una sugerencia, con la dirección formateada). */
   onChange: (text: string) => void;
   onPlace: (place: ChosenPlace) => void;
+  /** Se llama (con el texto) un momento después de salir del campo sin elegir sugerencia: sirve para geocodificar. */
+  onSettle?: (text: string) => void;
   invalid?: boolean;
   placeholder?: string;
 }) {
@@ -29,6 +31,8 @@ export function AddressAutocomplete({ id, value, onChange, onPlace, invalid, pla
   const [active, setActive] = React.useState(0);
   const token = React.useRef<google.maps.places.AutocompleteSessionToken | null>(null);
   const listId = React.useId();
+  const settleTimer = React.useRef<number | undefined>(undefined);
+  React.useEffect(() => () => window.clearTimeout(settleTimer.current), []);
 
   React.useEffect(() => {
     if (!enabled) return;
@@ -42,6 +46,7 @@ export function AddressAutocomplete({ id, value, onChange, onPlace, invalid, pla
   }, [debounced, enabled]);
 
   async function choose(suggestion: PlaceSuggestion) {
+    window.clearTimeout(settleTimer.current);
     setOpen(false);
     setSuggestions([]);
     setTyped("");
@@ -72,8 +77,14 @@ export function AddressAutocomplete({ id, value, onChange, onPlace, invalid, pla
           setTyped(e.target.value);
           setOpen(true);
         }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onFocus={() => { setOpen(true); window.clearTimeout(settleTimer.current); }}
+        onBlur={(e) => {
+          setTimeout(() => setOpen(false), 150);
+          const text = e.target.value;
+          window.clearTimeout(settleTimer.current);
+          // Espera a que termine un posible clic en una sugerencia antes de buscar el punto
+          if (onSettle) settleTimer.current = window.setTimeout(() => onSettle(text), 400);
+        }}
         onKeyDown={(e) => {
           if (!showList) return;
           if (e.key === "ArrowDown") { e.preventDefault(); setActive((i) => Math.min(i + 1, suggestions.length - 1)); }

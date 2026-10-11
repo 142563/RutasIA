@@ -4,7 +4,7 @@ import * as React from "react";
 import { makeProjection, type LatLng } from "@/lib/geo";
 import { useGoogleMaps } from "@/lib/googleMaps";
 import { cascadeDelay, mapStyles } from "@/lib/mapTheme";
-import { sampleWaypoints } from "@/lib/roads";
+import { guideCodes, sampleWaypoints, type Connector } from "@/lib/roads";
 import { useTheme } from "@/lib/theme";
 import type { GraphEdge, GraphNode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,13 @@ export interface MapPath {
   followRoads?: boolean;
   /** Ruta "en camino": un destello discontinuo la recorre despacio. */
   flow?: boolean;
+  /** Códigos de nodo que son paradas reales: el respaldo de Directions solo se guía por ellos. */
+  stopCodes?: string[];
+}
+
+/** Tramo discontinuo entre un nodo y un punto real (bodega o pedido) que no está en el grafo. */
+export interface MapConnector extends Connector {
+  color: string;
 }
 
 export interface MapNodeMark {
@@ -65,6 +72,8 @@ export interface NetworkMapProps {
   vehicles?: MapVehicle[];
   nodes: GraphNode[];
   edges: GraphEdge[];
+  /** Último/primer tramo: del nodo al punto real, por carretera (Directions de un solo tramo) y en discontinua. */
+  connectors?: MapConnector[];
   width?: number;
   height?: number;
   edgeStyle?: (edge: GraphEdge) => { stroke: string; width: number; opacity?: number } | null;
@@ -339,6 +348,21 @@ function MapLayers({ props, toXY, opts }: { props: NetworkMapProps; toXY: ToXY; 
         })}
       </g>
 
+      {/* Primer/último tramo hasta el punto real (bodega, pedido): discontinuo, del mismo color */}
+      <g fill="none" strokeLinecap="round" strokeLinejoin="round">
+        {(props.connectors ?? []).map((c) => {
+          const road = opts.roadGeometry?.get(`conn:${c.id}`);
+          const pts = (road ?? [c.from, c.to]).map(toXY);
+          const d = pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+          return (
+            <g key={`conn-${c.id}`}>
+              <polyline points={d} stroke="var(--color-surface)" strokeWidth={6.5} strokeOpacity={0.9} />
+              <polyline points={d} stroke={c.color} strokeWidth={3.5} strokeDasharray="6 5" />
+            </g>
+          );
+        })}
+      </g>
+
       {/* Nombres de las cabeceras (Google ya muestra los nombres de los lugares) */}
       {labels === "cabeceras" && !opts.onGoogle ? (
         <g fontSize={10} fill="var(--color-ink-2)" fontFamily="var(--font-sans)" style={{ paintOrder: "stroke" }} stroke="var(--color-surface)" strokeWidth={3}>
@@ -563,7 +587,8 @@ function GoogleNetworkMap(props: NetworkMapProps & { storedGeometry: Map<string,
 
   const fallbackPaths = props.geometryReady ? props.paths?.filter((path) => !props.storedGeometry.has(pathKey(path.codes))) : undefined;
   const fallbackGeometry = useRoadGeometry(map ? fallbackPaths : undefined, nodes);
-  const roadGeometry = new Map([...fallbackGeometry, ...props.storedGeometry]);
+  const connectorGeometry = useConnectorGeometry(map ? props.connectors : undefined);
+  const roadGeometry = new Map([...fallbackGeometry, ...props.storedGeometry, ...connectorGeometry]);
 
   const projection = overlay?.getProjection();
   const toXY: ToXY | null = projection
@@ -594,9 +619,11 @@ function GoogleNetworkMap(props: NetworkMapProps & { storedGeometry: Map<string,
 const roadCache = new Map<string, Promise<LatLng[] | null>>();
 /*
  El CAMINO (qué nodos se recorren) lo decidió nuestro Dijkstra / A*. Google Directions solo
- dibuja por dónde va la carretera entre esos puntos: pasa por cada nodo, sin reordenar.
- Directions admite máx. 25 intermedios, así que las rutas largas se submuestrean de forma pareja
- (origen y destino siempre se conservan). Si Directions falla, se dibujan líneas rectas.
+ dibuja por dónde va la carretera. Mientras las aristas no tengan polilínea guardada (RUT-75),
+ se le pasan solo los puntos de guía de `guideCodes` (origen, paradas, destino y cruces), NO cada
+ nodo: los de municipio están en el centro del pueblo, fuera de la carretera, y obligar a Google
+ a pasar por ellos produce lazos. Directions admite máx. 25 intermedios; si hay más se submuestrea.
+ Si Directions falla, se dibujan líneas rectas.
 */
 function requestRoad(points: LatLng[]): Promise<LatLng[] | null> {
   const sampled = sampleWaypoints(points);
@@ -612,6 +639,28 @@ function requestRoad(points: LatLng[]): Promise<LatLng[] | null> {
     .catch(() => null);
 }
 
+const connectorKey = (c: Connector) => `conn:${c.id}`;
+
+/** Tramos nodo → punto real: Directions de un solo tramo, sin waypoints. Clave `conn:<id>` en el mapa. */
+function useConnectorGeometry(connectors: Connector[] | undefined): Map<string, LatLng[]> {
+  const [geometry, setGeometry] = React.useState<Map<string, LatLng[]>>(new Map());
+  const wantedKey = (connectors ?? []).map((c) => `${c.id}:${c.from.lat},${c.from.lng}>${c.to.lat},${c.to.lng}`).join("|");
+  React.useEffect(() => {
+    if (!connectors?.length) return;
+    let alive = true;
+    connectors.forEach((c) => {
+      const cacheKey = `${c.from.lat},${c.from.lng}>${c.to.lat},${c.to.lng}`;
+      if (!roadCache.has(cacheKey)) roadCache.set(cacheKey, requestRoad([c.from, c.to]));
+      roadCache.get(cacheKey)!.then((road) => {
+        if (alive && road) setGeometry((prev) => new Map(prev).set(connectorKey(c), road));
+      });
+    });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantedKey]);
+  return geometry;
+}
+
 function useRoadGeometry(paths: MapPath[] | undefined, nodes: GraphNode[]): Map<string, LatLng[]> {
   const [geometry, setGeometry] = React.useState<Map<string, LatLng[]>>(new Map());
   const wanted = (paths ?? []).filter((p) => p.followRoads && p.codes.length >= 2);
@@ -623,10 +672,12 @@ function useRoadGeometry(paths: MapPath[] | undefined, nodes: GraphNode[]): Map<
     let alive = true;
     wanted.forEach((path) => {
       const key = pathKey(path.codes);
-      const points = path.codes.map((c) => byCode.get(c)).filter((n): n is GraphNode => !!n).map((n) => ({ lat: n.lat, lng: n.lng }));
+      const guide = guideCodes(path.codes, path.stopCodes ?? [], (c) => byCode.get(c)?.kind);
+      const points = guide.map((c) => byCode.get(c)).filter((n): n is GraphNode => !!n).map((n) => ({ lat: n.lat, lng: n.lng }));
       if (points.length < 2) return;
-      if (!roadCache.has(key)) roadCache.set(key, requestRoad(points));
-      roadCache.get(key)!.then((road) => {
+      const cacheKey = points.map((p) => `${p.lat},${p.lng}`).join(">");
+      if (!roadCache.has(cacheKey)) roadCache.set(cacheKey, requestRoad(points));
+      roadCache.get(cacheKey)!.then((road) => {
         if (alive && road) setGeometry((prev) => (prev.has(key) ? prev : new Map(prev).set(key, road)));
       });
     });

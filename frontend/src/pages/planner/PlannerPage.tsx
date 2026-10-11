@@ -13,6 +13,7 @@ import { formatClock, formatKm, formatMinutes, toLocalInputValue } from "@/lib/f
 import { useDepots, useOrders } from "@/lib/orders";
 import { routeNodes, useCreateRoute, useFleet, usePlan, type Criterion, type PlanResponse, type PlanVariant } from "@/lib/planning";
 import { useNetwork } from "@/lib/queries";
+import { routeConnectors } from "@/lib/roads";
 import { bandLabel } from "@/lib/traffic";
 import type { GraphEdge, GraphNode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -256,9 +257,19 @@ other: PlanVariant | null;
     markers.push({ id: "depot", kind: "depot", lat: data.depot.lat, lng: data.depot.lng, label: data.depot.name });
     variant?.stops.forEach((s) => markers.push({ id: `s${s.order_id}`, kind: "stop", lat: s.lat, lng: s.lng, label: String(s.sequence) }));
   }
+  const byCode = new Map(nodes.map((n) => [n.code, n]));
+  const path = variant ? routeNodes(variant) : [];
+  const connectors = data && variant
+    ? routeConnectors(
+        { lat: data.depot.lat, lng: data.depot.lng }, byCode.get(path[0]) ?? null,
+        variant.stops.map((s) => ({ id: s.order_id, lat: s.lat, lng: s.lng, node: s.node ? byCode.get(s.node.code) ?? null : null })),
+      ).map((c) => ({ ...c, color: ROUTE_COLOR }))
+    : [];
+  const stopCodes = variant?.stops.flatMap((s) => (s.node ? [s.node.code] : [])) ?? [];
   return (
     <div className="flex h-[70vh] flex-col lg:h-full">
       <NetworkMap
+        connectors={connectors}
         nodes={nodes}
         edges={edges}
         fitTo={markers.length ? [...markers, ...(variant ? routeNodes(variant) : []).map((c) => nodes.find((n) => n.code === c)!).filter(Boolean)] : undefined}
@@ -266,7 +277,7 @@ other: PlanVariant | null;
         paths={[
           ...(other && variant && routeNodes(other).join() !== routeNodes(variant).join()
             ? [{ codes: routeNodes(other), color: OTHER_COLOR, width: 2.5, dashed: true }] : []),
-          ...(variant ? [{ codes: routeNodes(variant), color: ROUTE_COLOR, width: 4, followRoads: true }] : []),
+          ...(variant ? [{ codes: routeNodes(variant), color: ROUTE_COLOR, width: 4, followRoads: true, stopCodes }] : []),
         ]}
         markers={markers}
       />

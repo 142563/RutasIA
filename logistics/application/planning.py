@@ -235,6 +235,8 @@ def route_payload(route: Route) -> dict:
         "status_label": route.get_status_display(),
         "criterion": route.criterion,
         "depot": route.depot.name,
+        # Coordenadas reales de la bodega: el mapa dibuja el primer tramo hasta su nodo
+        "depot_lat": route.depot.latitude, "depot_lng": route.depot.longitude,
         "driver": route.driver.name if route.driver else None,
         "driver_id": route.driver_id,
         "vehicle": route.vehicle.plate if route.vehicle else None,
