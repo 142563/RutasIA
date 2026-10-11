@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from "motion/react";
+import { useQuery } from "@tanstack/react-query";
 import * as React from "react";
 import { makeProjection, type LatLng } from "@/lib/geo";
 import { useGoogleMaps } from "@/lib/googleMaps";
@@ -8,6 +9,8 @@ import { useTheme } from "@/lib/theme";
 import type { GraphEdge, GraphNode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { pickMarker } from "./markerPick";
+import { api } from "@/lib/api";
+import { concatenateGeometry, type EdgeGeometry } from "@/lib/polyline";
 
 /**
  Mapa de la red vial nacional.
@@ -71,10 +74,34 @@ type ToXY = (p: LatLng) => [number, number];
 
 export function NetworkMap(props: NetworkMapProps) {
   const google = useGoogleMaps();
-  if (google.status === "ready") return <GoogleNetworkMap {...props} />;
+  const wanted = (props.paths ?? []).filter((path) => path.followRoads && path.codes.length >= 2);
+  const pairs = [...new Map(wanted.flatMap((path) => path.codes.slice(1).map((to, i) => {
+    const pair = [path.codes[i], to];
+    return [pair.join(">"), pair] as const;
+  }))).values()];
+  const query = useQuery({
+    queryKey: ["routing-geometry", pairs], enabled: pairs.length > 0, staleTime: 60_000,
+    queryFn: async () => {
+      const edges: EdgeGeometry[] = [];
+      for (let i = 0; i < pairs.length; i += 25) {
+        const response = await api<{ edges: EdgeGeometry[] }>("/api/routing/geometry/", {
+          query: { edges: JSON.stringify(pairs.slice(i, i + 25)) },
+        });
+        edges.push(...response.edges);
+      }
+      return edges;
+    },
+    retry: false,
+  });
+  const stored = new Map<string, LatLng[]>();
+  for (const path of wanted) {
+    const points = concatenateGeometry(path.codes, query.data ?? []);
+    if (points) stored.set(pathKey(path.codes), points);
+  }
+  if (google.status === "ready") return <GoogleNetworkMap {...props} storedGeometry={stored} geometryReady={!query.isPending || !pairs.length} />;
   return (
     <div className={cn("relative flex flex-col", props.fill && "h-full")}>
-      <SchematicMap {...props} />
+      <SchematicMap {...props} storedGeometry={stored} />
       {google.status === "unavailable" ? (
         <p className="absolute left-2 top-2 max-w-[calc(100%-1rem)] rounded-md border border-line bg-surface/95 px-2 py-1 text-[11px] text-ink-2">
           Mapa esquemático · Google Maps no disponible{google.reason ? `: ${google.reason}` : ""}
@@ -286,7 +313,7 @@ function MapLayers({ props, toXY, opts }: { props: NetworkMapProps; toXY: ToXY; 
 
 /* ───────────────────────── Mapa esquemático (sin Google) ───────────────────────── */
 
-function SchematicMap(props: NetworkMapProps) {
+function SchematicMap(props: NetworkMapProps & { storedGeometry: Map<string, LatLng[]> }) {
   const { nodes, width = 640, height = 720, fitTo, onPick, className, ariaLabel = "Mapa esquemático de la red vial de Guatemala" } = props;
   const svgRef = React.useRef<SVGSVGElement>(null);
   const fitKey = fitTo?.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join("|") ?? "";
@@ -313,7 +340,7 @@ function SchematicMap(props: NetworkMapProps) {
       aria-label={ariaLabel}
       onClick={handleClick}
     >
-      <MapLayers props={props} toXY={projection.toXY} opts={{ onGoogle: false }} />
+      <MapLayers props={props} toXY={projection.toXY} opts={{ onGoogle: false, roadGeometry: props.storedGeometry }} />
     </svg>
   );
 }
@@ -322,7 +349,7 @@ function SchematicMap(props: NetworkMapProps) {
 
 const GUATEMALA_CENTER = { lat: 15.6, lng: -90.35 };
 
-function GoogleNetworkMap(props: NetworkMapProps) {
+function GoogleNetworkMap(props: NetworkMapProps & { storedGeometry: Map<string, LatLng[]>; geometryReady: boolean }) {
   const { nodes, width = 640, height = 720, fitTo, onPick, fill, className, ariaLabel = "Mapa de la red vial de Guatemala" } = props;
   const divRef = React.useRef<HTMLDivElement>(null);
   const { resolved: theme } = useTheme();
@@ -393,7 +420,9 @@ function GoogleNetworkMap(props: NetworkMapProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, fitKey]);
 
-  const roadGeometry = useRoadGeometry(map ? props.paths : undefined, nodes);
+  const fallbackPaths = props.geometryReady ? props.paths?.filter((path) => !props.storedGeometry.has(pathKey(path.codes))) : undefined;
+  const fallbackGeometry = useRoadGeometry(map ? fallbackPaths : undefined, nodes);
+  const roadGeometry = new Map([...fallbackGeometry, ...props.storedGeometry]);
 
   const projection = overlay?.getProjection();
   const toXY: ToXY | null = projection

@@ -20,7 +20,7 @@ from django.utils import timezone
 
 from logistics.models import Edge, Node, RouteSample
 from logistics.routing.geo import haversine_km
-from logistics.routing.google import TRAFFIC_AWARE_OPTIMAL, TRAFFIC_UNAWARE, RoutesClient
+from logistics.routing.google import TRAFFIC_AWARE_OPTIMAL, TRAFFIC_UNAWARE, RoutesApiError, RoutesClient
 from logistics.routing.graph import RoadGraph, invalidate_graph
 from logistics.routing.seed_data import NODES, ROAD_SEGMENTS, RoadSegment
 
@@ -148,7 +148,51 @@ def build_from_google(client: RoutesClient, refresh: bool = False, segments=ROAD
         }, report)
 
     verify_graph(report, deactivate=True)
+    geometry = fill_polylines(client)
+    report.not_found.extend(geometry.not_found)
+    report.requests, report.elements = client.requests_made, client.elements_requested
     invalidate_graph()
+    return report
+
+
+def fill_polylines(client: RoutesClient) -> BuildReport:
+    """Rellena geometría faltante sin cambiar pesos, fuentes ni activar aristas.
+
+    Una llamada computeRoutes por arista dirigida sin geometría en la caché;
+    las siguientes ejecuciones no vuelven a consultar los tramos completos.
+    """
+    report = BuildReport()
+    for edge in Edge.objects.filter(is_active=True, polyline="").select_related("origin", "destination"):
+        sample = RouteSample.objects.filter(
+            origin=edge.origin, destination=edge.destination, band="", day_type="",
+        ).first()
+        polyline = sample.polyline if sample else ""
+        if not polyline:
+            try:
+                result = client.compute_route(
+                    (edge.origin.latitude, edge.origin.longitude),
+                    (edge.destination.latitude, edge.destination.longitude), traffic=False,
+                )
+                if not result.polyline:
+                    raise RoutesApiError("Google no devolvió la geometría del tramo.")
+            except RoutesApiError as exc:
+                report.not_found.append((edge.origin.code, edge.destination.code, str(exc)))
+                report.edges_skipped += 1
+                continue
+            polyline = result.polyline
+            if sample:
+                sample.polyline = polyline
+                sample.save(update_fields=["polyline"])
+            else:
+                RouteSample.objects.create(
+                    origin=edge.origin, destination=edge.destination,
+                    routing_preference=TRAFFIC_UNAWARE, duration_s=result.duration_s,
+                    static_duration_s=result.static_duration_s, distance_m=result.distance_m,
+                    polyline=polyline,
+                )
+        Edge.objects.filter(pk=edge.pk, polyline="").update(polyline=polyline)
+        report.edges_updated += 1
+    report.requests, report.elements = client.requests_made, client.elements_requested
     return report
 
 

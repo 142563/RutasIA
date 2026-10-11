@@ -16,7 +16,7 @@ MATRIX_URL = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix
 FIELD_MASK = "originIndex,destinationIndex,status,condition,distanceMeters,duration,staticDuration"
 
 ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
-ROUTE_FIELD_MASK = "routes.duration,routes.staticDuration,routes.distanceMeters"
+ROUTE_FIELD_MASK = "routes.duration,routes.staticDuration,routes.distanceMeters,routes.polyline.encodedPolyline"
 
 TRAFFIC_UNAWARE = "TRAFFIC_UNAWARE"
 TRAFFIC_AWARE_OPTIMAL = "TRAFFIC_AWARE_OPTIMAL"
@@ -60,6 +60,7 @@ class RouteResult:
     duration_s: float  # con el tráfico del momento
     static_duration_s: float | None  # sin tráfico
     distance_m: float
+    polyline: str = ""
 
 
 def _via_waypoint(point: LatLng) -> dict:
@@ -139,13 +140,16 @@ class RoutesClient:
         destination: LatLng,
         intermediates: Sequence[LatLng] = (),
         departure_time: datetime | None = None,
+        traffic: bool = True,
     ) -> RouteResult:
         """Una consulta computeRoutes con tráfico, pasando por los nodos intermedios dados."""
         body: dict = {
             "origin": {"location": {"latLng": {"latitude": origin[0], "longitude": origin[1]}}},
             "destination": {"location": {"latLng": {"latitude": destination[0], "longitude": destination[1]}}},
             "travelMode": "DRIVE",
-            "routingPreference": TRAFFIC_AWARE_OPTIMAL,
+            "routingPreference": TRAFFIC_AWARE_OPTIMAL if traffic else TRAFFIC_UNAWARE,
+            "polylineQuality": "HIGH_QUALITY",
+            "polylineEncoding": "ENCODED_POLYLINE",
         }
         if intermediates:
             body["intermediates"] = [_via_waypoint(p) for p in intermediates]
@@ -169,4 +173,5 @@ class RoutesClient:
             duration_s=duration,
             static_duration_s=parse_duration(raw.get("staticDuration")),
             distance_m=float(raw.get("distanceMeters", 0)),
+            polyline=(raw.get("polyline") or {}).get("encodedPolyline", ""),
         )

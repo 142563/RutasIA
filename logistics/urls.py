@@ -40,6 +40,7 @@ urlpatterns = [
     path("api/driver/stops/<int:stop_id>/", driver_views.api_driver_stop_update, name="api-driver-stop-update"),
     # Motor de rutas nuevo (grafo nacional con tráfico)
     path("api/routing/nodes/", routing_views.api_routing_nodes, name="api-routing-nodes"),
+    path("api/routing/geometry/", routing_views.api_routing_geometry, name="api-routing-geometry"),
     path("api/routing/route/", routing_views.api_routing_route, name="api-routing-route"),
     path("api/routing/compare/", routing_views.api_routing_compare, name="api-routing-compare"),
     path("api/routing/explore/", routing_views.api_routing_explore, name="api-routing-explore"),
