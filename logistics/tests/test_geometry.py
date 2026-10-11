@@ -4,6 +4,8 @@ from unittest.mock import patch
 
 import httpx
 from django.contrib.auth.models import User
+from django.urls import reverse
+from logistics.models import UserProfile
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 
@@ -57,7 +59,14 @@ class GeometryTests(TestCase):
     def test_api_requires_session_and_respects_direction_and_limit(self):
         url = "/api/routing/geometry/"
         self.assertNotEqual(self.client.get(url).status_code, 200)
-        self.client.force_login(User.objects.create_user("geometry"))
+        # La geometría es de despacho (RUT-86): un usuario sin rol de despacho recibe 403
+        plain = User.objects.create_user("sin-rol")
+        UserProfile.objects.create(user=plain, role=UserProfile.Role.DRIVER)
+        self.client.force_login(plain)
+        self.assertEqual(self.client.get(reverse("api-routing-geometry")).status_code, 403)
+        dispatcher = User.objects.create_user("geometry")
+        UserProfile.objects.create(user=dispatcher, role=UserProfile.Role.DISPATCHER)
+        self.client.force_login(dispatcher)
         self.edge.polyline = "??AA"
         self.edge.save(update_fields=["polyline"])
         data = self.client.get(url, {"edges": json.dumps([["a", "b"], ["b", "a"]])}).json()
