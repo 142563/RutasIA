@@ -1,0 +1,10 @@
+{% extends "emails/base.html" %}
+{% block title %}{{ subject }}{% endblock %}
+{% block heading %}No pudimos entregar tu pedido{% endblock %}
+{% block body %}
+<p style="margin:0 0 12px">Hola {{ recipient }},</p>
+<p style="margin:0 0 12px">Lamentamos avisarte que no pudimos entregar tu pedido <strong>{{ code }}</strong> en {{ address }}.</p>
+<p style="margin:0 0 12px">Motivo: {{ reason }}.</p>
+<p style="margin:0">Nos pondremos en contacto contigo para reprogramar la entrega. Disculpa las molestias.</p>
+{% endblock %}
+{% block action %}{% if tracking_url %}{% include "emails/_button.html" with url=tracking_url label="Seguir mi pedido" %}{% endif %}{% endblock %}

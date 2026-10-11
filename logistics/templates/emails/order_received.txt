@@ -1,0 +1,9 @@
+{% autoescape off %}Hola {{ recipient }},
+
+Recibimos tu pedido {{ code }} ({{ packages }}) para entregarlo en {{ address }}.
+
+Te avisaremos por este medio cuando tenga fecha de entrega.
+{% if tracking_url %}
+Seguir mi pedido: {{ tracking_url }}
+{% endif %}
+enruta{% endautoescape %}
