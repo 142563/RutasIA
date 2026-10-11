@@ -14,7 +14,7 @@ import { concatenateGeometry, type EdgeGeometry } from "@/lib/polyline";
 import { CONGESTION_STEPS, congestionColor } from "@/lib/congestion";
 import { useTrafficProfile } from "@/lib/queries";
 import { bandFor, bandLabel, dayTypeFor } from "@/lib/traffic";
-import { trafficMapEdges } from "@/lib/trafficMap";
+import { GEOMETRY_PENDING_NOTE, geometryPairsFor, mergeTrafficPairs, pairsWithGeometry, pairTitle, toggleLayer, trafficMapEdges } from "@/lib/trafficMap";
 import { useAnimatedPosition } from "@/components/ui/motion";
 
 /**
@@ -112,7 +112,8 @@ export function NetworkMap(props: NetworkMapProps) {
     const points = concatenateGeometry(path.codes, query.data ?? []);
     if (points) stored.set(pathKey(path.codes), points);
   }
-  const [trafficVisible, setTrafficVisible] = React.useState(false);
+  const [layersOn, setLayersOn] = React.useState({ google: false, ours: true });
+  const trafficVisible = layersOn.google;
   const [now, setNow] = React.useState(() => new Date());
   React.useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
@@ -123,26 +124,61 @@ export function NetworkMap(props: NetworkMapProps) {
   const profile = useTrafficProfile(band, day);
   const automatic = !props.renderEdges && !props.edgeStyle;
   const traffic = automatic ? trafficMapEdges(profile.data, band, day) : null;
+  const trafficPairs = React.useMemo(() => mergeTrafficPairs(traffic), [traffic]);
+  const onGoogle = google.status === "ready";
+  const showOurs = automatic && layersOn.ours && trafficPairs.length > 0;
+  // Sobre Google se necesita la geometría guardada de cada arista; solo se pide con la capa activa.
+  const trafficPairKey = trafficPairs.map((pair) => pair.key).join("|");
+  const trafficGeometry = useQuery({
+    queryKey: ["traffic-geometry", trafficPairKey], enabled: onGoogle && showOurs, staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const wantedPairs = geometryPairsFor(trafficPairs);
+      const edges: EdgeGeometry[] = [];
+      for (let i = 0; i < wantedPairs.length; i += 25) {
+        const response = await api<{ edges: EdgeGeometry[] }>("/api/routing/geometry/", {
+          query: { edges: JSON.stringify(wantedPairs.slice(i, i + 25)) },
+        });
+        edges.push(...response.edges);
+      }
+      return edges;
+    },
+    retry: false,
+  });
+  const drawn = React.useMemo(
+    () => (onGoogle ? pairsWithGeometry(trafficPairs, trafficGeometry.data ?? []) : []),
+    [onGoogle, trafficPairs, trafficGeometry.data]);
   const byCode = new Map(props.nodes.map((node) => [node.code, node]));
-  const layers = traffic?.length ? {
-    ...props,
-    renderEdges: (toXY: ToXY) => <g strokeLinecap="round">{traffic.map((edge) => {
-      const origin = byCode.get(edge.from);
-      const destination = byCode.get(edge.to);
-      if (!origin || !destination) return null;
-      const [ax, ay] = toXY(origin);
-      const [bx, by] = toXY(destination);
-      const length = Math.hypot(bx - ax, by - ay);
-      if (!length) return null;
-      // Separar sentidos opuestos para que un multiplicador no tape al otro.
-      const dx = -(by - ay) / length * 2.5;
-      const dy = (bx - ax) / length * 2.5;
-      return <line key={`${edge.from}>${edge.to}`} x1={ax + dx} y1={ay + dy} x2={bx + dx} y2={by + dy}
-        stroke={congestionColor(edge.multiplier)} strokeWidth={3}>
-        <title>{origin.name} → {destination.name}: ×{edge.multiplier}</title>
-      </line>;
-    })}</g>,
-  } : props;
+  const nameOf = (code: string) => byCode.get(code)?.name ?? code;
+  const geometryPending = onGoogle && showOurs && !trafficGeometry.isPending && drawn.length === 0;
+  let layers: NetworkMapProps = props;
+  if (showOurs && onGoogle && drawn.length) {
+    layers = {
+      ...props,
+      renderEdges: (toXY: ToXY) => <g strokeLinecap="round" strokeLinejoin="round" fill="none">{drawn.map(({ pair, points }) => {
+        const d = points.map((p, i) => { const [x, y] = toXY(p); return `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`; }).join("");
+        return <path key={pair.key} d={d} stroke={congestionColor(pair.multiplier)} strokeWidth={3} opacity={0.85}>
+          <title>{pairTitle(pair, nameOf)}</title>
+        </path>;
+      })}</g>,
+    };
+  } else if (showOurs && !onGoogle) {
+    // Mapa esquemático: la recta de nodo a nodo sí tiene sentido.
+    layers = {
+      ...props,
+      renderEdges: (toXY: ToXY) => <g strokeLinecap="round">{trafficPairs.map((pair) => {
+        const origin = byCode.get(pair.a);
+        const destination = byCode.get(pair.b);
+        if (!origin || !destination) return null;
+        const [ax, ay] = toXY(origin);
+        const [bx, by] = toXY(destination);
+        return <line key={pair.key} x1={ax} y1={ay} x2={bx} y2={by}
+          stroke={congestionColor(pair.multiplier)} strokeWidth={3} opacity={0.85}>
+          <title>{pairTitle(pair, nameOf)}</title>
+        </line>;
+      })}</g>,
+    };
+  }
+  // Sin geometría guardada no se dibuja nada propio sobre Google (nada de rectas sobre el mapa real).
   return (
     <div className={cn("relative flex min-h-0 min-w-0 w-full max-w-full flex-col", props.fill && "h-full")}>
       <div className={cn("relative flex flex-col", props.fill && "min-h-0 flex-1")}>
@@ -154,22 +190,31 @@ export function NetworkMap(props: NetworkMapProps) {
         ) : null}
       </div>
       <div className="flex shrink-0 flex-wrap items-start gap-3 px-2 py-2 text-xs text-ink-3">
-        <button type="button" role="switch" aria-checked={trafficVisible} disabled={google.status !== "ready"}
-          onClick={() => setTrafficVisible((value) => !value)}
+        <button type="button" role="switch" aria-checked={layersOn.google} disabled={!onGoogle}
+          onClick={() => setLayersOn((value) => toggleLayer(value, "google"))}
           className="flex min-h-11 items-center gap-2 rounded-md border border-line bg-surface px-3 disabled:opacity-50">
-          <span className={cn("size-2 rounded-full", trafficVisible ? "bg-accent" : "bg-line-strong")} aria-hidden />
-          Tráfico {trafficVisible ? "activado" : "desactivado"}
+          <span className={cn("size-2 rounded-full", layersOn.google ? "bg-accent" : "bg-line-strong")} aria-hidden />
+          Tráfico de Google {layersOn.google ? "activado" : "desactivado"}
         </button>
+        {automatic ? <button type="button" role="switch" aria-checked={layersOn.ours}
+          onClick={() => setLayersOn((value) => toggleLayer(value, "ours"))}
+          className="flex min-h-11 items-center gap-2 rounded-md border border-line bg-surface px-3">
+          <span className={cn("size-2 rounded-full", layersOn.ours ? "bg-accent" : "bg-line-strong")} aria-hidden />
+          Nuestro tráfico {layersOn.ours ? "activado" : "desactivado"}
+        </button> : null}
         <div className="min-w-0 flex-1 basis-48">
-          <p>Capa de Google: solo visual.{google.status !== "ready" ? " Requiere Google Maps." : ""}</p>
-          {automatic ? <>
-            <p className="mt-1">Nuestro tráfico · {bandLabel(band)}
+          {layersOn.google ? <p>Capa de Google: solo visual.{!onGoogle ? " Requiere Google Maps." : ""}</p> : null}
+          {automatic && layersOn.ours ? <>
+            <p>Nuestro tráfico · {bandLabel(band)}
               {profile.data?.data_source.traffic.includes("synthetic") ? " · datos de ejemplo" : ""}</p>
-            {traffic?.length ? <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1" aria-label="Leyenda del tráfico por sentido">
-              {CONGESTION_STEPS.map((step) => <li key={step.min} className="flex items-center gap-1.5">
-                <span className="h-1.5 w-5 rounded border border-line-strong" style={{ background: step.color }} aria-hidden />{step.label}
-              </li>)}
-            </ul> : <p className="mt-1">{profile.isPending ? "Cargando tráfico…" : "No hay datos de tráfico para esta franja."}</p>}
+            {trafficPairs.length ? <>
+              <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1" aria-label="Leyenda del tráfico (peor sentido)">
+                {CONGESTION_STEPS.map((step) => <li key={step.min} className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-5 rounded border border-line-strong" style={{ background: step.color }} aria-hidden />{step.label}
+                </li>)}
+              </ul>
+              {geometryPending ? <p className="mt-1">{GEOMETRY_PENDING_NOTE}</p> : null}
+            </> : <p className="mt-1">{profile.isPending ? "Cargando tráfico…" : "No hay datos de tráfico para esta franja."}</p>}
           </> : null}
         </div>
       </div>
