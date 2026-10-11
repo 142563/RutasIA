@@ -32,6 +32,9 @@ def api_routing_nodes(request: HttpRequest):
 @login_required
 @require_GET
 def api_routing_geometry(request: HttpRequest):
+    denied = _require_role(request, *DISPATCH_ROLES)
+    if denied:
+        return denied
     return _run(service.geometry, request.GET)
 
 

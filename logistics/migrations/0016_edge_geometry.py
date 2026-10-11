@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('logistics', '0013_order_recipient_email'),
+        ('logistics', '0015_password_and_tracking'),
     ]
 
     operations = [

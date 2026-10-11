@@ -1,0 +1,40 @@
+.route-sheet-table td {
+  border: 1px solid var(--color-line);
+  padding: 8px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+@page {
+  size: letter portrait;
+  margin: 12mm;
+}
+
+@media print {
+  /* La hoja usa sus propios tokens de papel aunque la aplicación esté en oscuro. */
+  html, html.dark, body, #root, .route-print {
+    --color-bg: white;
+    --color-surface: white;
+    --color-ink: black;
+    --color-ink-2: black;
+    --color-line: gray;
+    background: var(--color-bg) !important;
+    color: var(--color-ink) !important;
+    height: auto !important;
+    color-scheme: light;
+  }
+  .route-print, .route-print * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .route-print { padding: 0; }
+  .route-print-controls, [data-sonner-toaster] { display: none !important; }
+  .route-sheet { max-width: none; padding: 0; border: 0; border-radius: 0; box-shadow: none; }
+  .route-sheet header { break-inside: avoid; }
+  .route-sheet dl { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .route-sheet-table-wrap { overflow: visible; }
+  .route-sheet-table { min-width: 0; font-size: 9pt; }
+  .route-sheet-table thead { display: table-header-group; }
+  .route-sheet-table tr { break-inside: avoid; }
+  .route-print-unavailable { display: block; }
+}

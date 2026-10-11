@@ -17,6 +17,8 @@ Al entrar, la pantalla **Hoy** te dice cuál es el **siguiente paso** (por ejemp
 
 Para probar rápido, el login tiene botones **Despachador** y **Conductor**: entran sin contraseña, solo en modo demostración. Ya hay una ruta de ejemplo en curso.
 
+**Hoja de ruta (RUT-60):** desde el detalle de una ruta, el administrador o despachador puede abrir **Imprimir hoja de ruta** y entregársela al piloto. La vista abre aparte, sin navegación, y espera los datos completos antes de habilitar la impresión. Incluye las paradas en orden, referencias, teléfonos, horarios de Guatemala y espacios para firmas. En el diálogo del navegador, usa papel **Carta** y **Guardar como PDF** si quieres un archivo. Los minutos corresponden al manejo, sin el servicio en las paradas. La hoja es una copia del momento: imprime otra si cambia la ruta.
+
 **Análisis**, lo de la tesis, en un solo lugar:
 - **Dijkstra vs A\*:** los dos algoritmos lado a lado sobre el mapa, contando cuántos nodos explora cada uno.
 - **Tráfico por hora:** qué tramos se ponen lentos en cada franja del día.
