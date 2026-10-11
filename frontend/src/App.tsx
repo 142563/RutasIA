@@ -1,27 +1,39 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Navigate, Outlet, RouterProvider, createBrowserRouter, useLocation } from "react-router";
 import { MotionConfig } from "motion/react";
 import { Toaster } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { ErrorNote, Spinner } from "@/components/ui/misc";
+import { Skeleton } from "@/components/ui/motion";
 import { setUnauthorizedHandler } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { UserContext, homeFor, useSession } from "@/lib/auth";
 import type { Role } from "@/lib/types";
-import { DriverStopPage } from "@/pages/driver/DriverStopPage";
-import { DriverTodayPage } from "@/pages/driver/DriverTodayPage";
 import { HomePage } from "@/pages/Home";
-import { AnalysisLayout } from "@/pages/analysis/AnalysisLayout";
-import { LabPage } from "@/pages/lab/LabPage";
 import { LoginPage } from "@/pages/Login";
 import { OrdersPage } from "@/pages/orders/OrdersPage";
 import { PlannerPage } from "@/pages/planner/PlannerPage";
-import { ReportsPage } from "@/pages/reports/ReportsPage";
 import { RouteDetailPage } from "@/pages/routes/RouteDetailPage";
 import { RoutesPage } from "@/pages/routes/RoutesPage";
-import { TrafficPage } from "@/pages/traffic/TrafficPage";
-import { SettingsPage } from "@/pages/settings/SettingsPage";
 import { NotFoundPage } from "@/pages/Placeholder";
+
+const AnalysisLayout = lazy(() => import("@/pages/analysis/AnalysisLayout").then((m) => ({ default: m.AnalysisLayout })));
+const LabPage = lazy(() => import("@/pages/lab/LabPage").then((m) => ({ default: m.LabPage })));
+const TrafficPage = lazy(() => import("@/pages/traffic/TrafficPage").then((m) => ({ default: m.TrafficPage })));
+const ReportsPage = lazy(() => import("@/pages/reports/ReportsPage").then((m) => ({ default: m.ReportsPage })));
+const SettingsPage = lazy(() => import("@/pages/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+const DriverTodayPage = lazy(() => import("@/pages/driver/DriverTodayPage").then((m) => ({ default: m.DriverTodayPage })));
+const DriverStopPage = lazy(() => import("@/pages/driver/DriverStopPage").then((m) => ({ default: m.DriverStopPage })));
+
+/** Cada página reserva espacio mientras carga, sin ocultar la navegación. */
+function DeferredPage({ children }: { children: ReactNode }) {
+  return <Suspense fallback={(
+    <div className="min-h-[60vh] space-y-6 p-6 lg:p-8" role="status" aria-label="Cargando pantalla">
+      <Skeleton className="h-8 w-48" /><Skeleton className="h-64 w-full rounded-xl" />
+    </div>
+  )}>{children}</Suspense>;
+}
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -58,12 +70,12 @@ const router = createBrowserRouter([
           { path: "rutas/:routeId", element: <RouteDetailPage /> },
           {
             path: "analisis",
-            element: <AnalysisLayout />,
+            element: <DeferredPage><AnalysisLayout /></DeferredPage>,
             children: [
               { index: true, element: <Navigate to="laboratorio" replace /> },
-              { path: "laboratorio", element: <LabPage /> },
-              { path: "trafico", element: <TrafficPage /> },
-              { path: "reportes", element: <ReportsPage /> },
+              { path: "laboratorio", element: <DeferredPage><LabPage /></DeferredPage> },
+              { path: "trafico", element: <DeferredPage><TrafficPage /></DeferredPage> },
+              { path: "reportes", element: <DeferredPage><ReportsPage /></DeferredPage> },
             ],
           },
           // Direcciones anteriores: Monitoreo vive ahora en Hoy, y lo de la tesis en Análisis
@@ -71,7 +83,7 @@ const router = createBrowserRouter([
           { path: "laboratorio", element: <Navigate to="/analisis/laboratorio" replace /> },
           { path: "trafico", element: <Navigate to="/analisis/trafico" replace /> },
           { path: "reportes", element: <Navigate to="/analisis/reportes" replace /> },
-          { path: "configuracion/*", element: <SettingsPage /> },
+          { path: "configuracion/*", element: <DeferredPage><SettingsPage /></DeferredPage> },
           { path: "*", element: <NotFoundPage /> },
         ],
       },
@@ -80,8 +92,8 @@ const router = createBrowserRouter([
   {
     element: <RequireSession roles={["driver"]} />,
     children: [
-      { path: "/conductor", element: <DriverTodayPage /> },
-      { path: "/conductor/paradas/:stopId", element: <DriverStopPage /> },
+      { path: "/conductor", element: <DeferredPage><DriverTodayPage /></DeferredPage> },
+      { path: "/conductor/paradas/:stopId", element: <DeferredPage><DriverStopPage /></DeferredPage> },
     ],
   },
 ]);
