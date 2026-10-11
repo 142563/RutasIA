@@ -1,5 +1,7 @@
 # RutasIA — Sistema de Optimización de Rutas Inteligente
 
+**Producción: [https://enruta.world](https://enruta.world)** · Render · DNS en Spaceship · correos de entrega con Resend.
+
 Sistema web de **optimización de rutas para empresas de paquetería en Guatemala**, considerando el tráfico en tiempo real. Propone la **ruta más rápida** usando **Dijkstra y A\*** implementados desde cero, sobre una **red vial nacional** cuyos tramos pesan **minutos** (no kilómetros), con datos de tráfico de **Google Maps**.
 
 ---
@@ -117,9 +119,10 @@ frontend/
 ### 1. Clonar y configurar entorno
 
 ```bash
-git clone https://github.com/142563/RutasIA.git
-cd RutasIA
-git checkout dev
+git clone https://github.com/142563/RutasIA.git RutasIA-Codex
+cd RutasIA-Codex
+git fetch origin
+git checkout -b codex/rut-<n> origin/main
 
 python -m venv .venv
 # En Windows:
@@ -133,14 +136,25 @@ cp .env.example .env
 
 ### 2. Variables de entorno (`.env`)
 
-Mínimo para empezar:
-```bash
-GOOGLE_MAPS_API_KEY=<tu-key-del-navegador>
-DEBUG=true
-SECRET_KEY=<generada-por-django>
-```
+Reemplaza `<n>` por tu tarjeta. Usa tu propia copia: la carpeta `C:\Users\Julio Ticas\Documents\Repositorios\RutasIA` está reservada para Claude. Copia `.env.example` a `.env`; nunca subas ese archivo ni secretos a Git.
 
-Si dejas `DATABASE_URL` vacía, se usa SQLite local.
+| Variable | Uso | ¿Obligatoria? | Ejemplo sin secretos |
+|---|---|---|---|
+| `SECRET_KEY` | Sesiones Django | Sí en producción | `<clave privada aleatoria de al menos 50 caracteres>` |
+| `DEBUG` | Detalles de errores | `False` en producción | `True` local / `False` Render |
+| `ALLOWED_HOSTS` | Dominios aceptados | Sí para dominio propio | `enruta.world,www.enruta.world,rutasia.onrender.com` |
+| `CSRF_TRUSTED_ORIGINS` | Orígenes HTTPS confiables | Configura los de producción | `https://enruta.world,https://www.enruta.world` |
+| `DATABASE_URL` | PostgreSQL/Neon | Sí en Render; vacía usa SQLite | Vacío local / `<conexión privada de Neon>` |
+| `GOOGLE_MAPS_API_KEY` | Mapa, Places, Directions del navegador | Solo para mapa Google | Vacío / `<key restringida por dominio>` |
+| `GOOGLE_MAPS_MAP_ID` | Identificador del mapa | Opcional | `DEMO_MAP_ID` local |
+| `GOOGLE_ROUTES_API_KEY` | Grafo y tráfico de Routes API | Solo para datos reales | Vacío / `<key privada del servidor>` |
+| `DEMO_PASSWORD` | Creación de usuarios de demo | Solo para demo | `<contraseña propia>` |
+| `DEMO_LOGIN` | Acceso sin contraseña despachador/conductor | Opcional; sigue `DEBUG` | `False` producción; `True` solo defensa autorizada |
+| `RESEND_API_KEY` | Envío por Resend | Solo para enviar correo | Vacío local / `<key privada de Resend>` |
+| `NOTIFY_FROM` | Remitente verificado | Opcional; valor por defecto | `enruta <entregas@enruta.world>` |
+| `SITE_URL` | Enlace a la ruta en correos | Ajusta al entorno | `https://enruta.world` / `http://127.0.0.1:8000` local |
+
+Para desarrollo usa los valores locales de `.env.example`, con `DATABASE_URL=` vacía. Sin keys Google hay mapa esquemático y datos estimados. En Render ingresa los secretos en **Environment**; `render.yaml` no declara `ALLOWED_HOSTS` ni `CSRF_TRUSTED_ORIGINS`, así que agrégalas en el panel del servicio web. [Guía completa de variables](docs/EMPEZAR.md#3-variables-de-entorno).
 
 ### 3. Preparación en un paso (recomendado)
 
@@ -200,7 +214,7 @@ Abre http://127.0.0.1:8000
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -209,9 +223,16 @@ Abre http://localhost:5173 — Vite reenvía `/api` a Django en puerto 8000.
 ### 7. Correr pruebas
 
 ```bash
-python manage.py test logistics      # Backend (Django)
-cd frontend && npm test               # Frontend (Vitest)
+pip install -r requirements-dev.txt
+python -c 'import os,runpy,sys; os.environ["DATABASE_URL"]=""; sys.argv=["manage.py","test","--noinput"]; runpy.run_path("manage.py",run_name="__main__")'
+cd frontend
+npm ci
+npx tsc -b
+npx vitest run
+npm run build
 ```
+
+El comando del backend fuerza SQLite antes de leer `.env`; nunca corras pruebas contra la base de la nube. Las APIs Google y Resend se simulan en las pruebas.
 
 ---
 
@@ -297,11 +318,13 @@ Todos los endpoints requieren sesión autenticada. Ver `logistics/urls.py` y `lo
 
 ## Flujo de trabajo (desarrollo)
 
-### Rama y commits
+### Rama y commits (regla de Julio, 2026-10-11)
 
-- Rama principal: `dev` (se trabaja directamente en `dev` sin PR hasta producción)
-- Antes de commit: `python manage.py test` en verde
-- Mensaje de commit en español
+- Trabaja en tu propia copia, en `codex/rut-<n>` desde `origin/main`.
+- Antes del commit, completa todas las verificaciones de backend y frontend indicadas arriba.
+- Commit en español, en imperativo y terminado en `(RUT-<n>)`.
+- Actualiza documentación y kanban; deja la tarjeta en **En revision** e informa a Julio la rama y el hash. Claude revisa e integra a `main` localmente.
+- **No hagas push, merge a main ni abras PR. Nadie hace push sin autorización de Julio**: cada push a `main` despliega automáticamente a producción.
 
 ### Reglas del motor (no negociables)
 
@@ -328,16 +351,19 @@ Ver `CLAUDE.md` para arquitectura y convenciones completas.
 
 ## Deploy en Render
 
-1. Crear Web Service en Render conectado al repositorio
-2. **Build Command:**
-   ```bash
-   pip install -r requirements.txt && python manage.py collectstatic --noinput
-   ```
-3. **Start Command:**
-   ```bash
-   python manage.py migrate && gunicorn rutasia.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --timeout 120
-   ```
-4. **Variables de entorno:** `GOOGLE_MAPS_API_KEY`, `DATABASE_URL` (Neon), `SECRET_KEY`
+El servicio existente publica **https://enruta.world**. Usa `render.yaml` como referencia: su build compila React con `npm ci` y `npm run build`, instala Python, ejecuta `collectstatic` y las migraciones; el inicio usa Gunicorn con tres workers. El cron `refresh-traffic` recalibra cada domingo a las 06:00 de Guatemala y necesita su conexión de Neon y key del servidor propias en Environment. Los valores privados se ingresan en Render, sin publicarlos en el repositorio.
+
+### Dominio y DNS
+
+En Spaceship, `A @` apunta a `216.24.57.1` (Render) y `CNAME www` a `rutasia.onrender.com`. Confirma los valores en **Custom Domains** de Render antes de reconfigurar; Render gestiona HTTPS. Para el correo, `TXT resend._domainkey` contiene la firma DKIM que entrega Resend (no se copia aquí); los CNAME `send` y `rsend` delegan SPF/Return-Path a `send.forge.rmta.net` y `rsend.forge.rmta.net`. `TXT _dmarc` con `v=DMARC1; p=none` monitorea, sin bloquear mensajes falsificados. Comprueba la verificación en ambos paneles: web y correo son servicios distintos.
+
+Consulta [la tabla DNS y referencias oficiales](docs/EMPEZAR.md#dominio-y-dns), [Render](https://render.com/docs/custom-domains) y [Resend](https://resend.com/docs/dashboard/domains/custom-return-path). Los tipos y valores del panel de Resend prevalecen si cambia su configuración.
+
+### Correos en local
+
+Deja `RESEND_API_KEY=` vacía y `DATABASE_URL=` vacía. Con un pedido de prueba que tenga `cliente@example.invalid`, marca una parada como **Entregada** desde el conductor: se guarda la entrega y solo queda un registro `INFO` de los correos que no se enviaron; no hay llamada a Resend. El despachador creador también necesita correo para generar su aviso. Una parada fallida no dispara estos avisos. [Pasos para ver el log en consola](docs/EMPEZAR.md#probar-correos-en-local-sin-enviarlos).
+
+Actualmente RUT-55 avisa de entregas al cliente y al despachador creador; los demás correos por rol de `PLAN.md` §14 siguen pendientes. No hace falta enviar correos reales para verificar el desarrollo.
 
 ---
 
