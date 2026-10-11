@@ -25,6 +25,8 @@ urlpatterns = [
     path("api/v2/routes/<int:route_id>/cancel/", assignment_views.api_route_cancel, name="api-v2-route-cancel"),
     path("api/v2/routes/<int:route_id>/live-check/", live_views.api_route_live_check, name="api-v2-route-live-check"),
     # Configuración (admin): kind = depots | drivers | vehicles | users
+    path("api/v2/fleet/users/<int:item_id>/resend-access/", fleet_views.api_fleet_user_resend_access,
+         name="api-v2-fleet-resend-access"),
     path("api/v2/fleet/<str:kind>/", fleet_views.api_fleet_collection, name="api-v2-fleet"),
     path("api/v2/fleet/<str:kind>/<int:item_id>/", fleet_views.api_fleet_item, name="api-v2-fleet-item"),
     path("api/v2/dashboard/", dispatch_views.api_v2_dashboard, name="api-v2-dashboard"),

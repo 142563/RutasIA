@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse
+from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
@@ -28,6 +29,7 @@ def user_payload(user) -> dict:
         "role": role,
         "role_label": UserProfile.Role(role).label,
         "driver_id": driver.id if driver else None,
+        "must_change_password": bool(getattr(getattr(user, "profile", None), "must_change_password", False)),
     }
 
 
@@ -48,6 +50,9 @@ def api_login(request: HttpRequest):
     )
     if user is None:
         return _error("Usuario o contraseña incorrectos.", 400)
+    profile = getattr(user, "profile", None)
+    if profile and profile.must_change_password and profile.temp_password_expires_at             and profile.temp_password_expires_at < timezone.now():
+        return _error("Tu contraseña temporal venció. Pide al administrador que te reenvíe el acceso.", 403)
     login(request, user)
     return _ok({"user": user_payload(user)})
 

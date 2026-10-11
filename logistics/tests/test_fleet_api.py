@@ -156,7 +156,7 @@ class FleetApiTests(TestCase):
     # --- usuarios ---
     def test_user_create_and_password_change(self):
         response = self.post("users", {"username": "nuevo", "full_name": "Nora Pérez", "role": "dispatcher",
-                                       "password": "contraseña-larga"})
+                                       "password": "contraseña-larga", "email": "nora@example.com"})
         self.assertEqual(response.status_code, 201)
         body = response.json()["user"]
         self.assertEqual(body["role"], "dispatcher")
@@ -169,8 +169,8 @@ class FleetApiTests(TestCase):
         self.assertEqual(self.patch("users", user.id, {"password": "corta"}).status_code, 400)
 
     def test_user_validation(self):
-        self.assertEqual(self.post("users", {"username": "admin1", "role": "admin", "password": "contraseña-larga"}).status_code, 400)
-        self.assertEqual(self.post("users", {"username": "x", "role": "jefe", "password": "contraseña-larga"}).status_code, 400)
+        self.assertEqual(self.post("users", {"username": "admin1", "role": "admin", "password": "contraseña-larga", "email": "a@example.com"}).status_code, 400)
+        self.assertEqual(self.post("users", {"username": "x", "role": "jefe", "password": "contraseña-larga", "email": "a@example.com"}).status_code, 400)
 
     def test_user_email_create_edit_and_list(self):
         response = self.post("users", {"username": "correo", "role": "dispatcher", "password": PASSWORD,
@@ -212,10 +212,14 @@ class FleetApiTests(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.dispatcher.refresh_from_db()
                 self.assertEqual(self.dispatcher.email, "")
-        response = self.post("users", {"username": "sin-correo", "role": "driver", "password": PASSWORD,
-                                       "email": ""})
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["user"]["email"], "")
+
+    def test_user_email_is_required_on_create(self):
+        for payload in ({}, {"email": ""}, {"email": "  "}):
+            with self.subTest(payload=payload):
+                response = self.post("users", {"username": "sin-correo", "role": "driver", "password": PASSWORD, **payload})
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("correo", response.json()["error"])
+                self.assertFalse(User.objects.filter(username="sin-correo").exists())
 
     def test_only_admin_can_read_and_edit_user_email(self):
         for actor in (self.dispatcher, self.driver_user):

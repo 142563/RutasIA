@@ -1,0 +1,13 @@
+{% autoescape off %}Hola {{ name }},
+
+Se creó tu cuenta con el rol de {{ role_label }}. Tu usuario es {{ username }}.
+
+Tu contraseña temporal es: {{ temp_password }}
+{% if expires %}Vence el {{ expires }}. {% endif %}Al entrar por primera vez deberás cambiarla por una propia.
+{% if summary %}
+Con tu rol recibirás por correo:
+{% for item in summary %}- {{ item }}
+{% endfor %}{% endif %}
+Entra aquí: {{ login_url }}
+
+enruta{% endautoescape %}

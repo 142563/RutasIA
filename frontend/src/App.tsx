@@ -48,6 +48,10 @@ function RequireSession({ roles }: { roles?: Role[] }) {
   if (session.isPending) return <div className="p-8"><Spinner /></div>;
   if (session.error) return <div className="p-8"><ErrorNote error={session.error} /></div>;
   if (!session.data) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  // Con contraseña temporal solo se puede cambiarla (cualquier rol)
+  if (session.data.must_change_password && location.pathname !== "/cambiar-contrasena") {
+    return <Navigate to="/cambiar-contrasena" replace />;
+  }
   if (roles && !roles.includes(session.data.role)) return <Navigate to={homeFor(session.data.role)} replace />;
   return (
     <UserContext.Provider value={session.data}>

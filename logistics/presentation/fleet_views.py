@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 
 from logistics.application import fleet
 from logistics.domain.exceptions import PlanningError
@@ -53,6 +53,20 @@ def api_fleet_item(request: HttpRequest, kind: str, item_id: int):
         if request.method == "PATCH":
             return _ok(fleet.update_item(kind, item_id, _body(request), request.user))
         return _ok(fleet.deactivate_item(kind, item_id, request.user))
+    except LookupError as exc:
+        return _error(str(exc), 404)
+    except PlanningError as exc:
+        return _error(str(exc), 400)
+
+
+@login_required
+@require_POST
+def api_fleet_user_resend_access(request: HttpRequest, item_id: int):
+    """Admin: genera una contraseña temporal nueva y la envía por correo."""
+    if (denied := _require_role(request, UserProfile.Role.ADMIN)) is not None:
+        return denied
+    try:
+        return _ok(fleet.resend_access(item_id))
     except LookupError as exc:
         return _error(str(exc), 404)
     except PlanningError as exc:
