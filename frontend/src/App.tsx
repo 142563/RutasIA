@@ -25,6 +25,7 @@ const ReportsPage = lazy(() => import("@/pages/reports/ReportsPage").then((m) =>
 const SettingsPage = lazy(() => import("@/pages/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 const DriverTodayPage = lazy(() => import("@/pages/driver/DriverTodayPage").then((m) => ({ default: m.DriverTodayPage })));
 const DriverStopPage = lazy(() => import("@/pages/driver/DriverStopPage").then((m) => ({ default: m.DriverStopPage })));
+const RoutePrintPage = lazy(() => import("@/pages/routes/RoutePrintPage").then((m) => ({ default: m.RoutePrintPage })));
 
 /** Cada página reserva espacio mientras carga, sin ocultar la navegación. */
 function DeferredPage({ children }: { children: ReactNode }) {
@@ -60,6 +61,7 @@ const router = createBrowserRouter([
   {
     element: <RequireSession roles={["admin", "dispatcher"]} />,
     children: [
+      { path: "rutas/:routeId/imprimir", element: <DeferredPage><RoutePrintPage /></DeferredPage> },
       {
         element: <AppShell />,
         children: [

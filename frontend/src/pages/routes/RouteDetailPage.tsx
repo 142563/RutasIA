@@ -174,6 +174,10 @@ export function RouteDetailPage() {
                 {route.depot} · {formatWhen(route.departure_at)}
                 {route.driver ? <> · {route.driver}{route.vehicle ? ` · ${route.vehicle}` : ""}</> : <> · <span className="font-medium text-warn">Sin piloto</span></>}
               </p>
+              <Link to={`/rutas/${route.id}/imprimir`} target="_blank" rel="noopener noreferrer"
+                className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-line px-3 py-2 text-sm font-medium hover:bg-hover">
+                Imprimir hoja de ruta
+              </Link>
             </div>
             <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
               <SummaryStat label="Tiempo de manejo" hint={`Termina ${formatClock(route.finish_at)}`}>
