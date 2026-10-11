@@ -4,6 +4,9 @@ Regla de oro: nada se borra. "Eliminar" desactiva, para no romper rutas históri
 """
 from __future__ import annotations
 
+import secrets
+import string
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -11,8 +14,11 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from logistics.domain.exceptions import PlanningError
+from logistics.application.notifications import later
+from logistics.application.notifications.account import notify_account_created
 from logistics.models import (
     GT_LAT_MAX, GT_LAT_MIN, GT_LON_MAX, GT_LON_MIN, Depot, Driver, Node, UserProfile, Vehicle,
 )
@@ -20,6 +26,12 @@ from logistics.routing.graph import load_graph
 
 KINDS = ("depots", "drivers", "vehicles", "users")
 MIN_PASSWORD = 10
+TEMP_PASSWORD_HOURS = 72
+TEMP_PASSWORD_LENGTH = 12
+# Sin caracteres que se confunden al leer o copiar: 0/O, 1/l/I
+_UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+_LOWER = "abcdefghijkmnopqrstuvwxyz"
+_DIGITS = "23456789"
 # Valores razonables cuando el usuario no los indica (se pueden editar después).
 DEFAULT_KM_PER_LITER = Decimal("8")
 DEFAULT_COST_PER_KM = Decimal("2.50")
@@ -254,7 +266,25 @@ def _user_payload(user: User) -> dict:
         "id": user.id, "username": user.username, "full_name": user.get_full_name(),
         "role": role, "role_label": UserProfile.Role(role).label, "is_active": user.is_active,
         "email": user.email,
+        "must_change_password": bool(getattr(getattr(user, "profile", None), "must_change_password", False)),
     }
+
+
+def generate_temp_password() -> str:
+    """Contraseña temporal legible de 12 caracteres con mayúscula, minúscula y número."""
+    chars = [secrets.choice(_UPPER), secrets.choice(_LOWER), secrets.choice(_DIGITS)]
+    pool = _UPPER + _LOWER + _DIGITS
+    chars += [secrets.choice(pool) for _ in range(TEMP_PASSWORD_LENGTH - len(chars))]
+    secrets.SystemRandom().shuffle(chars)
+    return "".join(chars)
+
+
+def _mark_temporary(user: User) -> None:
+    """La contraseña actual es temporal: vence en 72 h y debe cambiarse al entrar."""
+    UserProfile.objects.update_or_create(user=user, defaults={
+        "must_change_password": True,
+        "temp_password_expires_at": timezone.now() + timedelta(hours=TEMP_PASSWORD_HOURS),
+    })
 
 
 def _write_user(payload: dict, user: User | None, actor: User) -> dict:
@@ -262,6 +292,8 @@ def _write_user(payload: dict, user: User | None, actor: User) -> dict:
     username = _text(payload, "username", "El usuario", required=creating, max_len=150)
     full_name = _text(payload, "full_name", "El nombre completo")
     email = _text(payload, "email", "El correo", max_len=254)
+    if creating and not email:
+        raise PlanningError("El correo es obligatorio: ahí enviamos el acceso.")
     if email:
         try:
             validate_email(email)
@@ -274,8 +306,10 @@ def _write_user(payload: dict, user: User | None, actor: User) -> dict:
         raise PlanningError("Elige el rol del usuario.")
     active = _flag(payload)
     password = payload.get("password") if "password" in payload else None
-    if creating or password not in (None, ""):
+    if password not in (None, ""):
         password = _check_password(password)
+    elif creating:
+        password = generate_temp_password()  # vacía al crear: la generamos y se envía por correo
     else:
         password = None
 
@@ -308,7 +342,26 @@ def _write_user(payload: dict, user: User | None, actor: User) -> dict:
         _save(user, "No se pudo guardar el usuario.")
         if role is not None:
             UserProfile.objects.update_or_create(user=user, defaults={"role": role})
+        if creating:
+            _mark_temporary(user)
+            later(notify_account_created, user.pk, password)
     return _user_payload(User.objects.select_related("profile").get(pk=user.pk))
+
+
+def resend_access(user_id: int) -> dict:
+    """Nueva contraseña temporal para el usuario, con vencimiento nuevo, enviada por correo."""
+    user = _get("users", user_id)
+    if not user.email:
+        raise PlanningError("Este usuario no tiene correo. Agrégalo para poder enviarle el acceso.")
+    if not user.is_active:
+        raise PlanningError("El usuario está desactivado. Actívalo antes de reenviarle el acceso.")
+    password = generate_temp_password()
+    with transaction.atomic():
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        _mark_temporary(user)
+        later(notify_account_created, user.pk, password)
+    return {"user": _user_payload(_get("users", user_id))}
 
 
 # --- punto de entrada --------------------------------------------------------

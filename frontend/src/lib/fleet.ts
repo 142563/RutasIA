@@ -18,6 +18,7 @@ export interface FleetVehicle {
 }
 export interface FleetUser {
   id: number; username: string; full_name: string; email: string; role: Role; role_label: string; is_active: boolean;
+  must_change_password: boolean;
 }
 
 export interface FleetTypes {
@@ -48,6 +49,15 @@ export function useSaveFleet(kind: FleetKind) {
       void client.invalidateQueries({ queryKey: ["fleet"] });
       void client.invalidateQueries({ queryKey: ["depots"] });
     },
+  });
+}
+
+/** Genera una contraseña temporal nueva y la envía por correo al usuario. */
+export function useResendAccess() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<unknown>(`/api/v2/fleet/users/${id}/resend-access/`, { method: "POST", body: {} }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["fleet", "users"] }),
   });
 }
 

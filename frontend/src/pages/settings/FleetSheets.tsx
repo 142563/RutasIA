@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
 import { SheetContent } from "@/components/ui/sheet";
 import {
-  parseLocation, ROLES, useFleet, useSaveFleet,
+  parseLocation, ROLES, useFleet, useResendAccess, useSaveFleet,
   type FleetDepot, type FleetDriver, type FleetKind, type FleetUser, type FleetVehicle, type Role,
 } from "@/lib/fleet";
 
@@ -251,11 +251,12 @@ export function UserSheet({ item, onDone }: { item: FleetUser | null; onDone: ()
   const [submitted, setSubmitted] = React.useState(false);
   const errors = {
     username: form.username.trim() ? null : "Indica el nombre de usuario.",
-    password: (!item || form.password) && form.password.length < 10 ? "La contraseña debe tener al menos 10 caracteres." : null,
+    email: item || EMAIL_RE.test(form.email.trim()) ? null : "Indica un correo válido: ahí enviamos el acceso.",
+    password: form.password && form.password.length < 10 ? "La contraseña debe tener al menos 10 caracteres." : null,
   };
 
   function build() {
-    if (errors.username || errors.password) return null;
+    if (errors.username || errors.email || errors.password) return null;
     const body: Record<string, unknown> = { username: form.username.trim(), full_name: form.full_name.trim(), email: form.email.trim(), role };
     if (form.password) body.password = form.password;
     return body;
@@ -271,18 +272,56 @@ export function UserSheet({ item, onDone }: { item: FleetUser | null; onDone: ()
       <Field label="Nombre completo" htmlFor="u-name">
         <Input id="u-name" value={form.full_name} onChange={set(setForm, "full_name")} />
       </Field>
-      <Field label="Correo" htmlFor="u-email" hint="Opcional. Aquí recibirás los avisos de entrega de las rutas que crees.">
-        <Input id="u-email" type="email" autoComplete="email" maxLength={254} value={form.email} onChange={set(setForm, "email")} />
+      <Field label="Correo" htmlFor="u-email" error={submitted ? errors.email : null}
+        hint={item ? "Aquí recibe sus avisos según su rol." : "Obligatorio. Aquí enviamos su acceso y sus avisos según su rol."}>
+        <Input id="u-email" type="email" autoComplete="email" maxLength={254} value={form.email} onChange={set(setForm, "email")} aria-invalid={submitted && !!errors.email} />
       </Field>
       <Field label="Rol" htmlFor="u-role" hint="Administrador: todo. Despachador: pedidos y rutas. Conductor: solo su ruta en el celular.">
         <Select id="u-role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
           {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
         </Select>
       </Field>
-      <Field label={item ? "Nueva contraseña" : "Contraseña"} htmlFor="u-password" error={submitted ? errors.password : null}
-        hint={item ? "Déjala vacía para no cambiarla." : "Mínimo 10 caracteres."}>
+      <Field label={item ? "Nueva contraseña" : "Contraseña temporal"} htmlFor="u-password" error={submitted ? errors.password : null}
+        hint={item ? "Déjala vacía para no cambiarla." : "Opcional. Si la dejas vacía, generamos una temporal y se la enviamos por correo."}>
         <Input id="u-password" type="password" value={form.password} onChange={set(setForm, "password")} autoComplete="new-password" />
       </Field>
+      {item ? <ResendAccess user={item} /> : null}
     </FormShell>
+  );
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Reenvía el acceso: contraseña temporal nueva por correo, con confirmación en dos pasos. */
+function ResendAccess({ user }: { user: FleetUser }) {
+  const resend = useResendAccess();
+  const [confirming, setConfirming] = React.useState(false);
+
+  if (!user.email) {
+    return <p className="rounded-lg border border-line bg-elevated p-3 text-[13px] text-ink-2">Agrega un correo para poder enviarle el acceso.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-line bg-elevated p-3">
+      <p className="text-[13px] text-ink-2">
+        {user.must_change_password ? "Aún no cambia su contraseña temporal." : "¿No puede entrar?"} Le enviamos una contraseña temporal nueva a {user.email}.
+      </p>
+      {confirming ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            disabled={resend.isPending}
+            onClick={() => resend.mutate(user.id, {
+              onSuccess: () => { toast.success(`Acceso enviado a ${user.email}`); setConfirming(false); },
+            })}
+          >
+            {resend.isPending ? "Enviando…" : "Sí, reenviar"}
+          </Button>
+          <Button variant="outline" onClick={() => setConfirming(false)} disabled={resend.isPending}>Cancelar</Button>
+          <span className="text-xs text-ink-2">La contraseña actual dejará de servir.</span>
+        </div>
+      ) : (
+        <Button variant="outline" className="self-start" onClick={() => setConfirming(true)}>Reenviar acceso</Button>
+      )}
+      {resend.error ? <p className="text-[13px] text-err" role="alert">{resend.error.message}</p> : null}
+    </div>
   );
 }

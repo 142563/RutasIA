@@ -1,0 +1,15 @@
+{% extends "emails/base.html" %}
+{% block title %}{{ subject }}{% endblock %}
+{% block heading %}Bienvenido a enruta{% endblock %}
+{% block body %}
+<p style="margin:0 0 12px">Hola {{ name }},</p>
+<p style="margin:0 0 12px">Se creó tu cuenta con el rol de <strong>{{ role_label }}</strong>. Tu usuario es <strong>{{ username }}</strong>.</p>
+<p style="margin:0 0 6px">Tu contraseña temporal es:</p>
+<p style="margin:0 0 12px;font-family:Menlo,Consolas,monospace;font-size:20px;font-weight:700;letter-spacing:1px;background:#f4f4f5;border-radius:8px;padding:12px 14px">{{ temp_password }}</p>
+<p style="margin:0 0 12px">{% if expires %}Vence el {{ expires }}. {% endif %}Al entrar por primera vez deberás cambiarla por una propia.</p>
+{% if summary %}
+<p style="margin:0 0 6px">Con tu rol recibirás por correo:</p>
+<ul style="margin:0 0 12px;padding-left:20px">{% for item in summary %}<li style="margin:0 0 4px">{{ item }}</li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}
+{% block action %}{% include "emails/_button.html" with url=login_url label="Entrar a enruta" %}{% endblock %}

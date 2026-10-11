@@ -10,6 +10,8 @@ export interface User {
   role: Role;
   role_label: string;
   driver_id: number | null;
+  /** Entró con una contraseña temporal: debe cambiarla antes de usar la app. */
+  must_change_password: boolean;
 }
 
 export interface DataSource {
