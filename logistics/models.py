@@ -368,6 +368,7 @@ class Edge(TimestampedModel):
     destination = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="edges_in")
     distance_km = models.FloatField()
     duration_free_min = models.FloatField(help_text="t0: minutos sin tráfico (staticDuration de Google).")
+    polyline = models.TextField(blank=True)
     road = models.CharField(max_length=20, blank=True, help_text="Carretera principal, p. ej. CA-1.")
     class RoadClass(models.TextChoices):
         PRIMARY = "primary", "Primaria (CA)"
@@ -458,6 +459,7 @@ class RouteSample(models.Model):
     duration_s = models.FloatField(null=True, blank=True)
     static_duration_s = models.FloatField(null=True, blank=True)
     distance_m = models.FloatField(null=True, blank=True)
+    polyline = models.TextField(blank=True)
     fetched_at = models.DateTimeField(default=timezone.now)
 
     class Meta:

@@ -6,14 +6,16 @@ errores se convierten en PlanningError con mensajes en español.
 """
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, time
 from typing import Any
 
 from django.utils import timezone
+from django.db.models import Q
 from django.utils.dateparse import parse_date, parse_datetime
 
 from logistics.domain.exceptions import PlanningError
-from logistics.models import DayType, TrafficBand
+from logistics.models import DayType, Edge, TrafficBand
 from logistics.routing.astar import astar
 from logistics.routing.dijkstra import dijkstra
 from logistics.routing.graph import CRITERIA, DISTANCE, TIME, RoadGraph, load_graph
@@ -23,6 +25,29 @@ from logistics.routing.traffic import GT_TZ, REPRESENTATIVE_TIME, profile_for, t
 
 ALGORITHMS = {"dijkstra": dijkstra, "astar": astar}
 MAX_STOPS = 50  # alcance declarado en el protocolo
+
+
+def geometry(params) -> dict:
+    """Consulta geometría almacenada de pares dirigidos, fuera del motor."""
+    try:
+        pairs = json.loads(params.get("edges", "[]"))
+    except (ValueError, TypeError):
+        raise PlanningError("Indica las aristas como pares de códigos en JSON.") from None
+    if not isinstance(pairs, list) or len(pairs) > 500 or any(
+        not isinstance(pair, list) or len(pair) != 2 or any(
+            not isinstance(code, str) or not code or len(code) > 60 for code in pair
+        ) for pair in pairs
+    ):
+        raise PlanningError("Indica hasta 500 pares de códigos de nodos.")
+    if not pairs:
+        return {"edges": []}
+    query = Q()
+    for a, b in pairs:
+        query |= Q(origin__code=a, destination__code=b)
+    return {"edges": [
+        {"from": edge.origin.code, "to": edge.destination.code, "polyline": edge.polyline}
+        for edge in Edge.objects.filter(query, is_active=True).select_related("origin", "destination")
+    ]}
 
 
 def get_graph() -> RoadGraph:

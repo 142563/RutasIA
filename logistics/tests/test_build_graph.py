@@ -11,7 +11,7 @@ from logistics.models import DayType, Edge, Node, RouteSample, TrafficBand, Traf
 from logistics.routing.build import build_estimated, build_from_google, estimate_segment
 from logistics.routing.geo import haversine_km
 from logistics.routing.google import (
-    FIELD_MASK, MATRIX_URL, MatrixElement, RoutesApiError, RoutesClient, parse_matrix_response,
+    FIELD_MASK, MATRIX_URL, MatrixElement, RouteResult, RoutesApiError, RoutesClient, parse_matrix_response,
 )
 from logistics.routing.graph import DISTANCE, TIME, RoadGraph, load_graph
 from logistics.routing.seed_data import ROAD_SEGMENTS, RoadSegment
@@ -95,6 +95,10 @@ class FakeRoutesClient:
             seconds = km / 50 * 3600
             result.append(MatrixElement(0, j, "", km * 1000, seconds, seconds))
         return result
+
+    def compute_route(self, origin, destination, traffic=False):
+        self.requests_made += 1
+        return RouteResult(60, 60, 1000, "_p~iF~ps|U_ulLnnqC_mqNvxq`@")
 
 
 def make_node(code, lat, lon):

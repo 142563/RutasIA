@@ -23,6 +23,12 @@ def api_routing_nodes(request: HttpRequest):
     return _run(service.nodes)
 
 
+@login_required
+@require_GET
+def api_routing_geometry(request: HttpRequest):
+    return _run(service.geometry, request.GET)
+
+
 def _post(use_case):
     @login_required
     @require_POST
