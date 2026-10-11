@@ -1,15 +1,32 @@
 {% extends "emails/base.html" %}
-{% block title %}{{ subject }}{% endblock %}
-{% block heading %}Bienvenido a enruta{% endblock %}
+{% block preheader %}Tu usuario es {{ username }}. Entra con tu contraseña temporal y elige una propia.{% endblock %}
+{% block status_wrap %}<span style="display:inline-block;padding:4px 10px;border-radius:999px;background:#f1f1ee;color:#3f4147;font-size:12px;font-weight:600;letter-spacing:0.2px;text-transform:uppercase">Cuenta nueva</span>{% endblock %}
+{% block heading %}Bienvenido a enruta, {{ name }}{% endblock %}
+{% block lead %}Ya tienes acceso como <strong>{{ role_label }}</strong>. Estos son tus datos para entrar por primera vez.{% endblock %}
 {% block body %}
-<p style="margin:0 0 12px">Hola {{ name }},</p>
-<p style="margin:0 0 12px">Se creó tu cuenta con el rol de <strong>{{ role_label }}</strong>. Tu usuario es <strong>{{ username }}</strong>.</p>
-<p style="margin:0 0 6px">Tu contraseña temporal es:</p>
-<p style="margin:0 0 12px;font-family:Menlo,Consolas,monospace;font-size:20px;font-weight:700;letter-spacing:1px;background:#f4f4f5;border-radius:8px;padding:12px 14px">{{ temp_password }}</p>
-<p style="margin:0 0 12px">{% if expires %}Vence el {{ expires }}. {% endif %}Al entrar por primera vez deberás cambiarla por una propia.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 4px;background:#f8f8f6;border:1px solid #ececea;border-radius:10px">
+  <tr>
+    <td style="padding:14px 16px 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:13px;color:#6b6f76;width:38%">Usuario</td>
+    <td style="padding:14px 16px 0 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;color:#111113">{{ username }}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 16px 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:13px;color:#6b6f76;vertical-align:middle">Contraseña temporal</td>
+    <td style="padding:10px 16px 0 0"><span style="display:inline-block;padding:8px 12px;background:#ffffff;border:1px dashed #c9cac5;border-radius:8px;font-family:Menlo,Consolas,'Courier New',monospace;font-size:18px;font-weight:700;letter-spacing:1.5px;color:#111113">{{ temp_password }}</span></td>
+  </tr>
+  <tr>
+    <td style="padding:10px 16px 14px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:13px;color:#6b6f76">Vence</td>
+    <td style="padding:10px 16px 14px 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;color:#111113">{% if expires %}{{ expires }} (en 72 horas){% else %}En 72 horas{% endif %}</td>
+  </tr>
+</table>
+<p style="margin:14px 0 0;font-size:14px;line-height:1.6;color:#3f4147">Al entrar te pediremos cambiarla por una contraseña propia. Por seguridad, nadie de enruta te la pedirá nunca por teléfono ni por correo.</p>
 {% if summary %}
-<p style="margin:0 0 6px">Con tu rol recibirás por correo:</p>
-<ul style="margin:0 0 12px;padding-left:20px">{% for item in summary %}<li style="margin:0 0 4px">{{ item }}</li>{% endfor %}</ul>
+<p style="margin:18px 0 6px;font-size:14px;font-weight:600;color:#111113">Con tu rol te avisaremos por correo de:</p>
+<table role="presentation" cellpadding="0" cellspacing="0">
+  {% for item in summary %}
+  <tr><td style="padding:3px 10px 3px 0;vertical-align:top;color:#2563eb;font-size:14px">&#8226;</td><td style="padding:3px 0;font-size:14px;line-height:1.5;color:#2b2b30">{{ item }}</td></tr>
+  {% endfor %}
+</table>
 {% endif %}
 {% endblock %}
 {% block action %}{% include "emails/_button.html" with url=login_url label="Entrar a enruta" %}{% endblock %}
+{% block reason %}Recibes este correo porque un administrador creó o reactivó tu cuenta en enruta. Si no esperabas este correo, ignóralo: sin la contraseña nadie puede entrar.{% endblock %}
