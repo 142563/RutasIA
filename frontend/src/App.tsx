@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/motion";
 import { setUnauthorizedHandler } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { UserContext, homeFor, useSession } from "@/lib/auth";
+import { replaceSession } from "@/lib/sessionCache";
 import type { Role } from "@/lib/types";
 import { HomePage } from "@/pages/Home";
 import { LoginPage } from "@/pages/Login";
@@ -112,7 +113,7 @@ const router = createBrowserRouter([
 ]);
 
 setUnauthorizedHandler(() => {
-  queryClient.setQueryData(["session"], null);
+  replaceSession(queryClient, null);
 });
 
 export function App() {
