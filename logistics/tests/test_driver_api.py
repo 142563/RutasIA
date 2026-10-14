@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from logistics.application.road_geometry import encode
 from logistics.models import Depot, Driver, Edge, Node, Order, Route, RouteStop, UserProfile
 
 
@@ -137,7 +138,8 @@ class DriverApiTests(TestCase):
         a = Node.objects.create(code="a", name="Alfa", kind="cabecera", department="01", latitude=14.6, longitude=-90.5)
         b = Node.objects.create(code="b", name="Beta", kind="cabecera", department="01", latitude=14.7, longitude=-90.4)
         c = Node.objects.create(code="c", name="Gama", kind="cabecera", department="01", latitude=14.8, longitude=-90.3)
-        Edge.objects.create(origin=a, destination=b, distance_km=10, duration_free_min=10, polyline="abc")
+        line = encode([(14.6, -90.5), (14.7, -90.4)])  # polilínea válida (las dañadas se descartan)
+        Edge.objects.create(origin=a, destination=b, distance_km=10, duration_free_min=10, polyline=line)
         Edge.objects.create(origin=b, destination=c, distance_km=10, duration_free_min=10, polyline="zzz")
         route, _ = self.make_route(self.driver_a)
         route.legs = [{"nodes": ["a", "b"]}]
@@ -145,7 +147,7 @@ class DriverApiTests(TestCase):
         self.client.force_login(self.user_a)
         data = self.client.get(reverse("api-driver-route-map", kwargs={"route_id": route.id})).json()
         self.assertEqual({n["code"] for n in data["nodes"]}, {"a", "b"})
-        self.assertEqual([(e["from"], e["to"], e["polyline"]) for e in data["edges"]], [("a", "b", "abc")])
+        self.assertEqual([(e["from"], e["to"], e["polyline"]) for e in data["edges"]], [("a", "b", line)])
         self.assertEqual(data["legs"], [{"to_sequence": 1, "nodes": ["a", "b"]}])
 
     def test_route_map_is_not_available_to_other_drivers_or_dispatch(self):

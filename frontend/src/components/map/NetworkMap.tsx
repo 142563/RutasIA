@@ -14,7 +14,7 @@ import { concatenateGeometry, type EdgeGeometry } from "@/lib/polyline";
 import { CONGESTION_STEPS, congestionColor } from "@/lib/congestion";
 import { useTrafficProfile } from "@/lib/queries";
 import { bandFor, bandLabel, dayTypeFor } from "@/lib/traffic";
-import { GEOMETRY_PENDING_NOTE, geometryPairsFor, mergeTrafficPairs, pairsWithGeometry, pairTitle, toggleLayer, trafficMapEdges } from "@/lib/trafficMap";
+import { GEOMETRY_PENDING_NOTE, mergeTrafficPairs, NETWORK_GEOMETRY_KEY, pairsWithGeometry, pairTitle, toggleLayer, trafficMapEdges } from "@/lib/trafficMap";
 import { useAnimatedPosition } from "@/components/ui/motion";
 
 /**
@@ -116,11 +116,17 @@ export function NetworkMap(props: NetworkMapProps) {
     },
     retry: false,
   });
-  const stored = new Map<string, LatLng[]>();
-  for (const path of wanted) {
-    const points = concatenateGeometry(path.codes, query.data ?? []);
-    if (points) stored.set(pathKey(path.codes), points);
-  }
+  // Decodificar solo cuando cambian las rutas o llega la geometría (no en cada render)
+  const wantedKey = wanted.map((path) => pathKey(path.codes)).join("|");
+  const stored = React.useMemo(() => {
+    const result = new Map<string, LatLng[]>();
+    for (const path of wanted) {
+      const points = concatenateGeometry(path.codes, query.data ?? []);
+      if (points) result.set(pathKey(path.codes), points);
+    }
+    return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantedKey, query.data]);
   const [layersOn, setLayersOn] = React.useState({ google: false, ours: true });
   const trafficVisible = layersOn.google;
   const [now, setNow] = React.useState(() => new Date());
@@ -132,25 +138,16 @@ export function NetworkMap(props: NetworkMapProps) {
   const day = dayTypeFor(now);
   const profile = useTrafficProfile(band, day);
   const automatic = !props.renderEdges && !props.edgeStyle;
-  const traffic = automatic ? trafficMapEdges(profile.data, band, day) : null;
+  // Memorizado: un arreglo nuevo en cada render obligaba a decodificar toda la red cada vez
+  const traffic = React.useMemo(
+    () => (automatic ? trafficMapEdges(profile.data, band, day) : null), [automatic, profile.data, band, day]);
   const trafficPairs = React.useMemo(() => mergeTrafficPairs(traffic), [traffic]);
   const onGoogle = google.status === "ready";
   const showOurs = automatic && layersOn.ours && trafficPairs.length > 0;
-  // Sobre Google se necesita la geometría guardada de cada arista; solo se pide con la capa activa.
-  const trafficPairKey = trafficPairs.map((pair) => pair.key).join("|");
+  // Sobre Google se necesita la geometría de cada arista: toda la red (simplificada) en una sola solicitud.
   const trafficGeometry = useQuery({
-    queryKey: ["traffic-geometry", trafficPairKey], enabled: onGoogle && showOurs, staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const wantedPairs = geometryPairsFor(trafficPairs);
-      const edges: EdgeGeometry[] = [];
-      for (let i = 0; i < wantedPairs.length; i += 25) {
-        const response = await api<{ edges: EdgeGeometry[] }>("/api/routing/geometry/", {
-          query: { edges: JSON.stringify(wantedPairs.slice(i, i + 25)) },
-        });
-        edges.push(...response.edges);
-      }
-      return edges;
-    },
+    queryKey: NETWORK_GEOMETRY_KEY, enabled: onGoogle && showOurs, staleTime: 30 * 60_000,
+    queryFn: async () => (await api<{ edges: EdgeGeometry[] }>("/api/routing/geometry/", { query: { all: "1" } })).edges,
     retry: false,
   });
   const drawn = React.useMemo(

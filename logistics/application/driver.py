@@ -12,9 +12,10 @@ from django.utils import timezone
 from logistics.application.notifications import (
     later, on_delivered, on_delivery_failed, on_route_completed, on_route_started,
 )
+from logistics.application import road_geometry
 from logistics.application.planning import route_payload
 from logistics.domain.exceptions import PlanningError
-from logistics.models import Driver, Edge, Node, Order, Route, RouteStop
+from logistics.models import Driver, Node, Order, Route, RouteStop
 
 REASON_MAX = 120
 
@@ -76,15 +77,9 @@ def route_map(user, route_id: int) -> dict:
         {"code": n.code, "name": n.name, "kind": n.kind, "lat": n.latitude, "lng": n.longitude}
         for n in Node.objects.filter(code__in=codes)
     ]
-    edges = []
-    if pairs:
-        wanted = Q()
-        for a, b in pairs:
-            wanted |= Q(origin__code=a, destination__code=b)
-        edges = [
-            {"from": e.origin.code, "to": e.destination.code, "polyline": e.polyline}
-            for e in Edge.objects.filter(wanted, is_active=True).select_related("origin", "destination")
-        ]
+    # Geometría simplificada y en memoria (road_geometry): ligera para el celular
+    geometry = road_geometry.simplified_geometry() if pairs else {}
+    edges = [{"from": a, "to": b, "polyline": geometry[(a, b)]} for a, b in sorted(pairs) if (a, b) in geometry]
     return {"route_id": route.id, "legs": legs, "nodes": nodes, "edges": edges}
 
 

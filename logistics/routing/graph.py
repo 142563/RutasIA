@@ -56,6 +56,8 @@ class RoadGraph:
         if not self.road_classes:
             self.road_classes = [""] * len(self.t0)
         self._weights_cache: dict[tuple, list[float]] = {}
+        # v_max de A* por lista de pesos (id → (lista, valor)); ver astar.compute_v_max
+        self._vmax_cache: dict[int, tuple[Sequence[float], float]] = {}
 
     # --- construcción -----------------------------------------------------
 

@@ -11,6 +11,7 @@ import { AnimatedNumber, Card, EASE, SPRING, Skeleton, Stagger, StaggerItem } fr
 import { EmptyState, ErrorNote, Metric, PageHeader, Segmented, Spinner } from "@/components/ui/misc";
 import { formatClock, formatKm, formatMinutes, toLocalInputValue } from "@/lib/format";
 import { useDepots, useOrders } from "@/lib/orders";
+import { useDebouncedValue } from "@/lib/debounce";
 import { routeNodes, useCreateRoute, useFleet, usePlan, type Criterion, type PlanResponse, type PlanVariant } from "@/lib/planning";
 import { useNetwork } from "@/lib/queries";
 import { routeConnectors } from "@/lib/roads";
@@ -81,7 +82,8 @@ export function PlannerPage() {
   const request = depotId && ids.length && departure
     ? { depot_id: depotId, order_ids: ids, departure, service_min: serviceMin, return_to_depot: returnToDepot, allow_unpaved: allowUnpaved }
     : null;
-  const plan = usePlan(request);
+  // Se pide el plan cuando la selección deja de cambiar: antes cada clic lanzaba un cálculo completo
+  const plan = usePlan(useDebouncedValue(request, 400));
   const fleet = useFleet();
   const create = useCreateRoute();
 
