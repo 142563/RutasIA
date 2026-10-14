@@ -1,3 +1,8 @@
 # Solo para desarrollo local (no se instala en Render)
 -r requirements.txt
 matplotlib>=3.9
+# Experimento de la tesis (run_thesis_experiment): OR-Tools solo como LÍNEA BASE del
+# genético, nunca en el motor; SciPy/Pandas para la estadística.
+ortools>=9.10
+scipy>=1.13
+pandas>=2.2

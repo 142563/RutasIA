@@ -156,7 +156,7 @@ m_e ≥ 1  →  1.0 = sin tráfico, 2.0 = tarda el doble
 
 1. Cada dirección se geocodifica con Google Places y se asocia a su **nodo más cercano** del grafo (su municipio o cruce).
 2. **Matriz de tiempos** entre bodega y paradas con Dijkstra uno-a-todos, para la franja de salida.
-3. **Orden de visita** con vecino más cercano + **2-opt**, minimizando el **tiempo total**.
+3. **Orden de visita** con el **algoritmo genético** (`genetic.py`, RUT-79: torneo, cruce OX, mutación, elitismo y 2-opt memético; aptitud = tiempo total con la franja de cada tramo), sembrado con vecino más cercano + 2-opt, minimizando el **tiempo total**. Tesis: el genético es el motor principal; OR-Tools solo es línea base en `run_thesis_experiment`.
 4. Cada tramo entre paradas con **A\***. La hora de llegada a una parada es la hora de salida del siguiente tramo, así que el tráfico se evalúa en la franja correcta de cada tramo.
 5. El dibujo en el mapa y la "última milla" dentro de la ciudad destino los traza **Google Directions** usando como *waypoints* los nodos que eligió nuestro algoritmo.
 
@@ -227,7 +227,7 @@ Todo se genera con `python manage.py run_experiments` → CSV + gráficas para e
 - Perfiles de tráfico por franja horaria (14 perfiles) calibrados con Google.
 - **Dijkstra y A\*** propios con pesos en tiempo y el checklist de §2.9 completo.
 - Comparación **más rápida (tráfico)** vs **más corta (km)** en el Planificador.
-- Varias paradas: Dijkstra para la matriz, vecino más cercano + 2-opt, A\* por tramo, ETAs.
+- Varias paradas: Dijkstra para la matriz, algoritmo genético para el orden, A\* por tramo, ETAs.
 - **Laboratorio**: Dijkstra y A\* lado a lado sobre el mapa de Guatemala.
 - Experimentos E1, E2, E3, E5 y E7.
 - Pedidos con dirección real (Google Places) asociada al nodo más cercano.
@@ -275,7 +275,8 @@ logistics/
     ├── traffic.py       # franja(t), multiplicadores m_e, incidentes
     ├── dijkstra.py      # punto a punto y uno-a-todos
     ├── astar.py         # A* con v_max derivado de los datos
-    ├── multistop.py     # matriz, vecino más cercano, 2-opt, ETAs
+    ├── multistop.py     # matriz, orden (genético; vecino más cercano + 2-opt como semilla), ETAs
+    ├── genetic.py       # algoritmo genético propio (RUT-79)
     ├── google.py        # cliente Routes API con caché (nunca se llama dentro del algoritmo)
     └── instrument.py    # nodos expandidos, ms, orden de exploración
 logistics/management/commands/
@@ -347,7 +348,7 @@ Los datos actuales (10 departamentos, 13 conexiones con km a mano) se reemplazan
 
 ### A. Planificar con tráfico
 1. Elegir bodega, **hora de salida** y pedidos (p. ej. entregas en Chimaltenango, Quetzaltenango y Retalhuleu).
-2. **Optimizar:** Dijkstra arma la matriz, 2-opt ordena y A\* elige los tramos.
+2. **Optimizar:** Dijkstra arma la matriz, el algoritmo genético ordena y A\* elige los tramos.
 3. Resultado: *"Más rápida: 5 h 10 min por CA-1 · La más corta (por CA-2) tardaría 5 h 55 min con el tráfico de las 07:00"*.
 4. Sugerencia: *"Si sales a las 09:00, ahorras 40 min"*.
 5. Confirmar y asignar al conductor.

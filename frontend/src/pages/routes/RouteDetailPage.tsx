@@ -167,6 +167,14 @@ function DetailSkeleton() {
   );
 }
 
+/** Algoritmo que ordenó las paradas (las rutas anteriores al genético no lo guardaban). */
+const OPTIMIZER_LABEL: Record<string, string> = {
+  genetic: "algoritmo genético",
+  nn2opt: "vecino más cercano + 2-opt",
+  fixed: "orden indicado",
+  "": "vecino más cercano + 2-opt",
+};
+
 export function RouteDetailPage() {
   const { routeId } = useParams();
   const query = useRouteDetail(routeId);
@@ -258,6 +266,9 @@ export function RouteDetailPage() {
                   <ChevronRightIcon className="size-4 text-ink-2 transition-transform group-open:rotate-90" aria-hidden />
                   Tramos <span className="num font-normal text-ink-2">{detail.legs.length}</span>
                 </summary>
+                <p className="mb-2 text-xs text-ink-2">
+                  Orden de visita: {OPTIMIZER_LABEL[route.optimizer ?? ""] ?? OPTIMIZER_LABEL[""]} · cada tramo con A*
+                </p>
                 {detail.legs.length === 0 ? <p className="text-sm text-ink-2">Sin tramos guardados.</p> : (
                   <ol className="divide-y divide-line border-y border-line">
                     {detail.legs.map((leg, i) => (

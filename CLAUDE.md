@@ -5,8 +5,13 @@ Guía para Claude Code en este repositorio. **Léela completa antes de programar
 ## Qué es este proyecto
 
 Proyecto de graduación: sistema web de **optimización de rutas para empresas de paquetería en Guatemala**.
-El objetivo es **proponer la mejor ruta considerando el tráfico**, usando **Dijkstra y A\*** implementados por nosotros
-sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los datos de tráfico vienen de Google Maps.
+El objetivo es **proponer la mejor ruta considerando el tráfico**: un **algoritmo genético** propio ordena las paradas y
+**Dijkstra y A\*** (también propios) calculan la matriz y cada tramo sobre una **red vial nacional** cuyas aristas pesan
+**minutos** (no km). Los datos de tráfico vienen de Google Maps.
+
+- **La tesis aprobada (PG2, Caps. I–V) es la especificación (2026-10-14):** si el código y el documento difieren, se
+  corrige el código. Genético = motor principal; OR-Tools = solo línea base en experimentos; refuerzo con TensorFlow =
+  exploratorio, en `experiments/colab/`.
 
 - **Plan completo (fuente de verdad):** [`docs/PLAN.md`](docs/PLAN.md). Antes de una tarea, lee la sección que corresponda.
 - **Foco (2026-10-10):** el producto es el **ruteo inteligente en vivo** (el sistema controla el mapa y decide la mejor ruta con tráfico), **no** un gestor de bodegas. Visión, avisos por rol y trabajo con Codex: §14 de `docs/PLAN.md`.
@@ -18,7 +23,13 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
 - Django 6 (requiere **Python ≥ 3.12**), app única `logistics`, organizada por capas:
   - **Motor nuevo** `logistics/routing/` (Semana 1, Días 1–5):
     - `graph.py` (`RoadGraph` en memoria), `dijkstra.py`, `astar.py` (`v_max` derivado de los datos), `instrument.py`.
-    - `traffic.py` (franjas), `multistop.py` (matriz + vecino más cercano + 2-opt + ETAs).
+    - `traffic.py` (franjas), `multistop.py` (matriz con Dijkstra + orden con el **genético** + tramos con A\* + ETAs).
+    - `genetic.py` (RUT-79): algoritmo genético propio (torneo, cruce OX, mutación, elitismo, 2-opt memético), aptitud
+      dependiente del tiempo (cada tramo con la franja en que empieza), semilla fija, sembrado con vecino más cercano +
+      2-opt (nunca peor). Parámetros del administrador en `OptimizerSettings` (fila única, editable en `/admin/`).
+    - `baseline_ortools.py` + `thesis_experiment.py`: experimento de la tesis (`python manage.py run_thesis_experiment`,
+      3 escenarios × 10 repeticiones, convencional = proximidad sucesiva) con salida en `docs/Capitulo V/resultados/`.
+      OR-Tools, SciPy y Pandas están solo en `requirements-dev.txt`.
     - `google.py` (Routes API, solo en comandos), `build.py`, `calibration.py`.
     - `experiments.py`, `synthetic.py`, `charts.py`, y los datos semilla en `seed_data.py`.
   - Modelos del grafo: `Node`, `Edge` (dirigida), `TrafficProfile` (m ≥ 1) y `RouteSample` (caché/bitácora de Google).
@@ -46,7 +57,7 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
    - Grafo nacional de ~100–150 nodos (`Node`, `Edge` dirigidas) verificado con Google Routes API.
    - Costo de arista = `t0_e × m_e(franja, tipo_de_día)`, con `m ≥ 1`. Hay 7 franjas horarias × laboral/fin de semana.
    - Dijkstra (punto a punto y uno-a-todos) y A\* con `h(n) = haversine(n, destino) / v_max`, **`v_max` derivado de los datos**.
-   - Varias paradas: matriz con Dijkstra, vecino más cercano + 2-opt, tramos con A\*.
+   - Varias paradas: matriz con Dijkstra, orden con el algoritmo genético, tramos con A\*.
    - Experimentos E1–E7 con `python manage.py run_experiments`.
 2. **Semana 2 — App React** (`frontend/`: Vite + TypeScript + Tailwind + shadcn/ui). Django sirve la API y el build.
 3. **Semana 3 — Conductor, incidentes y recálculo, pulido y deploy.**
@@ -57,9 +68,15 @@ sobre una **red vial nacional** cuyas aristas pesan **minutos** (no km). Los dat
 - Costo y heurística en la **misma unidad** (minutos).
 - `v_max = max_e haversine(u,v) / costo_mínimo(e)`. Así la heurística es admisible y consistente. Nunca uses una velocidad promedio.
 - Grafo **dirigido** y cargado **en memoria**. **Nunca** llamar a Google ni a la BD dentro del bucle de Dijkstra o A\*.
-- Implementación propia con `heapq`. **No** usar librerías de ruteo (networkx, OR-Tools, OSMnx) en el motor.
+- Implementación propia con `heapq` y biblioteca estándar (Dijkstra, A\* y el genético). **No** usar librerías de ruteo
+  ni de optimización (networkx, OSMnx, DEAP, OR-Tools) en el motor ni en la API. **OR-Tools se permite solo como línea
+  base** del experimento de la tesis (`baseline_ortools.py`, `requirements-dev.txt`; Render no lo instala).
+- El genético usa la **misma** matriz de Dijkstra y respeta la terracería (se evita por defecto, ×20). Límite: 50 paradas
+  y respuesta < 30 s (`response_seconds` en la API).
 - Toda búsqueda devuelve instrumentación: nodos expandidos, ms y la ruta.
 - Prueba obligatoria: `costo(A*) == costo(Dijkstra)` en todos los pares y franjas.
+- Pruebas del genético: óptimo de fuerza bruta con 8 paradas, nunca peor que vecino más cercano + 2-opt, misma semilla =
+  mismo resultado, 50 paradas < 30 s.
 
 ## Google Maps
 

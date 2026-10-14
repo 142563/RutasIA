@@ -55,6 +55,8 @@ export interface RouteRow {
   status: RouteStatus;
   status_label: string;
   criterion: "time" | "distance";
+  /** Quién ordenó las paradas: genetic | nn2opt | fixed; "" en rutas anteriores al genético. */
+  optimizer?: string;
   depot: string;
   depot_lat?: number | null;
   depot_lng?: number | null;

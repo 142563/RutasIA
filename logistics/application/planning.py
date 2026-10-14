@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from time import perf_counter
 
 from django.db import transaction
 from django.utils import timezone
@@ -17,11 +18,13 @@ from django.utils import timezone
 from logistics.application import assignment
 from logistics.application.notifications import later, on_route_created
 from logistics.application.orders import app_orders, node_ref
-from logistics.application.routing import avoid_unpaved, get_graph, parse_departure, roads_along
+from logistics.application.routing import (avoid_unpaved, get_graph, optimizer_params, optimizer_payload,
+                                           parse_departure, roads_along)
 from logistics.domain.exceptions import PlanningError
 from logistics.models import Depot, Driver, Order, Route, RouteStop, TrafficBand, Vehicle
 from logistics.routing.graph import TIME, RoadGraph
-from logistics.routing.multistop import DEFAULT_SERVICE_MIN, MultiStopPlan, UnreachableStopError, plan_multistop
+from logistics.routing.multistop import (DEFAULT_SERVICE_MIN, FIXED, GENETIC, NN2OPT, MultiStopPlan, UnreachableStopError,
+                                         plan_multistop)
 from logistics.routing.traffic import GT_TZ, REPRESENTATIVE_TIME, profile_for
 
 MAX_STOPS = 50
@@ -67,6 +70,7 @@ def _parse_request(payload: dict):
         "service_min": service_min,
         "return_to_depot": bool(payload.get("return_to_depot", True)),
         "avoid_unpaved": avoid_unpaved(payload),
+        "ga_params": optimizer_params(),
     }
 
 
@@ -76,26 +80,29 @@ def _node_of(graph: RoadGraph, code: str | None, lat: float, lng: float) -> int:
     return graph.nearest_node(lat, lng)
 
 
-def _plan(req: dict, criterion: str, departure: datetime | None = None, fixed_order=None) -> MultiStopPlan:
+def _plan(req: dict, criterion: str, departure: datetime | None = None, fixed_order=None,
+          optimizer: str = GENETIC) -> MultiStopPlan:
     graph, depot = req["graph"], req["depot"]
     depot_node = _node_of(graph, depot.node.code if depot.node else None, depot.latitude, depot.longitude)
     stops = [_node_of(graph, o.node.code if o.node else None, o.latitude, o.longitude) for o in req["orders"]]
     try:
         return plan_multistop(graph, depot_node, stops, departure or req["departure"], req["service_min"],
-                              req["return_to_depot"], criterion, fixed_order, req["avoid_unpaved"])
+                              req["return_to_depot"], criterion, fixed_order, req["avoid_unpaved"],
+                              optimizer=optimizer, ga_params=req["ga_params"])
     except UnreachableStopError as exc:
         raise PlanningError(f"No hay ruta hacia {graph.names[exc.node]}.") from None
 
 
-def _shortest(req: dict, departure: datetime | None = None) -> MultiStopPlan:
-    return _plan(req, Route.Criterion.DISTANCE, departure)
+def _shortest(req: dict, departure: datetime | None = None, optimizer: str = GENETIC) -> MultiStopPlan:
+    return _plan(req, Route.Criterion.DISTANCE, departure, optimizer=optimizer)
 
 
 def _fastest(req: dict, departure: datetime | None = None,
-             shortest: MultiStopPlan | None = None) -> MultiStopPlan:
+             shortest: MultiStopPlan | None = None, optimizer: str = GENETIC) -> MultiStopPlan:
     """La ruta con MENOS minutos entre varios candidatos, medidos con el mismo tráfico.
 
-    El orden de las paradas sale de una heurística (vecino más cercano + 2-opt) y
+    El orden de las paradas sale del algoritmo genético (sembrado con vecino más
+    cercano + 2-opt) y
     se optimiza con el tráfico de la hora de salida, mientras que cada tramo se
     recorre en su propia franja. Por eso el orden pensado para km puede resultar
     más rápido. Se evalúan:
@@ -104,13 +111,18 @@ def _fastest(req: dict, departure: datetime | None = None,
       3. la más corta tal cual.
     Así, por construcción, la más rápida nunca tarda más que la más corta.
     """
-    shortest = shortest or _shortest(req, departure)
+    shortest = shortest or _shortest(req, departure, optimizer)
     candidates = [
-        _plan(req, Route.Criterion.TIME, departure),
+        _plan(req, Route.Criterion.TIME, departure, optimizer=optimizer),
         _plan(req, Route.Criterion.TIME, departure, fixed_order=shortest.order),
         shortest,
     ]
-    return min(candidates, key=lambda plan: plan.driving_minutes)
+    best = min(candidates, key=lambda plan: plan.driving_minutes)
+    if best.optimizer == FIXED:
+        # El orden de km lo calculó el optimizador de la más corta: se le atribuye a él
+        best.optimizer, best.ga_generations, best.optimize_ms = (
+            shortest.optimizer, shortest.ga_generations, shortest.optimize_ms)
+    return best
 
 
 def _variant_payload(req: dict, plan: MultiStopPlan) -> dict:
@@ -148,16 +160,23 @@ def _variant_payload(req: dict, plan: MultiStopPlan) -> dict:
         "expanded": plan.expanded,
         "stops": stops,
         "legs": legs,
+        **optimizer_payload(plan),
     }
 
 
 def _departure_options(req: dict) -> list[dict]:
-    """La ruta más rápida saliendo a la hora representativa de cada franja del mismo día."""
+    """La ruta más rápida saliendo a la hora representativa de cada franja del mismo día.
+
+    Es una estimación para comparar horas (7 franjas × 2 variantes): el orden se
+    calcula con vecino más cercano + 2-opt para no correr 14 genéticos por solicitud
+    y mantener la respuesta por debajo de 30 s con 50 paradas. La ruta que se guarda
+    siempre la ordena el genético.
+    """
     day = req["departure"].date()
     options = []
     for band in TrafficBand.values:
         departure = datetime.combine(day, REPRESENTATIVE_TIME[band], tzinfo=GT_TZ)
-        plan = _fastest(req, departure)
+        plan = _fastest(req, departure, optimizer=NN2OPT)
         options.append({
             "band": band,
             "band_label": TrafficBand(band).label.split(" (")[0],
@@ -168,6 +187,7 @@ def _departure_options(req: dict) -> list[dict]:
 
 
 def plan_route(payload: dict) -> dict:
+    started = perf_counter()
     req = _parse_request(payload)
     shortest = _shortest(req)
     fastest = _fastest(req, shortest=shortest)
@@ -189,6 +209,8 @@ def plan_route(payload: dict) -> dict:
         "minutes_saved": round(shortest.driving_minutes - fastest.driving_minutes, 2),
         "departure_options": _departure_options(req),
         "data_source": req["graph"].sources,
+        # Tiempo real de respuesta del servidor para esta solicitud (tesis: meta < 30 s)
+        "response_seconds": round(perf_counter() - started, 3),
     }
 
 
@@ -210,7 +232,8 @@ def create_route(payload: dict, user) -> dict:
     variant = _variant_payload(req, plan)
     route = Route.objects.create(
         depot=req["depot"], driver=driver, vehicle=vehicle, created_by=user,
-        departure_at=req["departure"], criterion=criterion, return_to_depot=req["return_to_depot"],
+        departure_at=req["departure"], criterion=criterion, optimizer=plan.optimizer,
+        return_to_depot=req["return_to_depot"],
         service_min=req["service_min"], driving_minutes=plan.driving_minutes, total_km=plan.total_km,
         shortest_minutes=shortest.driving_minutes, expanded_nodes=plan.expanded, finish_at=plan.finish_at,
         legs=variant["legs"], data_source=";".join(f"{k}={v}" for k, v in sorted(req["graph"].sources.items())),
@@ -234,6 +257,7 @@ def route_payload(route: Route) -> dict:
         "status": route.status,
         "status_label": route.get_status_display(),
         "criterion": route.criterion,
+        "optimizer": route.optimizer,
         "depot": route.depot.name,
         # Coordenadas reales de la bodega: el mapa dibuja el primer tramo hasta su nodo
         "depot_lat": route.depot.latitude, "depot_lng": route.depot.longitude,

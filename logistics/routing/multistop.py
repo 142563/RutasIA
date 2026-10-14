@@ -2,12 +2,15 @@
 
 1. Matriz de tiempos con Dijkstra uno-a-todos desde la bodega y desde cada
    parada: N+1 corridas en vez de N² búsquedas punto a punto.
-2. Orden de visita: vecino más cercano y luego 2-opt, minimizando el tiempo total.
+2. Orden de visita con el algoritmo genético (genetic.py, motor principal de la
+   tesis), sembrado con vecino más cercano + 2-opt; "nn2opt" queda como opción.
 3. Cada tramo con A*, usando la franja en la que EMPIEZA el tramo: la llegada a
    una parada (más el tiempo de servicio) es la salida del tramo siguiente.
 
-El orden se optimiza con la matriz de la franja de salida (simplificación del
-nivel Must; el tráfico dependiente del tiempo dentro del orden es Should).
+Con criterio de tiempo, la aptitud del genético es dependiente del tiempo
+(TimeDependentCost): cada tramo cuesta lo que marca la franja en la que empieza,
+igual que al trazarlo con A*, así que el tiempo que estima coincide con el de la
+ruta trazada. La matriz de la franja de salida guía al 2-opt.
 La matriz NO es simétrica (grafo dirigido), por eso 2-opt evalúa el costo
 completo de cada candidato en vez de la fórmula de intercambio simétrica.
 """
@@ -15,8 +18,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from time import perf_counter
 from typing import Sequence
 
+from logistics.routing import genetic
 from logistics.routing.astar import astar
 from logistics.routing.dijkstra import dijkstra_all
 from logistics.routing.graph import DISTANCE, TIME, RoadGraph
@@ -24,6 +29,8 @@ from logistics.routing.instrument import INF, SearchResult
 from logistics.routing.traffic import profile_for, to_local
 
 DEFAULT_SERVICE_MIN = 10.0
+GENETIC, NN2OPT, FIXED = "genetic", "nn2opt", "fixed"
+OPTIMIZERS = (GENETIC, NN2OPT)
 
 
 class UnreachableStopError(Exception):
@@ -85,6 +92,51 @@ def two_opt(order: Sequence[int], matrix: list[list[float]], return_to_depot: bo
     return best
 
 
+class TimeDependentCost:
+    """Minutos de manejo de un orden, con cada tramo en la franja en la que EMPIEZA.
+
+    Reproduce el cálculo de los tramos de plan_multistop (llegada + servicio = salida
+    del siguiente) usando matrices de Dijkstra por perfil (franja, tipo de día),
+    calculadas solo cuando se necesitan. Las franjas cambian en horas exactas.
+    """
+
+    def __init__(self, graph: RoadGraph, nodes: Sequence[int], departure: datetime, service_min: float,
+                 return_to_depot: bool, avoid_unpaved: bool = False,
+                 known: dict[tuple[str, str], list[list[float]]] | None = None):
+        self.graph, self.nodes, self.service = graph, list(nodes), service_min
+        self.return_to_depot, self.avoid_unpaved = return_to_depot, avoid_unpaved
+        self.hour0 = departure.replace(minute=0, second=0, microsecond=0)
+        self.start = (departure - self.hour0).total_seconds() / 60  # minutos desde el inicio de esa hora
+        self.matrices: dict[tuple[str, str], list[list[float]]] = dict(known or {})
+        self.by_hour: dict[int, list[list[float]]] = {}
+        self.expanded = 0
+
+    def _matrix(self, clock: float) -> list[list[float]]:
+        hour = int(clock // 60)
+        matrix = self.by_hour.get(hour)
+        if matrix is None:
+            profile = profile_for(self.hour0 + timedelta(hours=hour))
+            matrix = self.matrices.get(profile)
+            if matrix is None:
+                weights = self.graph.search_weights(TIME, *profile, self.avoid_unpaved)
+                matrix, expanded = time_matrix(self.graph, weights, self.nodes)
+                self.matrices[profile] = matrix
+                self.expanded += expanded
+            self.by_hour[hour] = matrix
+        return matrix
+
+    def __call__(self, order: Sequence[int]) -> float:
+        total, clock, current = 0.0, self.start, 0
+        for stop in order:
+            minutes = self._matrix(clock)[current][stop]
+            total += minutes
+            clock += minutes + self.service
+            current = stop
+        if self.return_to_depot:
+            total += self._matrix(clock)[current][0]
+        return total
+
+
 @dataclass
 class Leg:
     origin: int
@@ -108,11 +160,15 @@ class MultiStopPlan:
     service_min: float
     return_to_depot: bool
     matrix_expanded: int
-    # Costos de la matriz (minutos o km, según el criterio) para comparar métodos de orden (E5):
+    # Costo de cada orden para comparar métodos (km, o minutos con la franja de cada tramo):
     capture_minutes: float  # orden tal como se capturaron las paradas
     nearest_neighbor_minutes: float
-    optimized_minutes: float  # vecino más cercano + 2-opt (con la matriz de la franja de salida)
+    optimized_minutes: float  # orden elegido por el optimizador (con la matriz de la franja de salida)
     criterion: str = TIME
+    optimizer: str = GENETIC  # genetic | nn2opt | fixed (orden dado)
+    two_opt_minutes: float = 0.0  # vecino más cercano + 2-opt, para comparar con el genético
+    ga_generations: int = 0
+    optimize_ms: float = 0.0  # tiempo real que tomó ordenar las paradas
     etas: list[datetime] = field(default_factory=list)  # llegada a cada parada, en orden de visita
 
     @property
@@ -143,6 +199,8 @@ def plan_multistop(
     criterion: str = TIME,
     fixed_order: Sequence[int] | None = None,
     avoid_unpaved: bool = False,
+    optimizer: str = GENETIC,
+    ga_params: genetic.GeneticParams | None = None,
 ) -> MultiStopPlan:
     """criterion="time": la más rápida con tráfico; "distance": la más corta en km.
 
@@ -150,7 +208,10 @@ def plan_multistop(
     tramo, así "la más corta" se compara con la más rápida en igualdad de condiciones.
 
     fixed_order (índices 0..k-1 de `stops`) evalúa un orden dado en vez de optimizarlo.
+    optimizer: "genetic" (por defecto) o "nn2opt" (vecino más cercano + 2-opt).
     """
+    if optimizer not in OPTIMIZERS:
+        raise ValueError(f"optimizer debe ser uno de {OPTIMIZERS}")
     departure = to_local(departure)
     band, day_type = profile_for(departure)
     weights = graph.search_weights(criterion, band, day_type, avoid_unpaved)
@@ -163,12 +224,24 @@ def plan_multistop(
 
     capture = list(range(1, len(nodes)))
     nn = nearest_neighbor(matrix)
+    started = perf_counter()
+    nn_two_opt = two_opt(nn, matrix, return_to_depot)
+    generations = 0
+    if criterion == TIME:
+        cost = TimeDependentCost(graph, nodes, departure, service_min, return_to_depot, avoid_unpaved,
+                                 known={(band, day_type): matrix})
+    else:
+        cost = lambda order: route_cost(order, matrix, return_to_depot)  # noqa: E731  (km: no depende de la hora)
     if fixed_order is not None:
         if sorted(fixed_order) != list(range(len(stops))):
             raise ValueError("fixed_order debe ser una permutación de las paradas")
-        optimized = [i + 1 for i in fixed_order]
+        optimized, optimizer = [i + 1 for i in fixed_order], FIXED
+    elif optimizer == GENETIC:
+        result = genetic.solve(matrix, ga_params, return_to_depot, seeds=[nn_two_opt, nn, capture], fitness=cost)
+        optimized, generations = result.order, result.generations
     else:
-        optimized = two_opt(nn, matrix, return_to_depot)
+        optimized = nn_two_opt
+    optimize_ms = (perf_counter() - started) * 1000
 
     legs, etas = [], []
     current_time, current_node = departure, depot
@@ -198,10 +271,14 @@ def plan_multistop(
         departure=departure,
         service_min=service_min,
         return_to_depot=return_to_depot,
-        matrix_expanded=matrix_expanded,
-        capture_minutes=route_cost(capture, matrix, return_to_depot),
-        nearest_neighbor_minutes=route_cost(nn, matrix, return_to_depot),
-        optimized_minutes=route_cost(optimized, matrix, return_to_depot),
+        matrix_expanded=matrix_expanded + getattr(cost, "expanded", 0),
+        capture_minutes=cost(capture),
+        nearest_neighbor_minutes=cost(nn),
+        optimized_minutes=cost(optimized),
         criterion=criterion,
+        optimizer=optimizer,
+        two_opt_minutes=cost(nn_two_opt),
+        ga_generations=generations,
+        optimize_ms=optimize_ms,
         etas=etas,
     )

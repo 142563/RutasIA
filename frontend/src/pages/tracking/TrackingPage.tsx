@@ -10,7 +10,7 @@ import {
 } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 
-/** Seguimiento pÃºblico del pedido (A3, RUT-71): sin sesiÃ³n, sin AppShell, celular primero. */
+/** Seguimiento público del pedido (A3, RUT-71): sin sesión, sin AppShell, celular primero. */
 
 const TONE_TEXT: Record<Tone, string> = { ok: "text-ok", err: "text-err", accent: "text-accent", muted: "text-ink" };
 
@@ -76,7 +76,7 @@ function Timeline({ data }: { data: TrackingData }) {
 
 function Details({ data }: { data: TrackingData }) {
   const window = formatWindow(data.window);
-  const place = [data.place.municipality, data.place.region && `RegiÃ³n ${data.place.region}`].filter(Boolean).join(" Â· ");
+  const place = [data.place.municipality, data.place.region && `Región ${data.place.region}`].filter(Boolean).join(" · ");
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-xl border border-line bg-surface p-4">
@@ -133,7 +133,7 @@ export function TrackingPage() {
   return (
     <Shell>
       <Details data={query.data} />
-      <p className="text-center text-xs text-ink-2">Esta pÃ¡gina se actualiza sola cada minuto.</p>
+      <p className="text-center text-xs text-ink-2">Esta página se actualiza sola cada minuto.</p>
     </Shell>
   );
 }

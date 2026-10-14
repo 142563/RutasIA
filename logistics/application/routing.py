@@ -7,7 +7,9 @@ errores se convierten en PlanningError con mensajes en español.
 from __future__ import annotations
 
 import json
+from dataclasses import fields as dc_fields
 from datetime import date, datetime, time
+from time import perf_counter
 from typing import Any
 
 from django.utils import timezone
@@ -15,12 +17,14 @@ from django.db.models import Q
 from django.utils.dateparse import parse_date, parse_datetime
 
 from logistics.domain.exceptions import PlanningError
-from logistics.models import DayType, Edge, TrafficBand
+from logistics.models import DayType, Edge, OptimizerSettings, TrafficBand
 from logistics.routing.astar import astar
 from logistics.routing.dijkstra import dijkstra
+from logistics.routing.genetic import GeneticParams
 from logistics.routing.graph import CRITERIA, DISTANCE, TIME, RoadGraph, load_graph
 from logistics.routing.instrument import SearchResult
-from logistics.routing.multistop import DEFAULT_SERVICE_MIN, UnreachableStopError, plan_multistop
+from logistics.routing.multistop import (DEFAULT_SERVICE_MIN, GENETIC, OPTIMIZERS, UnreachableStopError,
+                                         plan_multistop)
 from logistics.routing.traffic import GT_TZ, REPRESENTATIVE_TIME, profile_for, to_local
 
 ALGORITHMS = {"dijkstra": dijkstra, "astar": astar}
@@ -48,6 +52,23 @@ def geometry(params) -> dict:
         {"from": edge.origin.code, "to": edge.destination.code, "polyline": edge.polyline}
         for edge in Edge.objects.filter(query, is_active=True).select_related("origin", "destination")
     ]}
+
+
+def optimizer_params() -> GeneticParams:
+    """Parámetros del genético que guardó el administrador (o los de por defecto)."""
+    row = OptimizerSettings.objects.filter(pk=1).first()
+    if row is None:
+        return GeneticParams()
+    return GeneticParams(**{f.name: getattr(row, f.name) for f in dc_fields(GeneticParams)}).clamped()
+
+
+def optimizer_payload(plan) -> dict:
+    """Qué algoritmo ordenó las paradas y cuánto tardó (tesis: tiempo de respuesta < 30 s)."""
+    return {
+        "optimizer": plan.optimizer,
+        "ga_generations": plan.ga_generations,
+        "optimize_ms": round(plan.optimize_ms, 1),
+    }
 
 
 def get_graph() -> RoadGraph:
@@ -227,6 +248,7 @@ def explore(payload: dict) -> dict:
 
 
 def optimize(payload: dict) -> dict:
+    started = perf_counter()
     graph = get_graph()
     depot = resolve_node(graph, payload.get("depot"), "Bodega")
     raw_stops = payload.get("stops") or []
@@ -243,10 +265,11 @@ def optimize(payload: dict) -> dict:
     if service_min < 0:
         raise PlanningError("service_min no puede ser negativo.")
 
+    optimizer = parse_choice(payload.get("optimizer"), OPTIMIZERS, "Optimizador", GENETIC)
     avoid = avoid_unpaved(payload)
     try:
         plan = plan_multistop(graph, depot, stops, departure, service_min, bool(payload.get("return_to_depot")),
-                              avoid_unpaved=avoid)
+                              avoid_unpaved=avoid, optimizer=optimizer, ga_params=optimizer_params())
     except UnreachableStopError as exc:
         raise PlanningError(f"No hay ruta hacia {graph.names[exc.node]}.") from None
 
@@ -274,11 +297,15 @@ def optimize(payload: dict) -> dict:
             "baseline": {
                 "capture_order_minutes": round(plan.capture_minutes, 2),
                 "nearest_neighbor_minutes": round(plan.nearest_neighbor_minutes, 2),
-                "two_opt_minutes": round(plan.optimized_minutes, 2),
+                "two_opt_minutes": round(plan.two_opt_minutes, 2),
+                "optimized_minutes": round(plan.optimized_minutes, 2),
             },
+            **optimizer_payload(plan),
             "matrix_expanded": plan.matrix_expanded,
         },
         **meta(graph, departure, avoid),
+        # Tiempo real de respuesta del servidor para esta solicitud (tesis: meta < 30 s)
+        "response_seconds": round(perf_counter() - started, 3),
     }
 
 

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Department, Depot, Edge, Incident, RerouteProposal, Route, RouteStop, Node, Order, RouteConnection, TrafficProfile, Trip, TripEvent, TripOrder, Vehicle
+from .models import OptimizerSettings, Department, Depot, Edge, Incident, RerouteProposal, Route, RouteStop, Node, Order, RouteConnection, TrafficProfile, Trip, TripEvent, TripOrder, Vehicle
 
 
 @admin.register(Department)
@@ -90,8 +90,9 @@ class RouteStopInline(admin.TabularInline):
 
 @admin.register(Route)
 class RouteAdmin(admin.ModelAdmin):
-    list_display = ("code", "depot", "driver", "departure_at", "criterion", "driving_minutes", "total_km", "status")
-    list_filter = ("status", "criterion")
+    list_display = ("code", "depot", "driver", "departure_at", "criterion", "optimizer", "driving_minutes", "total_km",
+                    "status")
+    list_filter = ("status", "criterion", "optimizer")
     inlines = [RouteStopInline]
 
 
@@ -106,3 +107,16 @@ class IncidentAdmin(admin.ModelAdmin):
 class RerouteProposalAdmin(admin.ModelAdmin):
     list_display = ("route", "summary", "current_minutes", "proposed_minutes", "status", "created_at")
     list_filter = ("status",)
+
+
+@admin.register(OptimizerSettings)
+class OptimizerSettingsAdmin(admin.ModelAdmin):
+    """Parámetros del genético (tesis: los ajusta el administrador). Una sola fila."""
+
+    list_display = ("__str__", "population", "generations", "mutation_rate", "crossover_rate", "seed", "updated_at")
+
+    def has_add_permission(self, request):
+        return not OptimizerSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
