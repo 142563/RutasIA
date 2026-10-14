@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+import sys
 import re
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -107,9 +108,20 @@ GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 # AdvancedMarkerElement exige un Map ID. DEMO_MAP_ID funciona para desarrollo;
 # en produccion conviene crear uno propio en Google Cloud Console.
 GOOGLE_MAPS_MAP_ID = os.getenv("GOOGLE_MAPS_MAP_ID", "DEMO_MAP_ID")
-# Key del SERVIDOR para Routes API: solo la usan los comandos por lotes
-# (build_graph, calibrate_traffic), nunca el motor de rutas.
+# Key del SERVIDOR para Routes API: la usan los comandos por lotes (build_graph,
+# calibrate_traffic), la comprobación en vivo y el tráfico en vivo al planificar;
+# nunca se llama dentro de Dijkstra ni de A*.
 GOOGLE_ROUTES_API_KEY = os.getenv("GOOGLE_ROUTES_API_KEY", "")
+
+# Tráfico en vivo al planificar (híbrido): el genético ordena con los perfiles
+# calibrados y Google mide en vivo los tramos elegidos. Apagado en las pruebas
+# para que nunca gasten cuota. LIVE_TRAFFIC=0 lo desactiva.
+TESTING = len(sys.argv) > 1 and sys.argv[1] == "test"
+LIVE_TRAFFIC = os.getenv("LIVE_TRAFFIC", "1") == "1" and not TESTING
+# Si Google tarda más que esto, se usan los perfiles calibrados.
+LIVE_TRAFFIC_TIMEOUT_S = float(os.getenv("LIVE_TRAFFIC_TIMEOUT_S", "12"))
+# Tope de consultas por día y proceso (computeRoutes Pro: US$10 por 1 000).
+LIVE_TRAFFIC_DAILY_REQUESTS = int(os.getenv("LIVE_TRAFFIC_DAILY_REQUESTS", "1000"))
 
 # Correos de entrega con Resend (API HTTP). Sin RESEND_API_KEY no se envía nada.
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")

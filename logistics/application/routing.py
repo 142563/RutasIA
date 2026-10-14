@@ -276,12 +276,16 @@ def optimize(payload: dict) -> dict:
                               avoid_unpaved=avoid, optimizer=optimizer, ga_params=optimizer_params())
     except UnreachableStopError as exc:
         raise PlanningError(f"No hay ruta hacia {graph.names[exc.node]}.") from None
+    # Tráfico en vivo de Google para los tramos elegidos (import local: live_planning usa este módulo)
+    from logistics.application.live_planning import apply_live_traffic
+    live = apply_live_traffic(graph, [plan])
 
     legs = []
     for leg in plan.legs:
         leg_weights = graph.weights(TIME, leg.band, leg.day_type)
         legs.append({
             **search_payload(graph, leg.search, leg_weights),
+            "minutes": round(leg.minutes, 2),  # en vivo si Google respondió; si no, el perfil calibrado
             "depart_at": leg.depart_at.isoformat(),
             "arrive_at": leg.arrive_at.isoformat(),
             "band": leg.band,
@@ -308,6 +312,7 @@ def optimize(payload: dict) -> dict:
             "matrix_expanded": plan.matrix_expanded,
         },
         **meta(graph, departure, avoid),
+        **live.payload(),
         # Tiempo real de respuesta del servidor para esta solicitud (tesis: meta < 30 s)
         "response_seconds": round(perf_counter() - started, 3),
     }

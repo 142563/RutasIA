@@ -563,6 +563,9 @@ class Route(TimestampedModel):
     algorithm = models.CharField(max_length=16, default="astar")
     # Quién ordenó las paradas: genetic (motor principal) | nn2opt | fixed. Vacío = rutas anteriores a RUT-79.
     optimizer = models.CharField(max_length=16, blank=True, default="", db_default="")
+    # Fuente de los minutos al planificar: google_tiempo_real o perfil_calibrado (vacío = antes del cambio)
+    traffic_source = models.CharField(max_length=24, blank=True, default="", db_default="")
+    traffic_queried_at = models.DateTimeField(null=True, blank=True, help_text="Hora de la consulta a Google en vivo.")
     return_to_depot = models.BooleanField(default=True)
     service_min = models.FloatField(default=10)
     driving_minutes = models.FloatField(help_text="Minutos de manejo con el tráfico de cada tramo.")

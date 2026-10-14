@@ -69,6 +69,7 @@ El motor está en `logistics/routing/` y usa solo la librería estándar de Pyth
 | Varias paradas | `logistics/routing/multistop.py` (`time_matrix`, `TimeDependentCost`, `plan_multistop`) | Matriz de tiempos con Dijkstra uno-a-todos, **orden con el algoritmo genético** y cada tramo final con A* |
 | **Algoritmo genético (motor principal)** | `logistics/routing/genetic.py` (`GeneticParams`, `solve`, `ordered_crossover`, `mutate`, `fast_two_opt`) | Individuo = secuencia completa de entrega; aptitud = tiempo total estimado. Selección por torneo, cruce de orden (OX), mutación por intercambio o inversión, elitismo y búsqueda local 2-opt sobre élites y una fracción de hijos (variante memética). Semilla fija (reproducible). Se detiene por número de generaciones o por estancamiento |
 | Línea base (solo experimentos) | `logistics/routing/baseline_ortools.py` | Google OR-Tools `RoutingModel` (PATH_CHEAPEST_ARC + GUIDED_LOCAL_SEARCH) sobre la misma matriz; importación perezosa, no está en `requirements.txt` |
+| **Tráfico en vivo al planificar** | `logistics/application/live_planning.py` (`apply_live_traffic`) | Después de ordenar y trazar, Google Routes API (`computeRoutes` con tráfico) mide en vivo cada tramo elegido, pasando por los nodos de nuestro A*; los minutos y las llegadas de la ruta se recalculan con esas duraciones. Si Google falla, tarda o no hay llave, quedan los perfiles calibrados |
 | Experimento de la tesis | `logistics/routing/thesis_experiment.py` y `manage.py run_thesis_experiment` | Convencional (proximidad sucesiva) contra optimizada (genético), 3 escenarios × 10 repeticiones, estadística (sección 7.6) |
 | Instrumentación | `logistics/routing/instrument.py` (`SearchResult`) | Cada búsqueda devuelve nodos expandidos (`expanded`), inserciones (`pushed`), `elapsed_ms` y la ruta |
 | Tráfico por franja | `logistics/routing/traffic.py` | 7 franjas horarias × 2 tipos de día (laboral, fin de semana); zona horaria `America/Guatemala` |
@@ -82,6 +83,14 @@ El motor está en `logistics/routing/` y usa solo la librería estándar de Pyth
 4. Parámetros por defecto (`GeneticParams`): población 80, máximo 400 generaciones, torneo de 3, probabilidad de cruce 0.9, de mutación 0.2, elitismo 2, parada tras 60 generaciones sin mejora, semilla 2026 y 2-opt sobre el 10 % de los hijos. **El administrador los ajusta** en `/admin/` (modelo `OptimizerSettings`, fila única); el servidor los acota a rangos seguros.
 5. Con criterio de distancia (la ruta más corta), la aptitud son los km de la matriz, porque no dependen de la hora.
 6. Igual que el resto del planificador, evita la terracería por defecto (penalización ×20 al elegir el camino).
+
+**Tráfico en vivo (modelo híbrido, desde el 2026-10-14).** El orden de las paradas lo decide el genético con los multiplicadores calibrados por franja (Google, recalibrados cada domingo). Después, Google mide **en vivo** los tramos elegidos:
+
+- Una consulta `computeRoutes` por tramo, con `TRAFFIC_AWARE_OPTIMAL` y la hora de salida de ese tramo (la de la solicitud si es futura; "ahora" si ya pasó). Los nodos de nuestro A* van como puntos intermedios (máximo 25 por consulta, límite de Google; si hay más se submuestrean parejo), así Google mide **nuestro** camino.
+- Las consultas van en paralelo (8 a la vez), con caché de 5 minutos por tramo y franja de salida de 5 minutos, tope de `LIVE_TRAFFIC_TIMEOUT_S = 12` s y tope diario de `LIVE_TRAFFIC_DAILY_REQUESTS = 1 000` consultas.
+- Todo o nada: si una consulta falla, se agota el tiempo, falta la llave o se llegó al tope, la ruta completa queda con los perfiles calibrados. La respuesta lo indica con `traffic_source` = `google_tiempo_real` o `perfil_calibrado`, la hora de la consulta y el motivo.
+- Google nunca se llama dentro de Dijkstra ni de A*. Las pruebas nunca llaman a Google (`LIVE_TRAFFIC` se apaga al correr `manage.py test`).
+- Se descartó usar la matriz completa en vivo como aptitud del genético por costo: con 20 planificaciones diarias serían unos US$961 al mes con 12 paradas y US$8 830 con 50 (tarifa oficial de Compute Route Matrix Pro).
 
 **Bibliotecas.** El motor (Dijkstra, A* y el genético) usa solo la biblioteca estándar de Python; la prueba `test_engine_uses_only_standard_library` lo verifica. OR-Tools, SciPy, Pandas y TensorFlow solo aparecen en experimentos y cuadernos, nunca en el servidor de producción (`test_not_used_by_the_engine` verifica que ningún módulo del motor ni de la API importe OR-Tools). No se usan scikit-learn, networkx ni OSMnx.
 
@@ -452,12 +461,14 @@ Restricciones: única `(origin, destination)`; origen distinto de destino; dista
    2. `time_matrix` calcula la matriz de tiempos entre bodega y paradas con Dijkstra uno-a-todos (`dijkstra.py`).
    3. El **algoritmo genético** (`genetic.solve`) ordena las paradas, sembrado con vecino más cercano + 2-opt y con aptitud dependiente del tiempo (sección 1.3). El plan registra `optimizer = "genetic"`, las generaciones usadas y los milisegundos.
    4. Para cada tramo se recorre el reloj: se toma la franja del instante de salida de ese tramo, se corre **A\*** (`astar.py`) con los pesos de esa franja, se acumulan minutos y km, y se suma el tiempo de servicio en cada parada para obtener las llegadas estimadas (ETA).
+   - **Tráfico en vivo (al terminar el motor).** `live_planning.apply_live_traffic` manda a Google, en paralelo, los tramos de la ruta más rápida y de la más corta (los que comparten tramo se consultan una vez) y reemplaza sus minutos y llegadas con el tráfico del momento. Si con el tráfico en vivo la más corta resulta más rápida, pasa a ser la más rápida (`_faster`). Las opciones de hora de salida (7 franjas) siguen con los perfiles calibrados, para no multiplicar las consultas.
 6. **Respuesta de planificación.** `_variant_payload` devuelve para cada variante: orden de paradas con ETA, tramos (`nodes`, `roads`, `minutes`, `free_minutes`, `km`, `band`, `expanded`), minutos de manejo, minutos extra por tráfico, km y nodos expandidos. `plan_route` añade `minutes_saved` (minutos de la más corta menos los de la más rápida), `departure_options` (`_departure_options`: la más rápida saliendo a la hora representativa de cada una de las 7 franjas) y `data_source`.
 7. **Confirmar.** El hook `useCreateRoute` hace `POST /api/v2/routes/` con el criterio elegido y, si aplica, conductor y camión. `orders_views.api_v2_routes` llama a `planning.create_route`, decorada con `@transaction.atomic`:
    - Bloquea los pedidos con `select_for_update` (evita asignarlos dos veces).
    - **Recalcula en el servidor** (no confía en el cliente): `_shortest` y `_fastest`/`_shortest` según el criterio.
    - `assignment.validate_for_new_route` comprueba que conductor y camión estén activos y que el peso quepa en la capacidad; `assignment.ensure_available` verifica que no haya choque de horario con otras rutas.
-   - Crea `Route` (con `driving_minutes`, `total_km`, `shortest_minutes`, `expanded_nodes`, `legs`, `data_source`), crea las `RouteStop` con `bulk_create` y pasa los pedidos a `assigned`.
+   - Vuelve a aplicar el tráfico en vivo (sale de la caché de 5 minutos si se confirma poco después de planificar).
+   - Crea `Route` (con `driving_minutes`, `total_km`, `shortest_minutes`, `expanded_nodes`, `legs`, `data_source`, `traffic_source` y `traffic_queried_at`), crea las `RouteStop` con `bulk_create` y pasa los pedidos a `assigned`.
 8. **Avisos por correo.** Al final, `later(on_route_created, route.id)` (`notifications/core.py`) usa `transaction.on_commit`: solo se envía si la transacción se confirmó. `hooks.on_route_created` ejecuta `customer.notify_route_scheduled` (a los clientes con correo en `Order.recipient_email`) y `staff.notify_route_assigned` (al conductor, si ya tiene uno asignado). Cada envío queda en `NotificationLog`.
 
 Dos precisiones que importan para la tesis:
@@ -508,6 +519,8 @@ Fuente: `frontend/src/App.tsx` (router) y `frontend/src/components/layout/AppShe
 | `/conductor/paradas/:stopId` | Conductor | `pages/driver/DriverStopPage.tsx` | Detalle de la parada: marcar entregada o no entregada (con motivo) |
 | `/conductor/navegar` y `/conductor/navegar/:stopId` | Conductor | `pages/driver/DriverNavigatePage.tsx` | Navegación dentro de la aplicación: mapa, posición en vivo, tarjeta de parada, aviso de ruta alternativa |
 | Cualquier otra ruta | Con sesión de despacho | `pages/Placeholder.tsx` (`NotFoundPage`) | Página no encontrada |
+
+**Rendimiento de los mapas (corregido el 2026-10-14).** Todas las pantallas con mapa se trababan: cada una pedía la geometría de toda la red (258 tramos, 444 726 puntos, 1 MB) en 11 consultas a la base de datos, y la capa «Nuestro tráfico» volvía a decodificar ese megabyte en cada render porque una memorización (`useMemo`) dependía de un arreglo nuevo en cada render. Ahora el servidor simplifica la geometría una sola vez (Douglas-Peucker, tolerancia de unos 11 m, `logistics/application/road_geometry.py`), la guarda en memoria y la entrega en una sola solicitud (`/api/routing/geometry/?all=1`, 41 121 puntos, 171 KB); el navegador la decodifica una vez. Además, Planificar espera 400 ms a que termine la selección antes de pedir el plan, y A* memoriza su `v_max` por lista de pesos. Prueba: `test_road_geometry.py`.
 
 Si un usuario entra a una pantalla de otro rol, `RequireSession` lo redirige a la inicial de su rol (`homeFor`). Con contraseña temporal solo puede ir a `/cambiar-contrasena`.
 
@@ -560,6 +573,7 @@ Aparece una advertencia de Django (`UserWarning: No directory at: ...\staticfile
 | `VehiclePosition` | Tabla | Traza GPS de la ruta en curso |
 | `NotificationLog` | Tabla | Auditoría de correos |
 | `optimizer` | `Route.optimizer` | Algoritmo que ordenó las paradas: `genetic` (por defecto), `nn2opt` o `fixed`; vacío en rutas anteriores al cambio |
+| `traffic_source`, `traffic_queried_at` | `Route.traffic_source`, `Route.traffic_queried_at` y la respuesta de planificar y de `optimize` | Fuente de los minutos: `google_tiempo_real` (Google en vivo, con la hora de la consulta) o `perfil_calibrado` (multiplicadores por franja) |
 | `response_seconds` | **No se guarda**; viaja en la respuesta de planificar y de `optimize` | Tiempo real de respuesta del servidor (`perf_counter`) |
 | `data_source` | `Route.data_source` y columna de cada CSV | Procedencia: `edges=google;traffic=google_routes`, o `edges=estimate;traffic=synthetic` |
 
@@ -705,12 +719,14 @@ La tesis aprobada es la especificación: "Python en Google Colab, scikit-learn, 
 | 3 escenarios × 10 repeticiones (pico matutino, valle, pico vespertino) | **Cumple** | `run_thesis_experiment` (sección 7.6) |
 | Ruta convencional = proximidad sucesiva | **Cumple** | `thesis_experiment.conventional_order` |
 | Matriz comparativa exportable | **Cumple** como CSV del experimento (`matriz_comparativa.csv`, se abre en Excel). La interfaz no cambió: no hay botón de exportar en pantalla | `docs/Capitulo V/resultados/` |
+| Tráfico del momento al planificar | **Cumple (híbrido):** minutos y llegadas con Google en vivo; orden con perfiles calibrados | `live_planning.py`, `Route.traffic_source` |
 | El administrador ajusta los parámetros del genético | **Cumple** en `/admin/` de Django; no se agregó pantalla nueva en React para no cambiar la interfaz | `OptimizerSettings` |
 | Metas: distancia ≥ 15 %, tiempo ≥ 20 %, alternativas > 90 %, respuesta < 30 s | Alternativas (100 %) y respuesta (2.4 s) **se cumplen**. Distancia (2.30 %) y tiempo (13.72 %) **no se cumplen** en el total; el tiempo sí en congestionamiento (20.35 %) | Sección 7.6. **Se reporta sin ajustar datos** |
 
 **Diferencias que siguen abiertas y deben declararse en el documento:**
 
-- **Tráfico "del momento".** La tesis habla de consultar el tráfico en el momento de cada solicitud. El sistema usa multiplicadores **reales** de Google calibrados por franja horaria y tipo de día (14 perfiles por arista, recalibrados cada domingo). Consultar en vivo una matriz de 50 × 50 por solicitud costaría unos 2 500 elementos de Google por ruta. La comprobación en vivo existe solo para revisar una ruta ya planificada (`LiveCheck`).
+- **Tráfico "del momento": cumple en modo híbrido (desde el 2026-10-14).** Al planificar y al confirmar, Google mide en vivo cada tramo de la ruta (sección 1.3) y los minutos y llegadas salen de ese tráfico; la ruta guarda la fuente y la hora de la consulta. El orden de las paradas lo decide el genético con los perfiles calibrados, no con una matriz en vivo, por costo: la matriz completa costaría unos US$961 al mes con 12 paradas y US$8 830 con 50 (20 planificaciones diarias). Medido con Google real: 1.42 s con 12 paradas y 2.45 s con 50.
+- **Costo del híbrido** (tarifa oficial de Compute Routes Pro: 5 000 consultas gratis al mes y US$10 por 1 000 después): hasta 26 consultas por planificación con 12 paradas (dos variantes de 13 tramos; los tramos compartidos y la confirmación salen de la caché) y hasta 102 con 50 paradas. Con 20 planificaciones diarias: unos US$106 al mes con 12 paradas y unos US$562 con 50, menos el nivel gratuito. La recalibración de los domingos usa otra SKU (Compute Route Matrix Pro, unos 15 600 elementos al mes).
 - **"Mismo instante".** Se interpretó como las mismas condiciones de la vía (mismo grafo y misma franja) dentro de la misma ejecución.
 - **Ventanas de tiempo de entrega y precisión de la ETA mayor a 85 %:** no se implementaron. La precisión frente a Google medida en E4 es un MAPE de 38.13 % (sección 7.4.1).
 - **Hipótesis de distancia:** con la regla de la tesis (p < 0.05 y reducción ≥ 15 %), H0 no se rechaza: p = 0.030, pero la reducción es 2.30 %.
