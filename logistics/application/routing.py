@@ -13,11 +13,11 @@ from time import perf_counter
 from typing import Any
 
 from django.utils import timezone
-from django.db.models import Q
 from django.utils.dateparse import parse_date, parse_datetime
 
+from logistics.application import road_geometry
 from logistics.domain.exceptions import PlanningError
-from logistics.models import DayType, Edge, OptimizerSettings, TrafficBand
+from logistics.models import DayType, OptimizerSettings, TrafficBand
 from logistics.routing.astar import astar
 from logistics.routing.dijkstra import dijkstra
 from logistics.routing.genetic import GeneticParams
@@ -32,7 +32,13 @@ MAX_STOPS = 50  # alcance declarado en el protocolo
 
 
 def geometry(params) -> dict:
-    """Consulta geometría almacenada de pares dirigidos, fuera del motor."""
+    """Geometría simplificada de pares dirigidos (o de toda la red con all=1), fuera del motor.
+
+    Sale de una caché en memoria (road_geometry): no consulta la BD en cada mapa.
+    """
+    cached = road_geometry.simplified_geometry()
+    if str(params.get("all", "")).lower() in ("1", "true"):
+        return {"edges": [{"from": a, "to": b, "polyline": p} for (a, b), p in cached.items()]}
     try:
         pairs = json.loads(params.get("edges", "[]"))
     except (ValueError, TypeError):
@@ -43,15 +49,13 @@ def geometry(params) -> dict:
         ) for pair in pairs
     ):
         raise PlanningError("Indica hasta 500 pares de códigos de nodos.")
-    if not pairs:
-        return {"edges": []}
-    query = Q()
+    edges, seen = [], set()
     for a, b in pairs:
-        query |= Q(origin__code=a, destination__code=b)
-    return {"edges": [
-        {"from": edge.origin.code, "to": edge.destination.code, "polyline": edge.polyline}
-        for edge in Edge.objects.filter(query, is_active=True).select_related("origin", "destination")
-    ]}
+        polyline = cached.get((a, b))
+        if polyline and (a, b) not in seen:
+            seen.add((a, b))
+            edges.append({"from": a, "to": b, "polyline": polyline})
+    return {"edges": edges}
 
 
 def optimizer_params() -> GeneticParams:
@@ -272,12 +276,16 @@ def optimize(payload: dict) -> dict:
                               avoid_unpaved=avoid, optimizer=optimizer, ga_params=optimizer_params())
     except UnreachableStopError as exc:
         raise PlanningError(f"No hay ruta hacia {graph.names[exc.node]}.") from None
+    # Tráfico en vivo de Google para los tramos elegidos (import local: live_planning usa este módulo)
+    from logistics.application.live_planning import apply_live_traffic
+    live = apply_live_traffic(graph, [plan])
 
     legs = []
     for leg in plan.legs:
         leg_weights = graph.weights(TIME, leg.band, leg.day_type)
         legs.append({
             **search_payload(graph, leg.search, leg_weights),
+            "minutes": round(leg.minutes, 2),  # en vivo si Google respondió; si no, el perfil calibrado
             "depart_at": leg.depart_at.isoformat(),
             "arrive_at": leg.arrive_at.isoformat(),
             "band": leg.band,
@@ -304,6 +312,7 @@ def optimize(payload: dict) -> dict:
             "matrix_expanded": plan.matrix_expanded,
         },
         **meta(graph, departure, avoid),
+        **live.payload(),
         # Tiempo real de respuesta del servidor para esta solicitud (tesis: meta < 30 s)
         "response_seconds": round(perf_counter() - started, 3),
     }

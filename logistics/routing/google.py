@@ -17,6 +17,8 @@ FIELD_MASK = "originIndex,destinationIndex,status,condition,distanceMeters,durat
 
 ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 ROUTE_FIELD_MASK = "routes.duration,routes.staticDuration,routes.distanceMeters,routes.polyline.encodedPolyline"
+# Solo tiempos (tráfico en vivo al planificar): respuesta más ligera, sin geometría
+DURATION_FIELD_MASK = "routes.duration,routes.staticDuration,routes.distanceMeters"
 
 TRAFFIC_UNAWARE = "TRAFFIC_UNAWARE"
 TRAFFIC_AWARE_OPTIMAL = "TRAFFIC_AWARE_OPTIMAL"
@@ -141,6 +143,7 @@ class RoutesClient:
         intermediates: Sequence[LatLng] = (),
         departure_time: datetime | None = None,
         traffic: bool = True,
+        geometry: bool = True,
     ) -> RouteResult:
         """Una consulta computeRoutes con tráfico, pasando por los nodos intermedios dados."""
         body: dict = {
@@ -148,16 +151,18 @@ class RoutesClient:
             "destination": {"location": {"latLng": {"latitude": destination[0], "longitude": destination[1]}}},
             "travelMode": "DRIVE",
             "routingPreference": TRAFFIC_AWARE_OPTIMAL if traffic else TRAFFIC_UNAWARE,
-            "polylineQuality": "HIGH_QUALITY",
-            "polylineEncoding": "ENCODED_POLYLINE",
         }
+        if geometry:
+            body["polylineQuality"] = "HIGH_QUALITY"
+            body["polylineEncoding"] = "ENCODED_POLYLINE"
         if intermediates:
             body["intermediates"] = [_via_waypoint(p) for p in intermediates]
         if departure_time is not None:
             body["departureTime"] = to_rfc3339(departure_time)
         response = self.http.post(
             ROUTES_URL, json=body,
-            headers={"X-Goog-Api-Key": self.api_key, "X-Goog-FieldMask": ROUTE_FIELD_MASK},
+            headers={"X-Goog-Api-Key": self.api_key,
+                     "X-Goog-FieldMask": ROUTE_FIELD_MASK if geometry else DURATION_FIELD_MASK},
         )
         self.requests_made += 1
         if response.status_code != 200:

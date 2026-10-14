@@ -16,6 +16,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from logistics.application import assignment
+from logistics.application.live_planning import apply_live_traffic
 from logistics.application.notifications import later, on_route_created
 from logistics.application.orders import app_orders, node_ref
 from logistics.application.routing import (avoid_unpaved, get_graph, optimizer_params, optimizer_payload,
@@ -186,11 +187,19 @@ def _departure_options(req: dict) -> list[dict]:
     return options
 
 
+def _faster(fastest: MultiStopPlan, shortest: MultiStopPlan) -> MultiStopPlan:
+    """Con el tráfico en vivo, la más corta puede resultar más rápida: entonces es la más rápida."""
+    return shortest if shortest.driving_minutes < fastest.driving_minutes else fastest
+
+
 def plan_route(payload: dict) -> dict:
     started = perf_counter()
     req = _parse_request(payload)
     shortest = _shortest(req)
     fastest = _fastest(req, shortest=shortest)
+    # Tráfico en vivo de Google para los tramos elegidos (ambas variantes, misma fuente)
+    live = apply_live_traffic(req["graph"], [fastest, shortest])
+    fastest = _faster(fastest, shortest)
     band, day_type = profile_for(req["departure"])
     depot = req["depot"]
     return {
@@ -209,6 +218,8 @@ def plan_route(payload: dict) -> dict:
         "minutes_saved": round(shortest.driving_minutes - fastest.driving_minutes, 2),
         "departure_options": _departure_options(req),
         "data_source": req["graph"].sources,
+        # De dónde salen los minutos: google_tiempo_real o perfil_calibrado (y la hora de la consulta)
+        **live.payload(),
         # Tiempo real de respuesta del servidor para esta solicitud (tesis: meta < 30 s)
         "response_seconds": round(perf_counter() - started, 3),
     }
@@ -227,7 +238,10 @@ def create_route(payload: dict, user) -> dict:
     driver, vehicle = assignment.validate_for_new_route(payload, sum(o.weight_kg for o in req["orders"]))
 
     shortest = _shortest(req)
-    plan = shortest if criterion == Route.Criterion.DISTANCE else _fastest(req, shortest=shortest)
+    fastest = _fastest(req, shortest=shortest)
+    # Mismas consultas que al planificar (salen de la caché de 5 minutos)
+    live = apply_live_traffic(req["graph"], [fastest, shortest])
+    plan = shortest if criterion == Route.Criterion.DISTANCE else _faster(fastest, shortest)
     assignment.ensure_available(driver, vehicle, req["departure"], plan.finish_at)
     variant = _variant_payload(req, plan)
     route = Route.objects.create(
@@ -237,6 +251,7 @@ def create_route(payload: dict, user) -> dict:
         service_min=req["service_min"], driving_minutes=plan.driving_minutes, total_km=plan.total_km,
         shortest_minutes=shortest.driving_minutes, expanded_nodes=plan.expanded, finish_at=plan.finish_at,
         legs=variant["legs"], data_source=";".join(f"{k}={v}" for k, v in sorted(req["graph"].sources.items())),
+        traffic_source=live.source, traffic_queried_at=live.queried_at,
     )
     RouteStop.objects.bulk_create([
         RouteStop(route=route, order_id=stop["order_id"], sequence=stop["sequence"],
@@ -258,6 +273,8 @@ def route_payload(route: Route) -> dict:
         "status_label": route.get_status_display(),
         "criterion": route.criterion,
         "optimizer": route.optimizer,
+        "traffic_source": route.traffic_source,
+        "traffic_queried_at": _local_iso(route.traffic_queried_at),
         "depot": route.depot.name,
         # Coordenadas reales de la bodega: el mapa dibuja el primer tramo hasta su nodo
         "depot_lat": route.depot.latitude, "depot_lng": route.depot.longitude,

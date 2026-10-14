@@ -83,3 +83,6 @@ export function toggleLayer(state: { google: boolean; ours: boolean }, layer: "g
   if (state[layer]) return { ...state, [layer]: false };
   return layer === "google" ? { google: true, ours: false } : { google: false, ours: true };
 }
+
+/** Clave única de la geometría de toda la red: una sola solicitud compartida por todos los mapas. */
+export const NETWORK_GEOMETRY_KEY = ["network-geometry"] as const;

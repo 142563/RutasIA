@@ -25,8 +25,28 @@ from logistics.routing.instrument import INF, SearchResult, reconstruct
 VMAX_SAFETY = 1e-9
 
 
+VMAX_CACHE_SIZE = 64
+
+
 def compute_v_max(graph: RoadGraph, weights: Sequence[float]) -> float:
-    """Velocidad "en línea recta" máxima del grafo para estos pesos (km por unidad de costo)."""
+    """Velocidad "en línea recta" máxima del grafo para estos pesos (km por unidad de costo).
+
+    Se memoriza por lista de pesos (las del grafo son las mismas listas cacheadas): una
+    planificación corre A* cientos de veces con los mismos pesos y recalcular v_max en
+    cada tramo era la mitad del tiempo del planificador.
+    """
+    cache = graph._vmax_cache
+    hit = cache.get(id(weights))
+    if hit is not None and hit[0] is weights:
+        return hit[1]
+    value = _compute_v_max(graph, weights)
+    if len(cache) >= VMAX_CACHE_SIZE:
+        cache.pop(next(iter(cache)))
+    cache[id(weights)] = (weights, value)
+    return value
+
+
+def _compute_v_max(graph: RoadGraph, weights: Sequence[float]) -> float:
     best = 0.0
     for e, w in enumerate(weights):
         if w == INF:
