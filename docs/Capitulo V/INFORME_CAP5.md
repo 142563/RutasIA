@@ -530,7 +530,7 @@ Si un usuario entra a una pantalla de otro rol, `RequireSession` lo redirige a l
 
 ### 7.1 Inventario de pruebas
 
-**Backend (Django, `logistics/tests/`)**: 37 archivos `test_*.py`, 369 casos según Django (339 anteriores más 30 nuevos del genético, OR-Tools y el experimento).
+**Backend (Django, `logistics/tests/`)**: 39 archivos `test_*.py`, 388 casos según Django (339 anteriores, 30 del genético, OR-Tools y el experimento, 8 de la geometría de los mapas y 11 del tráfico en vivo).
 
 | Clase | Archivos (casos) |
 |---|---|
@@ -539,9 +539,10 @@ Si un usuario entra a una pantalla de otro rol, `RequireSession` lo redirige a l
 | Integración de la API | `test_planning_api.py` (5), `test_orders_api.py` (5), `test_assignment_api.py` (15), `test_dispatch_api.py` (11), `test_driver_api.py` (10), `test_fleet_api.py` (22), `test_incidents.py` (27: penalizaciones, bloqueo, propuestas, aceptar/mantener, permisos), `test_positions.py` (8), `test_live_traffic.py` (11), `test_tracking.py` (6), `test_routing_roles.py` (3) |
 | Seguridad y sesión | `test_app_session.py` (18), `test_login_limits.py` (15), `test_password_change.py` (13), `test_csp.py` (8), `test_json_requests.py` (2) |
 | Correos | `test_notifications.py` (23), `test_staff_notifications.py` (19), `test_email_design.py` (2) |
+| Mapas y tráfico en vivo | `test_road_geometry.py` (8: simplificación dentro de la tolerancia, red completa en una respuesta ligera, sin consultas repetidas a la base, caché que sigue los cambios del grafo, `v_max` memorizado), `test_live_planning.py` (11: minutos y llegadas de Google en vivo, hora futura enviada a Google, caché, respaldo ante falla, demora, falta de llave y tope diario, ruta guardada con su fuente, 50 paradas en menos de 30 s, las pruebas nunca llaman a Google) |
 | Algoritmo genético y experimento de la tesis (RUT-79) | `test_genetic.py` (18: operadores válidos, 2-opt asimétrico, óptimo de fuerza bruta con 8 paradas, nunca peor que vecino más cercano + 2-opt, misma semilla = mismo resultado, 50 paradas en menos de 30 s, aptitud dependiente del tiempo, planificador y ruta guardada con el genético, parámetros del administrador, solo biblioteca estándar), `test_baseline_ortools.py` (2), `test_thesis_experiment.py` (10: 30 pares, reparto 4/3/3 por franja, mismos puntos en los tres escenarios, unidades y fórmula de reducción, cierre con alternativa, reproducibilidad, estadística) |
 
-**Frontend (Vitest, `frontend/src/**/*.test.ts`)**: 27 archivos de prueba y 122 casos según Vitest (lógica pura: `lib/*.test.ts` más `components/map/markerPick.test.ts`). No hay pruebas de componentes de React ni pruebas de extremo a extremo (no hay archivos `.test.tsx` ni dependencias de Testing Library o Playwright en `package.json`).
+**Frontend (Vitest, `frontend/src/**/*.test.ts`)**: 28 archivos de prueba y 124 casos según Vitest (lógica pura: `lib/*.test.ts` más `components/map/markerPick.test.ts`). No hay pruebas de componentes de React ni pruebas de extremo a extremo (no hay archivos `.test.tsx` ni dependencias de Testing Library o Playwright en `package.json`).
 
 **Cómo ejecutarlas**
 
@@ -552,8 +553,8 @@ Si un usuario entra a una pantalla de otro rol, `RequireSession` lo redirige a l
 
 | Suite | Resultado | Duración |
 |---|---|---|
-| Django (`manage.py test`, SQLite local) | **369 pruebas, OK, 0 fallos** | 263.8 s |
-| Vitest | **27 archivos, 122 pruebas, todas aprobadas** | 10.7 s |
+| Django (`manage.py test`, SQLite local) | **388 pruebas, OK, 0 fallos** | 290.7 s |
+| Vitest | **28 archivos, 124 pruebas, todas aprobadas** | 10.7 s |
 
 Aparece una advertencia de Django (`UserWarning: No directory at: ...\staticfiles\`) que no afecta el resultado.
 
@@ -751,7 +752,7 @@ Archivos consultados para este informe:
 - Motor: `logistics/routing/dijkstra.py`, `astar.py`, `graph.py`, `multistop.py`, `genetic.py`, `baseline_ortools.py`, `thesis_experiment.py`, `traffic.py`, `incidents.py`, `instrument.py`, `geo.py`, `google.py`, `experiments.py`.
 - Comandos: `logistics/management/commands/run_experiments.py`, `run_thesis_experiment.py`, `export_graph_json.py`, `refresh_traffic.py` (más `--help` de `calibrate_traffic` y `build_graph`).
 - Cuadernos: `experiments/colab/analisis_estadistico.ipynb` y `refuerzo_exploratorio.ipynb` (ejecutados el 2026-10-14).
-- Pruebas: los 34 archivos de `logistics/tests/test_*.py` (conteo de casos y nombres citados) y los 27 archivos `frontend/src/**/*.test.ts`.
+- Pruebas: los 39 archivos de `logistics/tests/test_*.py` (conteo de casos y nombres citados) y los 28 archivos `frontend/src/**/*.test.ts`.
 - Frontend: `frontend/src/App.tsx`, `components/layout/AppShell.tsx`, `components/map/NetworkMap.tsx`, `lib/googleMaps.ts`, `lib/places.ts`, `lib/geocode.ts`, `lib/roads.ts`, `lib/planning.ts`, `lib/incidents.ts`, `lib/lab.ts`, `pages/settings/SettingsPage.tsx`.
 - Datos y ejecuciones: `experiments/output/*.csv` (resumen propio), y ejecuciones del 2026-10-14 de `manage.py test`, `npx vitest run` y `manage.py run_experiments` (con datos estimados y sintéticos, salida en carpeta temporal).
 - Búsquedas con `grep` sobre todo el proyecto: `genetic|genético|ortools|or-tools|sklearn|scikit|tensorflow|reinforcement|torch|networkx|osmnx|colab`; `distancematrix|geocode/json|maps/api/`; `SECURE_|HSTS`; `MAX_STOPS`; `later(`; `recompute_routes`.
