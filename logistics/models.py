@@ -562,7 +562,7 @@ class Route(TimestampedModel):
     criterion = models.CharField(max_length=10, choices=Criterion.choices, default=Criterion.TIME)
     algorithm = models.CharField(max_length=16, default="astar")
     # Quién ordenó las paradas: genetic (motor principal) | nn2opt | fixed. Vacío = rutas anteriores a RUT-79.
-    optimizer = models.CharField(max_length=16, blank=True, default="")
+    optimizer = models.CharField(max_length=16, blank=True, default="", db_default="")
     return_to_depot = models.BooleanField(default=True)
     service_min = models.FloatField(default=10)
     driving_minutes = models.FloatField(help_text="Minutos de manejo con el tráfico de cada tramo.")
