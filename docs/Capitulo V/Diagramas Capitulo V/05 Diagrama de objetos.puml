@@ -1,0 +1,186 @@
+@startuml
+!pragma layout elk
+skinparam dpi 300
+skinparam backgroundColor white
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ArrowColor #333333
+skinparam ObjectBorderColor #1F3A5F
+skinparam ObjectBackgroundColor #F5F5F5
+skinparam ObjectHeaderBackgroundColor #DDE6F0
+skinparam NoteBorderColor #7A7A7A
+skinparam NoteBackgroundColor #F5F5F5
+skinparam NoteFontSize 10
+skinparam ArrowFontSize 10
+skinparam PackageBorderColor #7A7A7A
+skinparam PackageBackgroundColor #FFFFFF
+
+title Diagrama de objetos: una ruta planificada desde Bodega Central
+
+object "bodega : Depot" as dep {
+  name = "Bodega Central"
+  latitude = 14.5965
+  longitude = -90.5370
+}
+
+object "ruta : Route" as rt {
+  code = "RUT-20261014-0001"
+  departure_at = 2026-10-14 07:00
+  criterion = "time"
+  optimizer = "genetic"
+  return_to_depot = true
+  driving_minutes = 168.4
+  total_km = 112.6
+  status = "planned"
+}
+
+object "conductor : Driver" as drv {
+  name = "Carlos Andrés Mendoza López"
+  license_number = "L-10234567"
+}
+
+object "vehiculo : Vehicle" as veh {
+  plate = "C-102BDF"
+  model = "Camión Isuzu NPR"
+  capacity_kg = 2800
+}
+
+object "parada1 : RouteStop" as s1 {
+  sequence = 1
+  eta = 2026-10-14 07:42
+  status = "pending"
+}
+object "parada2 : RouteStop" as s2 {
+  sequence = 2
+  eta = 2026-10-14 08:41
+  status = "pending"
+}
+object "parada3 : RouteStop" as s3 {
+  sequence = 3
+  eta = 2026-10-14 09:36
+  status = "pending"
+}
+
+object "pedido1 : Order" as o1 {
+  recipient = "Distribuidora El Roble"
+  weight_kg = 38.0
+  status = "assigned"
+}
+object "pedido2 : Order" as o2 {
+  recipient = "Óscar Lemus"
+  weight_kg = 6.8
+  status = "assigned"
+}
+object "pedido3 : Order" as o3 {
+  recipient = "Lucía Morales"
+  weight_kg = 4.5
+  status = "assigned"
+}
+
+package "Camino de la ruta en el grafo (Node y Edge)" {
+  object "n1 : Node" as n1 {
+    code = "ciudad-guatemala"
+    name = "Ciudad de Guatemala"
+    kind = "cabecera"
+  }
+  object "n2 : Node" as n2 {
+    code = "el-trebol"
+    name = "El Trébol (CA-1/CA-9)"
+    kind = "cruce"
+  }
+  object "n3 : Node" as n3 {
+    code = "mixco"
+    name = "Mixco (Calzada Roosevelt)"
+    kind = "municipio"
+  }
+  object "n4 : Node" as n4 {
+    code = "san-lucas-sacatepequez"
+    name = "San Lucas Sacatepéquez"
+    kind = "cruce"
+  }
+  object "n5 : Node" as n5 {
+    code = "antigua-guatemala"
+    name = "Antigua Guatemala"
+    kind = "cabecera"
+  }
+  object "n6 : Node" as n6 {
+    code = "chimaltenango"
+    name = "Chimaltenango"
+    kind = "cabecera"
+  }
+
+  object "e1 : Edge" as e1 {
+    road = "Urbano"
+    distance_km = 4.1
+    duration_free_min = 9.0
+  }
+  object "e2 : Edge" as e2 {
+    road = "CA-1"
+    distance_km = 8.2
+    duration_free_min = 11.0
+  }
+  object "e3 : Edge" as e3 {
+    road = "CA-1"
+    distance_km = 14.8
+    duration_free_min = 16.0
+  }
+  object "e4 : Edge" as e4 {
+    road = "RN-10"
+    distance_km = 12.5
+    duration_free_min = 17.0
+  }
+  object "e5 : Edge" as e5 {
+    road = "RN-14"
+    distance_km = 18.3
+    duration_free_min = 24.0
+  }
+
+  object "perfil : TrafficProfile" as tp {
+    band = "peak_am"
+    day_type = "weekday"
+    multiplier = 1.60
+  }
+}
+
+dep -- rt : sale de
+rt -- drv : conductor
+rt -- veh : vehículo
+rt *-- s1 : paradas
+rt *-- s2
+rt *-- s3
+s1 -- o1 : entrega
+s2 -- o2 : entrega
+s3 -- o3 : entrega
+dep .. n1 : node
+o1 .. n3 : node
+o2 .. n5 : node
+o3 .. n6 : node
+
+n1 <.. e1 : origin
+e1 ..> n2 : destination
+n2 <.. e2 : origin
+e2 ..> n3 : destination
+n3 <.. e3 : origin
+e3 ..> n4 : destination
+n4 <.. e4 : origin
+e4 ..> n5 : destination
+n5 <.. e5 : origin
+e5 ..> n6 : destination
+e2 -- tp : multiplicadores
+
+note bottom of rt
+  Tramos de la ruta (campo legs):
+  1) ciudad-guatemala, el-trebol, mixco (e1, e2)
+  2) mixco, san-lucas-sacatepequez, antigua-guatemala (e3, e4)
+  3) antigua-guatemala, chimaltenango (e5)
+  4) regreso a la bodega (no se dibuja)
+end note
+
+note bottom of tp
+  Valores de ejemplo: los nombres, códigos de nodos, carreteras y pedidos
+  salen de los datos semilla (seed_data y seed_demo_data); los km, minutos,
+  horas y multiplicadores son ilustrativos, no mediciones.
+end note
+@enduml

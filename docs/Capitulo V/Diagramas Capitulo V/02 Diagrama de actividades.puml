@@ -1,0 +1,120 @@
+@startuml
+skinparam dpi 300
+skinparam backgroundColor white
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ArrowColor #333333
+skinparam ActivityBorderColor #1F3A5F
+skinparam ActivityBackgroundColor #F5F5F5
+skinparam ActivityDiamondBorderColor #1F3A5F
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ActivityStartColor #333333
+skinparam ActivityEndColor #333333
+skinparam SwimlaneBorderColor #7A7A7A
+skinparam SwimlaneTitleFontStyle bold
+skinparam NoteBorderColor #7A7A7A
+skinparam NoteBackgroundColor #F5F5F5
+skinparam NoteFontSize 10
+skinparam ArrowFontSize 10
+
+title Diagrama de actividades: generar ruta optimizada y recalcular ante un bloqueo
+
+|Coordinador de rutas|
+start
+:Elegir bodega, hora de salida\ny pedidos pendientes;
+:Solicitar propuesta\n(POST /api/v2/routes/plan/);
+
+|Sistema enruta (backend)|
+:Validar sesión y rol, bodega activa,\npedidos pendientes (máx. 50);
+if (¿Hay pedidos válidos\ny nodos alcanzables?) then (no)
+  :Responder error de planificación\n(PlanningError);
+  |Coordinador de rutas|
+  :Corregir la selección;
+  stop
+else (sí)
+endif
+:Obtener el grafo en memoria\n(get_graph) con multiplicadores\nde la franja de salida;
+
+|Motor de rutas (Dijkstra / A*)|
+:Matriz de tiempos con Dijkstra\nuno-a-todos desde bodega y paradas;
+:Ordenar paradas con el algoritmo genético\n(población inicial con vecino más cercano + 2-opt;\ntorneo, cruce OX, mutación, elitismo, 2-opt;\naptitud = tiempo total con la franja de cada tramo);
+:Trazar cada tramo con A*\n(franja de inicio del tramo);
+:Comparar variante más rápida (minutos)\ncon la más corta (km) y obtener\nopciones de hora de salida;
+
+|Sistema enruta (backend)|
+:Responder con variantes, minutos\nahorrados y ETA de cada parada;
+
+|API de Google Maps|
+:Dibujar el trazo por carretera\n(Maps JavaScript / Directions\nen el navegador);
+
+|Coordinador de rutas|
+:Revisar propuesta y elegir criterio,\nconductor y vehículo;
+:Confirmar ruta\n(POST /api/v2/routes/);
+
+|Sistema enruta (backend)|
+:Bloquear pedidos y validar\nconductor y vehículo;
+if (¿La capacidad del vehículo\nalcanza para el peso total?) then (no)
+  :Rechazar la solicitud con el motivo;
+  |Coordinador de rutas|
+  :Elegir otro vehículo;
+  stop
+else (sí)
+endif
+
+|Motor de rutas (Dijkstra / A*)|
+:Recalcular en el servidor la variante elegida\n(no se confía en el cliente);
+
+|Sistema enruta (backend)|
+if (¿Conductor y vehículo libres\nen ese horario?) then (no)
+  :Rechazar la solicitud con el motivo;
+  |Coordinador de rutas|
+  :Elegir otro horario o recurso;
+  stop
+else (sí)
+endif
+:Guardar Route y RouteStop; marcar\npedidos como asignados;
+:Enviar correos tras el commit\n(cliente y conductor);
+
+|Mensajero|
+:Recibir aviso y ver la ruta del día;
+:Iniciar ruta y entregar paradas;
+
+|Sistema enruta (backend)|
+:Registrar incidente reportado\n(bloqueo o tránsito pesado);
+:Revisar rutas planificadas o en curso\n(recompute_routes);
+
+|Motor de rutas (Dijkstra / A*)|
+:Recalcular con A* los tramos pendientes\ncon costo penalizado (cierre = infinito);
+
+|Sistema enruta (backend)|
+if (¿Tramo actual bloqueado\no ahorro ≥ MIN_SAVING_MIN?) then (no)
+  :Mantener la ruta sin avisar;
+  stop
+else (sí)
+  :Crear RerouteProposal pendiente\ny avisar al coordinador;
+endif
+
+|Coordinador de rutas|
+if (¿Aprobar la ruta nueva?) then (aprobar)
+  |Sistema enruta (backend)|
+  :Reemplazar tramos pendientes\ny actualizar ETA;
+  :Avisar al conductor\n(reroute_approved);
+  |Mensajero|
+  :Seguir la ruta nueva;
+else (mantener)
+  |Sistema enruta (backend)|
+  :Marcar propuesta como\n"mantuvo la ruta";
+endif
+stop
+
+note right
+  La Routes API de Google no interviene
+  en la planificación: sus datos se
+  cargaron antes en el grafo (build_graph
+  y calibrate_traffic). También puede
+  decidir la propuesta el conductor de
+  la ruta.
+end note
+@enduml

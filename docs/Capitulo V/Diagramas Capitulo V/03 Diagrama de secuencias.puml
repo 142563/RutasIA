@@ -1,0 +1,115 @@
+@startuml
+skinparam dpi 300
+skinparam backgroundColor white
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ArrowColor #333333
+skinparam SequenceLifeLineBorderColor #7A7A7A
+skinparam ParticipantBorderColor #1F3A5F
+skinparam ParticipantBackgroundColor #F5F5F5
+skinparam ActorBorderColor #333333
+skinparam ActorBackgroundColor #FFFFFF
+skinparam DatabaseBorderColor #1F3A5F
+skinparam DatabaseBackgroundColor #F5F5F5
+skinparam SequenceGroupBorderColor #7A7A7A
+skinparam SequenceGroupBackgroundColor #FFFFFF
+skinparam SequenceBoxBorderColor #7A7A7A
+skinparam NoteBorderColor #7A7A7A
+skinparam NoteBackgroundColor #F5F5F5
+skinparam NoteFontSize 10
+skinparam ArrowFontSize 10
+skinparam ParticipantPadding 12
+skinparam BoxPadding 6
+skinparam maxMessageSize 150
+autonumber "<b>0"
+
+title Diagrama de secuencias: generar ruta optimizada
+
+actor "Coordinador\nde rutas" as COO
+participant "Interfaz React\n(PlannerPage)" as UI
+participant "Backend Django\n(orders_views)" as BE
+participant "Motor de optimización\n(planning, multistop, genetic)" as MO
+participant "Grafo en memoria\n(RoadGraph, dijkstra, astar)" as GR
+database "Base de datos\nPostgreSQL" as DB
+participant "Servicio de correo\n(Resend)" as RES
+participant "API de Google Maps" as GGL
+
+note over GGL, GR
+  Antes de esta secuencia, build_graph y calibrate_traffic
+  consultaron la Routes API por lotes y guardaron en la base
+  de datos los tiempos t0 y los multiplicadores por franja.
+  La Routes API NO se llama durante la planificación.
+end note
+
+== Proponer la ruta (sin guardar) ==
+COO -> UI : Elegir bodega, pedidos pendientes\ny hora de salida
+UI -> BE : POST /api/v2/routes/plan/
+activate BE
+BE -> BE : api_v2_routes_plan: verificar rol\n(administrador o despachador)
+BE -> MO : plan_route(payload)
+activate MO
+MO -> DB : Consultar Depot y Order (_parse_request)
+DB --> MO : bodega y pedidos pendientes
+MO -> GR : get_graph() (load_graph, grafo en caché)
+note right of GR
+  Solo si el grafo no está en caché,
+  load_graph lo arma desde Node, Edge
+  y TrafficProfile en la base de datos.
+end note
+GR --> MO : RoadGraph (nodos, aristas, t0, multiplicadores)
+loop Variantes: más corta (km), más rápida (minutos)\ny una por cada franja de salida
+  MO -> GR : plan_multistop(): dijkstra_all (matriz de tiempos)
+  GR --> MO : distancias entre bodega y paradas
+  MO -> MO : genetic.solve(): algoritmo genético (orden de paradas;\n  semilla = vecino más cercano + 2-opt, parámetros de OptimizerSettings)
+  MO -> GR : astar() por cada tramo (franja de inicio del tramo)
+  GR --> MO : SearchResult (ruta, costo, nodos expandidos)
+end
+MO --> BE : fastest, shortest, minutes_saved, departure_options,\noptimizer = "genetic", response_seconds
+deactivate MO
+BE --> UI : 200 JSON con variantes, ETA y fuente de datos
+deactivate BE
+UI --> COO : Mostrar comparación, ETA y horas de salida
+
+ref over UI, GGL
+  Dibujo en el navegador (no es parte del cálculo): la interfaz carga la API de Maps JavaScript
+  y pide a DirectionsService el trazo por carretera, pasando por los nodos que eligió A*.
+end ref
+
+== Confirmar y guardar la ruta ==
+COO -> UI : Elegir criterio, conductor y vehículo,\ny confirmar
+UI -> BE : POST /api/v2/routes/
+activate BE
+BE -> MO : create_route(payload, user) [transaction.atomic]
+activate MO
+MO -> DB : select_for_update de los pedidos
+MO -> DB : Consultar Driver y Vehicle (validate_for_new_route)
+DB --> MO : conductor y vehículo
+alt Capacidad o disponibilidad insuficiente
+  MO --> BE : PlanningError
+  BE --> UI : 400 con el motivo
+  UI --> COO : Mostrar el error
+else Conductor y vehículo válidos
+  MO -> GR : plan_multistop() de nuevo (el servidor no confía en el cliente)
+  GR --> MO : plan de la variante elegida
+  MO -> DB : ensure_available: rutas que se traslapan
+  MO -> DB : INSERT Route, bulk_create RouteStop,\nUPDATE Order a "asignado"
+  MO -> MO : later(on_route_created): programa el aviso para el commit
+  MO -> DB : COMMIT de la transacción
+  MO -> DB : Verificar avisos ya enviados (NotificationLog)
+  MO -> RES : POST /emails/batch (cliente y conductor)
+  RES --> MO : identificadores de los correos
+  MO -> DB : INSERT NotificationLog (enviado o falló)
+  note right of RES
+    Sin RESEND_API_KEY solo se registra
+    "sin enviar"; un fallo del correo
+    nunca revierte la ruta.
+  end note
+  MO --> BE : route_payload
+  deactivate MO
+  BE --> UI : 201 con la ruta creada
+  UI --> COO : Ruta creada
+end
+deactivate BE
+@enduml
