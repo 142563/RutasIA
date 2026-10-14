@@ -2,7 +2,8 @@
 
 1. Matriz de tiempos con Dijkstra uno-a-todos desde la bodega y desde cada
    parada: N+1 corridas en vez de N² búsquedas punto a punto.
-2. Orden de visita: vecino más cercano y luego 2-opt, minimizando el tiempo total.
+2. Orden de visita con el algoritmo genético (genetic.py, motor principal de la
+   tesis), sembrado con vecino más cercano + 2-opt; "nn2opt" queda como opción.
 3. Cada tramo con A*, usando la franja en la que EMPIEZA el tramo: la llegada a
    una parada (más el tiempo de servicio) es la salida del tramo siguiente.
 
@@ -15,8 +16,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from time import perf_counter
 from typing import Sequence
 
+from logistics.routing import genetic
 from logistics.routing.astar import astar
 from logistics.routing.dijkstra import dijkstra_all
 from logistics.routing.graph import DISTANCE, TIME, RoadGraph
@@ -24,6 +27,8 @@ from logistics.routing.instrument import INF, SearchResult
 from logistics.routing.traffic import profile_for, to_local
 
 DEFAULT_SERVICE_MIN = 10.0
+GENETIC, NN2OPT, FIXED = "genetic", "nn2opt", "fixed"
+OPTIMIZERS = (GENETIC, NN2OPT)
 
 
 class UnreachableStopError(Exception):
@@ -111,8 +116,12 @@ class MultiStopPlan:
     # Costos de la matriz (minutos o km, según el criterio) para comparar métodos de orden (E5):
     capture_minutes: float  # orden tal como se capturaron las paradas
     nearest_neighbor_minutes: float
-    optimized_minutes: float  # vecino más cercano + 2-opt (con la matriz de la franja de salida)
+    optimized_minutes: float  # orden elegido por el optimizador (con la matriz de la franja de salida)
     criterion: str = TIME
+    optimizer: str = GENETIC  # genetic | nn2opt | fixed (orden dado)
+    two_opt_minutes: float = 0.0  # vecino más cercano + 2-opt, para comparar con el genético
+    ga_generations: int = 0
+    optimize_ms: float = 0.0  # tiempo real que tomó ordenar las paradas
     etas: list[datetime] = field(default_factory=list)  # llegada a cada parada, en orden de visita
 
     @property
@@ -143,6 +152,8 @@ def plan_multistop(
     criterion: str = TIME,
     fixed_order: Sequence[int] | None = None,
     avoid_unpaved: bool = False,
+    optimizer: str = GENETIC,
+    ga_params: genetic.GeneticParams | None = None,
 ) -> MultiStopPlan:
     """criterion="time": la más rápida con tráfico; "distance": la más corta en km.
 
@@ -150,7 +161,10 @@ def plan_multistop(
     tramo, así "la más corta" se compara con la más rápida en igualdad de condiciones.
 
     fixed_order (índices 0..k-1 de `stops`) evalúa un orden dado en vez de optimizarlo.
+    optimizer: "genetic" (por defecto) o "nn2opt" (vecino más cercano + 2-opt).
     """
+    if optimizer not in OPTIMIZERS:
+        raise ValueError(f"optimizer debe ser uno de {OPTIMIZERS}")
     departure = to_local(departure)
     band, day_type = profile_for(departure)
     weights = graph.search_weights(criterion, band, day_type, avoid_unpaved)
@@ -163,12 +177,19 @@ def plan_multistop(
 
     capture = list(range(1, len(nodes)))
     nn = nearest_neighbor(matrix)
+    started = perf_counter()
+    nn_two_opt = two_opt(nn, matrix, return_to_depot)
+    generations = 0
     if fixed_order is not None:
         if sorted(fixed_order) != list(range(len(stops))):
             raise ValueError("fixed_order debe ser una permutación de las paradas")
-        optimized = [i + 1 for i in fixed_order]
+        optimized, optimizer = [i + 1 for i in fixed_order], FIXED
+    elif optimizer == GENETIC:
+        result = genetic.solve(matrix, ga_params, return_to_depot, seeds=[nn_two_opt])
+        optimized, generations = result.order, result.generations
     else:
-        optimized = two_opt(nn, matrix, return_to_depot)
+        optimized = nn_two_opt
+    optimize_ms = (perf_counter() - started) * 1000
 
     legs, etas = [], []
     current_time, current_node = departure, depot
@@ -203,5 +224,9 @@ def plan_multistop(
         nearest_neighbor_minutes=route_cost(nn, matrix, return_to_depot),
         optimized_minutes=route_cost(optimized, matrix, return_to_depot),
         criterion=criterion,
+        optimizer=optimizer,
+        two_opt_minutes=route_cost(nn_two_opt, matrix, return_to_depot),
+        ga_generations=generations,
+        optimize_ms=optimize_ms,
         etas=etas,
     )

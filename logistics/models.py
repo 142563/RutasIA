@@ -508,6 +508,38 @@ class Depot(TimestampedModel):
         return self.name
 
 
+class OptimizerSettings(models.Model):
+    """Parámetros del algoritmo genético que ajusta el administrador (fila única, pk=1).
+
+    Se editan en /admin/. Sin fila, valen los de logistics.routing.genetic.GeneticParams.
+    """
+
+    population = models.PositiveIntegerField(default=80, help_text="Individuos por generación (4–1000).")
+    generations = models.PositiveIntegerField(default=400, help_text="Máximo de generaciones (1–5000).")
+    tournament = models.PositiveIntegerField(default=3, help_text="Tamaño del torneo de selección (2–10).")
+    crossover_rate = models.FloatField(default=0.9, help_text="Probabilidad de cruce OX (0–1).")
+    mutation_rate = models.FloatField(default=0.2, help_text="Probabilidad de mutación (0–1).")
+    elitism = models.PositiveIntegerField(default=2, help_text="Mejores que pasan intactos (0–20).")
+    stall_generations = models.PositiveIntegerField(
+        default=60, help_text="Se detiene si el mejor no mejora en tantas generaciones.")
+    seed = models.IntegerField(null=True, blank=True, default=2026,
+                               help_text="Semilla (resultados reproducibles). Vacío = aleatoria.")
+    local_search = models.BooleanField(default=True, help_text="Búsqueda local 2-opt (genético memético).")
+    local_search_rate = models.FloatField(default=0.1, help_text="Fracción de hijos pulidos con 2-opt (0–1).")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "parámetros del optimizador"
+        verbose_name_plural = "parámetros del optimizador"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return "Algoritmo genético"
+
+
 class Route(TimestampedModel):
     """Ruta de reparto planificada con el motor nuevo (docs/PLAN.md §6)."""
 
@@ -529,6 +561,8 @@ class Route(TimestampedModel):
     departure_at = models.DateTimeField()
     criterion = models.CharField(max_length=10, choices=Criterion.choices, default=Criterion.TIME)
     algorithm = models.CharField(max_length=16, default="astar")
+    # Quién ordenó las paradas: genetic (motor principal) | nn2opt | fixed. Vacío = rutas anteriores a RUT-79.
+    optimizer = models.CharField(max_length=16, blank=True, default="")
     return_to_depot = models.BooleanField(default=True)
     service_min = models.FloatField(default=10)
     driving_minutes = models.FloatField(help_text="Minutos de manejo con el tráfico de cada tramo.")
