@@ -14,6 +14,8 @@
 | Acceso | Límite de intentos de inicio de sesión con almacén compartido (RUT-85). | ☐ |
 | Acceso | Permisos por rol también en las APIs del motor de rutas (RUT-86). | ☐ |
 | Acceso | Bitácora de auditoría: quién inició sesión, creó usuarios, asignó o canceló rutas (RUT-88). | ☐ |
+| Acceso | Parámetros del algoritmo genético (`OptimizerSettings`) solo en `/admin/` de Django (personal autorizado); sin endpoint nuevo en la API. Valores acotados en el servidor (`GeneticParams.clamped`) para que nadie fije una población o generaciones que tumben el servidor (RUT-79). | ✓ |
+| Dependencias | OR-Tools, SciPy y Pandas solo en `requirements-dev.txt` (experimento de la tesis); no se instalan en producción. El grafo exportado para Colab (`grafo.json`) no se sube a Git (RUT-79). | ✓ |
 | Peticiones | Protección CSRF en todo POST/PATCH/DELETE; cuerpos JSON validados (objeto o 400) (RUT-64). | ✓ |
 | Peticiones | SQL solo por el ORM de Django (consultas parametrizadas): sin SQL armado a mano. | ✓ |
 | Peticiones | Salida escapada: React escapa por defecto y las plantillas de correo usan el autoescape de Django. | ✓ |

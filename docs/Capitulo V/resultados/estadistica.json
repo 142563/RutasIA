@@ -1,0 +1,197 @@
+{
+  "alfa": 0.05,
+  "metas": {
+    "distance_pct": 15.0,
+    "time_pct": 20.0,
+    "alternative_success_pct": 90.0,
+    "response_s": 30.0
+  },
+  "pares": 30,
+  "total": {
+    "distancia_km": {
+      "n": 30,
+      "media_convencional": 838.203,
+      "media_optimizada": 812.176,
+      "de_convencional": 275.284,
+      "de_optimizada": 249.565,
+      "reduccion_media_pct": 2.3,
+      "shapiro_p": 0.27721,
+      "diferencias_normales": true,
+      "prueba": "t pareada",
+      "p_valor": 0.0303,
+      "d_cohen": 0.356,
+      "significativo": true,
+      "cumple_meta_15": false
+    },
+    "tiempo_min": {
+      "n": 30,
+      "media_convencional": 1646.932,
+      "media_optimizada": 1385.359,
+      "de_convencional": 594.166,
+      "de_optimizada": 414.694,
+      "reduccion_media_pct": 13.72,
+      "shapiro_p": 2e-05,
+      "diferencias_normales": false,
+      "prueba": "Wilcoxon",
+      "p_valor": 9.313225746154785e-10,
+      "d_cohen": 0.973,
+      "significativo": true,
+      "cumple_meta_20": false
+    }
+  },
+  "por_escenario": {
+    "normal": {
+      "distancia_km": {
+        "n": 10,
+        "media_convencional": 805.744,
+        "media_optimizada": 753.886,
+        "de_convencional": 243.263,
+        "de_optimizada": 235.349,
+        "reduccion_media_pct": 6.49,
+        "shapiro_p": 0.19057,
+        "diferencias_normales": true,
+        "prueba": "t pareada",
+        "p_valor": 0.00241,
+        "d_cohen": 1.175,
+        "significativo": true,
+        "cumple_meta_15": false
+      },
+      "tiempo_min": {
+        "n": 10,
+        "media_convencional": 1260.657,
+        "media_optimizada": 1130.812,
+        "de_convencional": 253.153,
+        "de_optimizada": 230.591,
+        "reduccion_media_pct": 9.89,
+        "shapiro_p": 0.27892,
+        "diferencias_normales": true,
+        "prueba": "t pareada",
+        "p_valor": 0.00155,
+        "d_cohen": 1.266,
+        "significativo": true,
+        "cumple_meta_20": false
+      }
+    },
+    "congestion": {
+      "distancia_km": {
+        "n": 10,
+        "media_convencional": 805.744,
+        "media_optimizada": 837.119,
+        "de_convencional": 243.263,
+        "de_optimizada": 220.182,
+        "reduccion_media_pct": -5.25,
+        "shapiro_p": 0.09411,
+        "diferencias_normales": true,
+        "prueba": "t pareada",
+        "p_valor": 0.89444,
+        "d_cohen": -0.426,
+        "significativo": false,
+        "cumple_meta_15": false
+      },
+      "tiempo_min": {
+        "n": 10,
+        "media_convencional": 2271.497,
+        "media_optimizada": 1779.46,
+        "de_convencional": 522.57,
+        "de_optimizada": 368.633,
+        "reduccion_media_pct": 20.35,
+        "shapiro_p": 0.0539,
+        "diferencias_normales": true,
+        "prueba": "t pareada",
+        "p_valor": 0.00072,
+        "d_cohen": 1.431,
+        "significativo": true,
+        "cumple_meta_20": true
+      }
+    },
+    "cierre": {
+      "distancia_km": {
+        "n": 10,
+        "media_convencional": 903.12,
+        "media_optimizada": 845.524,
+        "de_convencional": 344.684,
+        "de_optimizada": 301.856,
+        "reduccion_media_pct": 5.67,
+        "shapiro_p": 0.05007,
+        "diferencias_normales": true,
+        "prueba": "t pareada",
+        "p_valor": 0.01067,
+        "d_cohen": 0.88,
+        "significativo": true,
+        "cumple_meta_15": false
+      },
+      "tiempo_min": {
+        "n": 10,
+        "media_convencional": 1408.642,
+        "media_optimizada": 1245.805,
+        "de_convencional": 371.594,
+        "de_optimizada": 314.42,
+        "reduccion_media_pct": 10.93,
+        "shapiro_p": 0.44671,
+        "diferencias_normales": true,
+        "prueba": "t pareada",
+        "p_valor": 0.00113,
+        "d_cohen": 1.333,
+        "significativo": true,
+        "cumple_meta_20": false
+      }
+    }
+  },
+  "ruta_alternativa": {
+    "casos": 10,
+    "exito_pct": 100.0,
+    "cumple_meta_90": true,
+    "max_s": 0.0167
+  },
+  "tiempo_respuesta": {
+    "max_s": 2.409,
+    "media_s": 0.407,
+    "con_50_paradas": [
+      {
+        "franja": "pico matutino",
+        "paradas": 50,
+        "tiempo_respuesta_s": 2.206,
+        "generaciones_ga": 147
+      },
+      {
+        "franja": "valle",
+        "paradas": 50,
+        "tiempo_respuesta_s": 1.409,
+        "generaciones_ga": 97
+      },
+      {
+        "franja": "pico vespertino",
+        "paradas": 50,
+        "tiempo_respuesta_s": 2.409,
+        "generaciones_ga": 118
+      }
+    ],
+    "cumple_meta_30": true
+  },
+  "h0_distancia": {
+    "rechazada": false,
+    "regla": "p < 0.05 y reducción media de distancia ≥ 15 %"
+  },
+  "genetico_vs_ortools": {
+    "instancias": 30,
+    "genetico_igual_o_mejor": 30,
+    "diferencia_media_pct": 0.0,
+    "diferencia_max_pct": 0.0,
+    "genetico_ms_media": 145.8,
+    "ortools_ms_media": 10002.3
+  },
+  "fuente_datos": "edges=google;traffic=google_routes",
+  "parametros_genetico": {
+    "population": 80,
+    "generations": 400,
+    "tournament": 3,
+    "crossover_rate": 0.9,
+    "mutation_rate": 0.2,
+    "elitism": 2,
+    "stall_generations": 60,
+    "seed": 2026,
+    "local_search": true,
+    "local_search_rate": 0.1
+  },
+  "semilla": 2026
+}

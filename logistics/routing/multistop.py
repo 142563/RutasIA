@@ -7,8 +7,10 @@
 3. Cada tramo con A*, usando la franja en la que EMPIEZA el tramo: la llegada a
    una parada (más el tiempo de servicio) es la salida del tramo siguiente.
 
-El orden se optimiza con la matriz de la franja de salida (simplificación del
-nivel Must; el tráfico dependiente del tiempo dentro del orden es Should).
+Con criterio de tiempo, la aptitud del genético es dependiente del tiempo
+(TimeDependentCost): cada tramo cuesta lo que marca la franja en la que empieza,
+igual que al trazarlo con A*, así que el tiempo que estima coincide con el de la
+ruta trazada. La matriz de la franja de salida guía al 2-opt.
 La matriz NO es simétrica (grafo dirigido), por eso 2-opt evalúa el costo
 completo de cada candidato en vez de la fórmula de intercambio simétrica.
 """
@@ -90,6 +92,51 @@ def two_opt(order: Sequence[int], matrix: list[list[float]], return_to_depot: bo
     return best
 
 
+class TimeDependentCost:
+    """Minutos de manejo de un orden, con cada tramo en la franja en la que EMPIEZA.
+
+    Reproduce el cálculo de los tramos de plan_multistop (llegada + servicio = salida
+    del siguiente) usando matrices de Dijkstra por perfil (franja, tipo de día),
+    calculadas solo cuando se necesitan. Las franjas cambian en horas exactas.
+    """
+
+    def __init__(self, graph: RoadGraph, nodes: Sequence[int], departure: datetime, service_min: float,
+                 return_to_depot: bool, avoid_unpaved: bool = False,
+                 known: dict[tuple[str, str], list[list[float]]] | None = None):
+        self.graph, self.nodes, self.service = graph, list(nodes), service_min
+        self.return_to_depot, self.avoid_unpaved = return_to_depot, avoid_unpaved
+        self.hour0 = departure.replace(minute=0, second=0, microsecond=0)
+        self.start = (departure - self.hour0).total_seconds() / 60  # minutos desde el inicio de esa hora
+        self.matrices: dict[tuple[str, str], list[list[float]]] = dict(known or {})
+        self.by_hour: dict[int, list[list[float]]] = {}
+        self.expanded = 0
+
+    def _matrix(self, clock: float) -> list[list[float]]:
+        hour = int(clock // 60)
+        matrix = self.by_hour.get(hour)
+        if matrix is None:
+            profile = profile_for(self.hour0 + timedelta(hours=hour))
+            matrix = self.matrices.get(profile)
+            if matrix is None:
+                weights = self.graph.search_weights(TIME, *profile, self.avoid_unpaved)
+                matrix, expanded = time_matrix(self.graph, weights, self.nodes)
+                self.matrices[profile] = matrix
+                self.expanded += expanded
+            self.by_hour[hour] = matrix
+        return matrix
+
+    def __call__(self, order: Sequence[int]) -> float:
+        total, clock, current = 0.0, self.start, 0
+        for stop in order:
+            minutes = self._matrix(clock)[current][stop]
+            total += minutes
+            clock += minutes + self.service
+            current = stop
+        if self.return_to_depot:
+            total += self._matrix(clock)[current][0]
+        return total
+
+
 @dataclass
 class Leg:
     origin: int
@@ -113,7 +160,7 @@ class MultiStopPlan:
     service_min: float
     return_to_depot: bool
     matrix_expanded: int
-    # Costos de la matriz (minutos o km, según el criterio) para comparar métodos de orden (E5):
+    # Costo de cada orden para comparar métodos (km, o minutos con la franja de cada tramo):
     capture_minutes: float  # orden tal como se capturaron las paradas
     nearest_neighbor_minutes: float
     optimized_minutes: float  # orden elegido por el optimizador (con la matriz de la franja de salida)
@@ -180,12 +227,17 @@ def plan_multistop(
     started = perf_counter()
     nn_two_opt = two_opt(nn, matrix, return_to_depot)
     generations = 0
+    if criterion == TIME:
+        cost = TimeDependentCost(graph, nodes, departure, service_min, return_to_depot, avoid_unpaved,
+                                 known={(band, day_type): matrix})
+    else:
+        cost = lambda order: route_cost(order, matrix, return_to_depot)  # noqa: E731  (km: no depende de la hora)
     if fixed_order is not None:
         if sorted(fixed_order) != list(range(len(stops))):
             raise ValueError("fixed_order debe ser una permutación de las paradas")
         optimized, optimizer = [i + 1 for i in fixed_order], FIXED
     elif optimizer == GENETIC:
-        result = genetic.solve(matrix, ga_params, return_to_depot, seeds=[nn_two_opt])
+        result = genetic.solve(matrix, ga_params, return_to_depot, seeds=[nn_two_opt, nn, capture], fitness=cost)
         optimized, generations = result.order, result.generations
     else:
         optimized = nn_two_opt
@@ -219,13 +271,13 @@ def plan_multistop(
         departure=departure,
         service_min=service_min,
         return_to_depot=return_to_depot,
-        matrix_expanded=matrix_expanded,
-        capture_minutes=route_cost(capture, matrix, return_to_depot),
-        nearest_neighbor_minutes=route_cost(nn, matrix, return_to_depot),
-        optimized_minutes=route_cost(optimized, matrix, return_to_depot),
+        matrix_expanded=matrix_expanded + getattr(cost, "expanded", 0),
+        capture_minutes=cost(capture),
+        nearest_neighbor_minutes=cost(nn),
+        optimized_minutes=cost(optimized),
         criterion=criterion,
         optimizer=optimizer,
-        two_opt_minutes=route_cost(nn_two_opt, matrix, return_to_depot),
+        two_opt_minutes=cost(nn_two_opt),
         ga_generations=generations,
         optimize_ms=optimize_ms,
         etas=etas,

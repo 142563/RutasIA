@@ -130,15 +130,22 @@ class GeneticPlanTests(SimpleTestCase):
         with self.assertRaises(ValueError):
             plan_multistop(self.g, self.depot, stops, datetime(2026, 10, 6, 10, 0, tzinfo=GT_TZ), optimizer="x")
 
-    def test_matrix_comes_from_dijkstra_with_the_band(self):
-        """El genético ordena sobre la matriz de Dijkstra; los costos coinciden con time_matrix."""
+    def test_time_dependent_fitness_matches_the_traced_route(self):
+        """La aptitud usa la franja en que empieza cada tramo: lo que estima el genético
+        es exactamente lo que suman los tramos trazados con A*."""
+        rng = random.Random(12)
+        for departure in (datetime(2026, 10, 6, 6, 40, 30, tzinfo=GT_TZ), datetime(2026, 10, 9, 16, 15, tzinfo=GT_TZ)):
+            stops = rng.sample([i for i in range(self.g.node_count) if i != self.depot], 10)
+            plan = plan_multistop(self.g, self.depot, stops, departure, service_min=12, return_to_depot=True)
+            self.assertAlmostEqual(plan.optimized_minutes, plan.driving_minutes, places=6)
+            self.assertGreater(len({leg.band for leg in plan.legs}), 1)  # cruza varias franjas
+
+    def test_static_matrix_still_used_for_distance(self):
         stops = [self.g.node_index(c) for c in ("antigua-guatemala", "escuintla", "mazatenango", "retalhuleu")]
-        departure = datetime(2026, 10, 6, 7, 30, tzinfo=GT_TZ)
-        plan = plan_multistop(self.g, self.depot, stops, departure)
-        from logistics.routing.traffic import profile_for
-        band, day = profile_for(departure)
-        matrix, _ = time_matrix(self.g, self.g.weights(TIME, band, day), [self.depot, *stops])
+        plan = plan_multistop(self.g, self.depot, stops, datetime(2026, 10, 6, 7, 30, tzinfo=GT_TZ), criterion="distance")
+        matrix, _ = time_matrix(self.g, self.g.km, [self.depot, *stops])
         self.assertAlmostEqual(plan.optimized_minutes, route_cost([i + 1 for i in plan.order], matrix), places=6)
+        self.assertAlmostEqual(plan.optimized_minutes, plan.total_km, places=6)
 
 
 class GeneticApiTests(TestCase):

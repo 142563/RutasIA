@@ -2,7 +2,9 @@
 
 Individuo = una secuencia completa de entrega (permutación de las paradas 1..k;
 la bodega es el índice 0 de la matriz). Aptitud = tiempo total estimado del
-recorrido según la matriz (minutos con el tráfico de la franja), menor es mejor.
+recorrido, menor es mejor. Por defecto se mide con la matriz; el planificador pasa
+`fitness` dependiente del tiempo (cada tramo con el tráfico de la franja en que
+empieza, multistop.TimeDependentCost), y entonces la matriz solo guía al 2-opt.
 
 Operadores:
 - Selección por torneo.
@@ -23,7 +25,7 @@ from __future__ import annotations
 import random
 import time
 from dataclasses import dataclass, field, fields
-from typing import Sequence
+from typing import Callable, Sequence
 
 EPS = 1e-9
 
@@ -161,16 +163,23 @@ def fast_two_opt(order: Sequence[int], matrix: Sequence[Sequence[float]], return
 
 
 def solve(matrix: Sequence[Sequence[float]], params: GeneticParams | None = None,
-          return_to_depot: bool = False, seeds: Sequence[Sequence[int]] = ()) -> GeneticResult:
+          return_to_depot: bool = False, seeds: Sequence[Sequence[int]] = (),
+          fitness: Callable[[Sequence[int]], float] | None = None) -> GeneticResult:
     """Mejor orden de visita encontrado por el genético para la matriz dada.
 
     `seeds` = órdenes conocidos que entran a la población inicial (p. ej. el de
     vecino más cercano + 2-opt); el resultado nunca es peor que ninguno de ellos.
+    `fitness(order)` reemplaza al costo de la matriz (p. ej. tiempo dependiente de la franja).
     """
     started = time.perf_counter()
     params = (params or GeneticParams()).clamped()
     stops = list(range(1, len(matrix)))
-    cost = lambda o: tour_cost(o, matrix, return_to_depot)  # noqa: E731
+    cost = fitness or (lambda o: tour_cost(o, matrix, return_to_depot))
+
+    def polish(order: list[int]) -> list[int]:
+        """2-opt guiado por la matriz; con otra aptitud solo se acepta si no empeora."""
+        out = fast_two_opt(order, matrix, return_to_depot)
+        return out if fitness is None or cost(out) <= cost(order) + EPS else order
 
     if len(stops) <= 2:
         # 0, 1 o 2 paradas: se prueban todas las opciones directamente
@@ -183,14 +192,14 @@ def solve(matrix: Sequence[Sequence[float]], params: GeneticParams | None = None
     population = [list(s) for s in seeds if sorted(s) == stops]
     population.append(nearest_neighbor_order(matrix))
     if params.local_search:
-        population.append(fast_two_opt(population[-1], matrix, return_to_depot))
+        population.append(polish(population[-1]))
     polished_quota = len(population) + int(params.population * 0.2) if params.local_search else 0
     while len(population) < params.population:
         individual = stops[:]
         rng.shuffle(individual)
         if len(population) < polished_quota:
             # Parte de la población arranca en óptimos locales distintos (diversidad + calidad)
-            individual = fast_two_opt(individual, matrix, return_to_depot)
+            individual = polish(individual)
         population.append(individual)
     population = population[:max(params.population, len(seeds) + 1)]
     scored = sorted(((cost(o), o) for o in population), key=lambda s: s[0])
@@ -205,14 +214,14 @@ def solve(matrix: Sequence[Sequence[float]], params: GeneticParams | None = None
     for generation in range(1, params.generations + 1):
         nxt = [list(o) for _, o in scored[:elite_count]]
         if params.local_search and generation % 10 == 0:
-            nxt = [fast_two_opt(o, matrix, return_to_depot) for o in nxt]
+            nxt = [polish(o) for o in nxt]
         while len(nxt) < params.population:
             p1, p2 = pick(), pick()
             child = ordered_crossover(p1, p2, rng) if rng.random() < params.crossover_rate else list(p1)
             if rng.random() < params.mutation_rate:
                 mutate(child, rng)
             if params.local_search and rng.random() < params.local_search_rate:
-                child = fast_two_opt(child, matrix, return_to_depot)
+                child = polish(child)
             nxt.append(child)
         scored = sorted(((cost(o), o) for o in nxt), key=lambda s: s[0])
         if scored[0][0] < best_cost - EPS:
@@ -225,7 +234,7 @@ def solve(matrix: Sequence[Sequence[float]], params: GeneticParams | None = None
             break
 
     if params.local_search:
-        polished = fast_two_opt(best, matrix, return_to_depot)
+        polished = polish(best)
         if cost(polished) < best_cost - EPS:
             best, best_cost = polished, cost(polished)
             history[-1] = best_cost
