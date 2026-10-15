@@ -1,0 +1,75 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+hide circle
+hide empty members
+title Diagrama entidad-relación: pedidos, rutas y seguimiento
+
+entity "logistics_order" as order {
+  * id : integer <<PK>>
+  --
+  node_id : integer <<FK>>
+  code : varchar(24) <<UK>>
+  tracking_token : varchar(32) <<UK>>
+  recipient : varchar(120)
+  recipient_email : varchar(254)
+  latitude : double
+  longitude : double
+  weight_kg : numeric(8,2)
+  status : varchar(16)
+}
+entity "logistics_route" as route {
+  * id : integer <<PK>>
+  --
+  depot_id, driver_id,
+  vehicle_id, created_by_id <<FK>>
+  code : varchar(24) <<UK>>
+  departure_at : timestamp
+  criterion : varchar(10)
+  optimizer : varchar(16)
+  traffic_source : varchar(24)
+  traffic_queried_at : timestamp
+  driving_minutes : double
+  total_km : double
+  legs : jsonb
+  status : varchar(16)
+}
+entity "logistics_routestop" as stop {
+  * id : integer <<PK>>
+  --
+  * route_id : integer <<FK>>
+  * order_id : integer <<FK>>
+  sequence : integer
+  eta : timestamp
+  status : varchar(10)
+}
+entity "logistics_vehicleposition" as position {
+  * id : integer <<PK>>
+  --
+  * route_id : integer <<FK>>
+  * driver_id : integer <<FK>>
+  lat : double
+  lng : double
+  recorded_at : timestamp
+}
+entity "logistics_notificationlog" as notif {
+  * id : integer <<PK>>
+  --
+  order_id : integer <<FK>>
+  route_id : integer <<FK>>
+  user_id : integer <<FK>>
+  event : varchar(32)
+  status : varchar(10)
+}
+entity "depot, driver, vehicle,\nauth_user (detalladas en 07a)" as fleet EXTERNO
+entity "logistics_node\n(detallada en 07c)" as node EXTERNO
+
+route ||-down-|{ stop
+order ||-left-o{ stop
+route ||-left-o{ position
+route |o-right-o{ notif
+order |o-up-o{ notif
+route }o-up-|| fleet
+order }o-down-o| node
+
+@enduml

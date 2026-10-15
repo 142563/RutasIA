@@ -1,0 +1,37 @@
+@startuml
+!include ../estilo.iuml
+skinparam maxMessageSize 130
+autonumber "<b>0"
+hide footbox
+title Diagrama de secuencias: planificación de la ruta
+
+actor "Coordinador" as COO
+participant "Interfaz" as UI
+participant "Servidor\n(planificación)" as BE
+participant "Motor de\nrutas" as MO
+participant "Algoritmo\ngenético" as GA
+participant "Google\nMaps" as GGL
+
+COO -> UI : bodega, pedidos\ny hora de salida
+UI -> BE : pedir propuesta
+activate BE
+BE -> BE : verificar rol
+BE -> BE : leer bodega y pedidos\n(base de datos)
+BE -> MO : grafo en memoria\n(en caché)
+group repetir [cada variante y franja]
+  BE -> MO : matriz con Dijkstra\n(uno a todos)
+  MO --> BE : matriz de minutos
+  BE -> GA : ordenar paradas
+  activate GA
+  GA -> GA : torneo, cruce\nOX, mutación,\nelitismo, 2-opt
+  GA --> BE : mejor orden
+  deactivate GA
+  BE -> MO : A* por cada tramo
+  MO --> BE : tramos y llegadas
+end
+BE -> GGL : medir tramos en vivo\n(en paralelo, caché 5 min)
+GGL --> BE : minutos con tráfico\ndel momento
+BE --> UI : variantes,\nahorro y tiempo\nde respuesta
+deactivate BE
+UI --> COO : comparación\nen el mapa
+@enduml

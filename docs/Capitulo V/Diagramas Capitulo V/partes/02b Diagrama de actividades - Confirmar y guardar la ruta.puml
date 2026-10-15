@@ -1,0 +1,39 @@
+@startuml
+!include ../estilo.iuml
+title Diagrama de actividades: confirmar y guardar la ruta
+
+|Coordinador de rutas|
+start
+:Elegir criterio, conductor
+y vehículo, y confirmar;
+
+|Servidor enruta|
+:Bloquear los pedidos
+(evita asignarlos dos veces);
+if (¿Capacidad y horario
+disponibles?) then (no)
+  :Rechazar con el motivo;
+  stop
+else (sí)
+endif
+
+|Motor de rutas|
+:Recalcular la variante
+elegida (no se confía
+en la interfaz);
+
+|Servidor enruta|
+:Guardar la ruta y sus
+paradas; pedidos
+pasan a «asignado»;
+:Avisar por correo al cliente
+y al conductor tras confirmar
+la transacción;
+stop
+
+note right
+  Avisos: detallado en 01e.
+  La ejecución por el
+  mensajero sigue en 02d.
+end note
+@enduml

@@ -1,0 +1,107 @@
+@startuml
+!pragma layout elk
+skinparam dpi 300
+skinparam backgroundColor white
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam componentStyle uml2
+skinparam ArrowColor #333333
+skinparam ComponentBorderColor #1F3A5F
+skinparam ComponentBackgroundColor #F5F5F5
+skinparam NodeBorderColor #7A7A7A
+skinparam NodeBackgroundColor #FFFFFF
+skinparam RectangleBorderColor #7A7A7A
+skinparam RectangleBackgroundColor #FFFFFF
+skinparam PackageBorderColor #7A7A7A
+skinparam PackageBackgroundColor #FFFFFF
+skinparam DatabaseBorderColor #1F3A5F
+skinparam DatabaseBackgroundColor #F5F5F5
+skinparam InterfaceBorderColor #333333
+skinparam InterfaceBackgroundColor #FFFFFF
+skinparam CloudBorderColor #7A7A7A
+skinparam CloudBackgroundColor #FFFFFF
+skinparam NoteBorderColor #7A7A7A
+skinparam NoteBackgroundColor #F5F5F5
+skinparam NoteFontSize 10
+skinparam ArrowFontSize 10
+
+title Diagrama de componentes del sistema enruta
+
+node "Dispositivo del usuario" as DEV {
+  node "Navegador web" as BRW {
+    component "Aplicación React\n(Vite, TypeScript,\nReact Router)" as SPA
+    component "Mapa con Google Maps\n(o esquema propio si no hay llave)" as GMJS
+  }
+}
+
+cloud "DNS Spaceship\n(enruta.world)" as DNS
+
+node "Render: servicio web" as RSVC {
+  component "Gunicorn\n(3 procesos)" as GUN
+  component "WhiteNoise\n(archivos estáticos\ny compilación de React)" as WN
+  package "Django" as DJ {
+    component "Presentación\n(vistas de la API, sesión, roles)" as PRES
+    component "Aplicación\n(planificación, incidentes, asignación,\nconductor, pedidos, seguimiento)" as APP
+    component "Dominio\n(reglas, regiones y avisos)" as DOM
+    component "Motor de rutas\n(grafo, Dijkstra, A*,\nvarias paradas, algoritmo\ngenético, tráfico por franja)" as ENG
+    component "Tráfico en vivo\n(caché de 5 minutos)" as LIVE
+    component "Notificaciones\n(correo al cliente\ny al personal)" as NOT
+    component "Cliente de Google\nRoutes API" as RCL
+  }
+}
+
+node "Render: tarea programada" as RCRON {
+  component "Recalibración semanal del tráfico\n(domingos 12:00 UTC)" as CRON
+}
+
+database "PostgreSQL en Neon" as PG
+
+node "Equipo de desarrollo / Google Colab\n(fuera de producción)" as DEVX {
+  component "Experimento de la tesis\n(3 escenarios × 10)" as EXPC
+  component "OR-Tools\n(línea base)" as ORTC
+  component "Cuadernos: estadística (SciPy)\ny refuerzo (TensorFlow)" as NBC
+}
+
+cloud "Google Maps Platform" as GMP {
+  component "Mapa, lugares,\ndirecciones y trazo" as GMAPS
+  component "Routes API\n(computeRoutes,\ncomputeRouteMatrix)" as GROUTES
+}
+
+cloud "Resend\n(correo transaccional)" as RES
+
+interface "API REST" as IREST
+interface "API HTTP de Resend" as IMAIL
+
+SPA --> DNS : resuelve enruta.world
+DNS ..> GUN : apunta al servicio
+SPA --> IREST : /api/
+IREST - GUN
+GUN --> WN : interfaz compilada
+GUN --> PRES : interfaz del servidor web
+PRES --> APP
+APP --> DOM
+APP --> ENG : grafo en memoria
+APP --> LIVE : después del motor
+LIVE --> RCL
+APP --> NOT : tras confirmar la transacción
+APP --> PG : consultas (ORM de Django)
+ENG ..> PG : carga única del grafo
+NOT --> IMAIL
+IMAIL - RES
+RCL --> GROUTES : HTTPS
+APP ..> RCL : verificación de tráfico en vivo
+GMJS --> GMAPS : mapa, direcciones y trazo
+SPA --> GMJS
+CRON --> RCL : calibrar tráfico
+CRON --> PG
+EXPC --> ENG : mismo motor
+EXPC --> ORTC : compara
+EXPC ..> PG : lee el grafo
+NBC ..> EXPC : resultados y grafo exportado
+note bottom of ENG
+  El motor nunca llama a Google ni a la base
+  de datos dentro de Dijkstra o A*.
+end note
+@enduml

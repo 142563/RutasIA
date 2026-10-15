@@ -1,0 +1,62 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+hide circle
+hide empty members
+title Diagrama de clases: red vial, tráfico e incidentes
+
+class Node {
+  +code: slug
+  +name: str
+  +kind: cabecera | municipio | cruce
+  +latitude: float
+  +longitude: float
+}
+class Edge {
+  +distance_km: float
+  +duration_free_min: float
+  +road: str
+  +road_class: primary |
+   secondary | unpaved
+  +polyline: str
+}
+class TrafficProfile {
+  +band: str
+  +day_type: weekday | weekend
+  +multiplier: float (≥ 1)
+}
+class RouteSample {
+  +duration_s: float
+  +static_duration_s: float
+  +fetched_at: datetime
+}
+class Incident {
+  +kind: traffic | accident |
+   landslide | closure
+  +blocked: bool
+  +multiplier: float (≥ 1)
+  +ends_at: datetime
+}
+class RerouteProposal {
+  +current_minutes: float
+  +proposed_minutes: float
+  +status: pending | accepted |
+   kept | expired
+}
+class Route <<detallado en 04b>> EXTERNO
+
+Edge "0..*" --> "1" Node : origen
+Edge "0..*" --> "1" Node : destino
+Edge "1" *-- "0..*" TrafficProfile : 7 franjas × 2\ntipos de día
+RouteSample "0..*" --> "2" Node : origen y destino
+Incident "0..*" --> "1..*" Edge : tramos afectados
+RerouteProposal "0..*" --> "0..1" Incident
+RerouteProposal "0..*" --> "1" Route
+Incident "0..*" --> "0..1" Route : reportado desde
+
+note bottom of RouteSample
+  Respuesta de Google
+  guardada para auditar
+  cada peso del grafo.
+end note
+@enduml

@@ -1,0 +1,37 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+title Diagrama de componentes: vista general del despliegue
+
+cloud "DNS Spaceship\n(resuelve\nenruta.world)" as DNS
+node "Dispositivo del usuario" {
+  component "Aplicación React\n(navegador)" as SPA
+}
+cloud "Google Maps\n(mapa, lugares\ny trazo)" as GMAPS
+
+cloud "Google Routes API\n(tráfico en vivo\ny calibración)" as GROUTES
+node "Render: servicio web" {
+  component "Servidor Django\n(detallado en 06b)" as DJ EXTERNO
+}
+cloud "Resend\n(correo)" as RES
+
+node "Render: tarea\nprogramada" {
+  component "Recalibración\nsemanal del\ntráfico" as CRON
+}
+database "PostgreSQL\nen Neon" as PG
+node "Fuera de producción\n(equipo o Google Colab)" {
+  component "Experimento de\nla tesis y\nOR-Tools" as EXP
+  component "Cuadernos:\nSciPy y\nTensorFlow" as NB
+}
+
+SPA -left-> DNS
+SPA -right-> GMAPS
+SPA -down-> DJ : API REST
+DJ -left-> GROUTES
+DJ -right-> RES
+DJ -down-> PG : ORM
+CRON -up-> GROUTES
+CRON -right-> PG
+PG <-down- EXP : lee el grafo
+NB -right-> EXP : resultados
+@enduml

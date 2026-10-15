@@ -1,0 +1,62 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+hide circle
+hide empty members
+title Diagrama de clases: pedidos y rutas
+
+class Order {
+  +code: str
+  +recipient: str
+  +recipient_email: str
+  +tracking_token: str
+  +address: str
+  +latitude: float
+  +longitude: float
+  +weight_kg: decimal
+  +priority: low | normal | high
+  +status: pending | assigned |
+   in_transit | delivered |
+   failed | canceled
+}
+class Route {
+  +code: str
+  +departure_at: datetime
+  +criterion: time | distance
+  +optimizer: genetic | nn2opt
+  +traffic_source: str
+  +traffic_queried_at: datetime
+  +driving_minutes: float
+  +total_km: float
+  +legs: json
+  +status: planned | in_progress |
+   completed | canceled
+}
+class RouteStop {
+  +sequence: int
+  +eta: datetime
+  +status: pending |
+   delivered | failed
+  +reason: str
+}
+class VehiclePosition {
+  +lat: float
+  +lng: float
+  +recorded_at: datetime
+}
+class NotificationLog {
+  +event: str
+  +recipient: email
+  +status: sent | failed | skipped
+}
+class "Depot, Driver,\nVehicle, User" as F <<detallado en 04a>> EXTERNO
+class Node <<detallado en 04c>> EXTERNO
+
+Route "1" *-- "1..*" RouteStop : paradas
+RouteStop "0..*" --> "1" Order : entrega
+Route "1" -- "0..*" VehiclePosition : posiciones
+NotificationLog "0..*" --> "0..1" Route
+NotificationLog "0..*" --> "0..1" Order
+Route --> F : bodega, conductor,\nvehículo y creador
+Order "0..*" --> "0..1" Node : nodo del destino
+@enduml

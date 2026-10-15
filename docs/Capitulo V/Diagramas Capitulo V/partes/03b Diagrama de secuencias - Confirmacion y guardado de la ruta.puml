@@ -1,0 +1,45 @@
+@startuml
+!include ../estilo.iuml
+skinparam maxMessageSize 130
+autonumber "<b>0"
+hide footbox
+title Diagrama de secuencias: confirmación y guardado
+
+actor "Coordinador" as COO
+participant "Interfaz" as UI
+participant "Servidor\n(planificación)" as BE
+database "Base de\ndatos" as DB
+participant "Servicio de\ncorreo Resend" as RES
+
+COO -> UI : criterio, conductor\ny vehículo
+UI -> BE : confirmar ruta
+activate BE
+group transacción [todo o nada]
+  BE -> DB : bloquear pedidos
+  BE -> DB : conductor y vehículo
+  BE -> BE : validar capacidad
+  note over BE
+    Recalcular la variante elegida
+    y su tráfico en vivo (detallado
+    en 03a; sale de la caché de 5 min)
+  end note
+  BE -> DB : rutas que se traslapan
+  group alternativa [capacidad u horario no disponible]
+    BE --> UI : rechazo con el motivo
+  else disponible
+    BE -> DB : guardar ruta, paradas y\nfuente del tráfico; pedidos\n«asignado»
+  end
+end
+BE -> RES : avisos al cliente\ny al conductor
+RES --> BE : identificadores
+BE -> DB : bitácora de avisos
+BE --> UI : ruta creada
+deactivate BE
+UI --> COO : confirmación
+
+note over RES, DB
+  El correo sale después de confirmar
+  la transacción; un fallo nunca
+  deshace la ruta.
+end note
+@enduml

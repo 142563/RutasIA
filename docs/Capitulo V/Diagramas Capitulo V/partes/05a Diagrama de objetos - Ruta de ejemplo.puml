@@ -1,0 +1,72 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+title Diagrama de objetos: una ruta de ejemplo
+
+object "bodega : Depot" as dep {
+  name = "Bodega Central"
+}
+object "ruta : Route" as rt {
+  code = "RUT-20261014-0001"
+  departure_at = 14/10/2026 07:00
+  criterion = "time"
+  optimizer = "genetic"
+  traffic_source = "google_tiempo_real"
+  driving_minutes = 168.4
+  total_km = 112.6
+  status = "planned"
+}
+object "conductor : Driver" as drv {
+  name = "Carlos Andrés Mendoza López"
+}
+object "vehículo : Vehicle" as veh {
+  plate = "C-102BDF"
+  capacity_kg = 2800
+}
+object "parada1 : RouteStop" as s1 {
+  sequence = 1
+  eta = 07:42
+}
+object "parada2 : RouteStop" as s2 {
+  sequence = 2
+  eta = 08:41
+}
+object "parada3 : RouteStop" as s3 {
+  sequence = 3
+  eta = 09:36
+}
+object "pedido1 : Order" as o1 {
+  destino = Mixco
+  weight_kg = 38.0
+  status = "assigned"
+}
+object "pedido2 : Order" as o2 {
+  destino = Antigua Guatemala
+  weight_kg = 6.8
+  status = "assigned"
+}
+object "pedido3 : Order" as o3 {
+  destino = Chimaltenango
+  weight_kg = 4.5
+  status = "assigned"
+}
+
+dep -right- rt : sale de
+rt -right- drv : conductor
+drv -[hidden]down- veh
+rt -right- veh : vehículo
+rt *-down- s1
+s1 -[hidden]down- s2
+s2 -[hidden]down- s3
+rt *-- s2
+rt *-- s3
+s1 -right- o1 : entrega
+s2 -right- o2 : entrega
+s3 -right- o3 : entrega
+
+legend bottom
+  Los tramos de esta ruta en el grafo se detallan en 05b.
+  Nombres y lugares de los datos semilla; minutos, km y
+  horas son ilustrativos, no mediciones.
+endlegend
+@enduml

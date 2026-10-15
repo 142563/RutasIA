@@ -1,0 +1,36 @@
+@startuml
+!include ../estilo.iuml
+title Diagrama de actividades: proponer una ruta
+
+|Coordinador de rutas|
+start
+:Elegir bodega, hora de
+salida y pedidos pendientes;
+
+|Servidor enruta|
+:Validar rol, bodega activa
+y pedidos (máximo 50);
+if (¿Datos válidos?) then (no)
+  :Responder el error;
+  stop
+else (sí)
+endif
+
+|Motor de rutas|
+:Matriz con Dijkstra y orden
+con el algoritmo genético;
+:Trazar cada tramo con A*
+en la franja en que inicia;
+
+|Servidor enruta|
+:Google mide en vivo cada
+tramo (si falla o tarda:
+perfil calibrado);
+:Comparar la más rápida
+con la más corta;
+
+|Coordinador de rutas|
+:Revisar la propuesta (aún no
+se guarda; se confirma en 02b);
+stop
+@enduml

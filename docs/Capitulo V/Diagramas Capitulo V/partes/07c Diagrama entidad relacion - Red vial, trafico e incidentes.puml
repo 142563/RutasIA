@@ -1,0 +1,76 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+hide circle
+hide empty members
+title Diagrama entidad-relación: red vial, tráfico e incidentes
+
+entity "logistics_node" as node {
+  * id : integer <<PK>>
+  --
+  code : varchar(40) <<UK>>
+  name : varchar(120)
+  kind : varchar(10)
+  latitude : double
+  longitude : double
+}
+entity "logistics_edge" as edge {
+  * id : integer <<PK>>
+  --
+  * origin_id : integer <<FK>>
+  * destination_id : integer <<FK>>
+  distance_km : double
+  duration_free_min : double
+  road_class : varchar(10)
+  polyline : text
+}
+entity "logistics_trafficprofile" as tp {
+  * id : integer <<PK>>
+  --
+  * edge_id : integer <<FK>>
+  band : varchar(12)
+  day_type : varchar(8)
+  multiplier : double
+}
+entity "logistics_routesample" as sample {
+  * id : integer <<PK>>
+  --
+  * origin_id : integer <<FK>>
+  * destination_id : integer <<FK>>
+  duration_s : double
+  fetched_at : timestamp
+}
+entity "logistics_incident" as incident {
+  * id : integer <<PK>>
+  --
+  route_id : integer <<FK>>
+  reported_by_id : integer <<FK>>
+  kind : varchar(12)
+  blocked : boolean
+  multiplier : double
+}
+entity "logistics_incident_edges" as ie {
+  * incident_id : integer <<FK>>
+  * edge_id : integer <<FK>>
+}
+entity "logistics_rerouteproposal" as rp {
+  * id : integer <<PK>>
+  --
+  * route_id : integer <<FK>>
+  incident_id : integer <<FK>>
+  current_minutes : double
+  proposed_minutes : double
+  status : varchar(10)
+}
+entity "logistics_route\n(detallada en 07b)" as route EXTERNO
+
+node ||--o{ edge : origen
+node ||--o{ edge : destino
+edge ||--o{ tp
+node ||--o{ sample
+incident ||--|{ ie
+edge ||--o{ ie
+route |o--o{ incident
+route ||--o{ rp
+incident |o--o{ rp
+@enduml

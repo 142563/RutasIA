@@ -1,0 +1,43 @@
+@startuml
+!include ../estilo.iuml
+title Diagrama de actividades: ejecución de la ruta
+
+|Mensajero|
+start
+:Ver la ruta del día e iniciarla;
+
+|Servidor enruta|
+:Ruta «en curso», pedidos
+«en tránsito» y aviso
+a los clientes;
+
+|Mensajero|
+repeat
+  :Navegar a la siguiente parada
+  en el mapa de la aplicación;
+  if (¿Se entregó?) then (sí)
+    :Marcar «entregado»;
+  else (no)
+    :Marcar «no entregado»
+    con el motivo;
+  endif
+
+  |Servidor enruta|
+  :Actualizar parada y
+  pedido; avisar por
+  correo al cliente;
+
+  |Mensajero|
+repeat while (¿Quedan paradas?) is (sí)
+->no;
+
+|Servidor enruta|
+:Ruta «completada» y
+aviso al coordinador;
+stop
+
+legend bottom
+  En ruta comparte su ubicación (cada 5 s como
+  mínimo) y puede reportar un incidente (02c).
+endlegend
+@enduml

@@ -1,0 +1,312 @@
+@startuml
+!pragma layout elk
+skinparam dpi 300
+skinparam backgroundColor white
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam classAttributeIconSize 0
+skinparam roundCorner 4
+skinparam ArrowColor #333333
+skinparam ClassBorderColor #1F3A5F
+skinparam ClassBackgroundColor #F5F5F5
+skinparam ClassHeaderBackgroundColor #DDE6F0
+skinparam PackageBorderColor #7A7A7A
+skinparam PackageBackgroundColor #FFFFFF
+skinparam NoteBorderColor #7A7A7A
+skinparam NoteBackgroundColor #F5F5F5
+skinparam NoteFontSize 10
+skinparam ArrowFontSize 10
+hide circle
+hide empty members
+
+title Diagrama de clases del sistema enruta
+
+together {
+  class User <<auth.User>> {
+    +username: str
+    +email: str
+    +is_active: bool
+  }
+  class UserProfile {
+    +role: admin | dispatcher | driver
+    +must_change_password: bool
+  }
+  class Driver {
+    +name: str
+    +license_number: str
+    +is_active: bool
+  }
+  class Vehicle {
+    +plate: str
+    +model: str
+    +capacity_kg: decimal
+    +is_active: bool
+  }
+  class LoginAttempt {
+    +key: str
+    +failures: json
+    +blocked_until: datetime
+  }
+}
+
+together {
+  class Depot {
+    +name: str
+    +latitude: float
+    +longitude: float
+  }
+  class Order {
+    +code: str
+    +recipient_email: str
+    +latitude: float
+    +longitude: float
+    +weight_kg: decimal
+    +priority: low | normal | high
+    +status: pending | assigned | in_transit | delivered | failed | canceled
+  }
+  class Route {
+    +code: str
+    +departure_at: datetime
+    +criterion: time | distance
+    +optimizer: genetic | nn2opt | fixed
+    +driving_minutes: float
+    +total_km: float
+    +finish_at: datetime
+    +status: planned | in_progress | completed | canceled
+  }
+  class RouteStop {
+    +sequence: int
+    +eta: datetime
+    +status: pending | delivered | failed
+    +delivered_at: datetime
+  }
+  class VehiclePosition {
+    +lat: float
+    +lng: float
+    +recorded_at: datetime
+  }
+}
+
+together {
+  class Node {
+    +code: slug
+    +name: str
+    +kind: cabecera | municipio | cruce
+    +latitude: float
+    +longitude: float
+  }
+  class Edge {
+    +distance_km: float
+    +duration_free_min: float
+    +road_class: primary | secondary | unpaved
+  }
+  class TrafficProfile {
+    +band: str
+    +day_type: weekday | weekend
+    +multiplier: float
+  }
+  class RouteSample {
+    +duration_s: float
+    +fetched_at: datetime
+  }
+  class Incident {
+    +kind: traffic | accident | landslide | closure
+    +blocked: bool
+    +multiplier: float
+    +ends_at: datetime
+  }
+  class RerouteProposal {
+    +current_minutes: float
+    +proposed_minutes: float
+    +status: pending | accepted | kept | expired
+  }
+  class NotificationLog {
+    +event: str
+    +recipient: email
+    +status: sent | failed | skipped
+  }
+}
+
+package "Motor de rutas (logistics/routing, en memoria)" {
+  class RoadGraph {
+    +codes: list[str]
+    +t0: list[float]
+    +weights(criterion, band, day_type): list[float]
+    +search_weights(criterion, band, day_type, avoid_unpaved): list[float]
+    +nearest_node(lat, lon): int
+    +node_index(code): int
+  }
+  class SearchResult {
+    +algorithm: str
+    +cost: float
+    +edges: list[int]
+    +expanded: int
+    +v_max: float
+    +found: bool
+    +total(values): float
+  }
+  class ShortestPathTree {
+    +source: int
+    +dist: list[float]
+    +expanded: int
+    +path_to(grafo, destino)
+  }
+  class Leg {
+    +depart_at: datetime
+    +arrive_at: datetime
+    +km: float
+    +minutes: float
+  }
+  class MultiStopPlan {
+    +order: list[int]
+    +etas: list[datetime]
+    +optimizer: str
+    +ga_generations: int
+    +optimize_ms: float
+    +driving_minutes: float
+    +total_km: float
+  }
+  class "Dijkstra" as DIJ <<módulo>> {
+    +dijkstra(grafo, pesos, origen, destino): SearchResult
+    +dijkstra_all(grafo, pesos, origen): ShortestPathTree
+  }
+  class "A*" as AST <<módulo>> {
+    +astar(grafo, pesos, origen, destino, v_max): SearchResult
+    +compute_v_max(grafo, pesos): float
+    +heuristic(grafo, nodo, destino, v_max): float
+  }
+  class "Varias paradas" as MUL <<módulo>> {
+    +plan_multistop(grafo, bodega, paradas, salida, ...): MultiStopPlan
+    +time_matrix(grafo, pesos, nodos)
+    +nearest_neighbor(matrix): list[int]
+    +two_opt(order, matrix): list[int]
+  }
+  class TimeDependentCost {
+    +__call__(order): float
+  }
+  class "Algoritmo genético" as GEN <<módulo>> {
+    +solve(matrix, params, return_to_depot, seeds, fitness): GeneticResult
+    +ordered_crossover(a, b, rng): list[int]
+    +mutate(order, rng)
+    +fast_two_opt(order, matrix, return_to_depot): list[int]
+  }
+  class GeneticParams {
+    +population: int = 80
+    +generations: int = 400
+    +tournament: int = 3
+    +crossover_rate: float = 0.9
+    +mutation_rate: float = 0.2
+    +elitism: int = 2
+    +stall_generations: int = 60
+    +seed: int = 2026
+    +clamped(): GeneticParams
+  }
+  class GeneticResult {
+    +order: list[int]
+    +cost: float
+    +generations: int
+    +stop_reason: str
+  }
+  class OptimizerSettings {
+    +population, generations, tournament
+    +crossover_rate, mutation_rate, elitism
+    +stall_generations, seed, local_search
+  }
+  class "Línea base OR-Tools" as ORT <<módulo, solo experimentos>> {
+    +solve(matrix, return_to_depot, time_limit_s): BaselineResult
+  }
+  class "Tráfico por franja" as TRA <<módulo>> {
+    +profile_for(moment): (band, day_type)
+    +band_for(moment): str
+    +day_type_for(moment): str
+  }
+  class RoutesClient {
+    +compute_route_matrix(...)
+    +compute_route(...)
+  }
+}
+
+together {
+  class "Planificación" as PLN <<módulo>> {
+    +plan_route(payload): dict
+    +create_route(payload, user): dict
+  }
+  class "Incidentes" as INC <<módulo>> {
+    +create_incident(payload, user): dict
+    +recompute_routes(incident): dict
+    +decide_reroute(proposal_id, payload, user, role): dict
+  }
+}
+
+package "Modelos heredados, sin uso" {
+  class Department
+  class RouteConnection
+  class Trip
+  class TripOrder
+  class TripEvent
+  class FuelPrice
+}
+
+User "1" -- "1" UserProfile : perfil
+User "1" -- "0..1" Driver : cuenta
+Driver "0..1" -- "0..*" Vehicle : asignado
+Depot "0..*" -- "0..1" Node : nodo más cercano
+Order "0..*" -- "0..1" Node : nodo del destino
+Route "0..*" -- "1" Depot : sale de
+Route "0..*" -- "0..1" Driver : conductor
+Route "0..*" -- "0..1" Vehicle : vehículo
+Route "0..*" -- "0..1" User : creada por
+Route "1" *-- "1..*" RouteStop : paradas
+RouteStop "0..*" -- "1" Order : entrega
+Route "1" -- "0..*" VehiclePosition : posiciones
+Driver "1" -- "0..*" VehiclePosition
+Edge "0..*" -- "1" Node : origen
+Edge "0..*" -- "1" Node : destino
+Edge "1" *-- "0..*" TrafficProfile : multiplicadores
+RouteSample "0..*" -- "2" Node : origen y destino
+Incident "0..*" -- "1..*" Edge : tramos afectados
+Incident "0..*" -- "0..1" Route : reportado desde
+Incident "0..*" -- "0..1" User : reportado por
+RerouteProposal "0..*" -- "1" Route
+RerouteProposal "0..*" -- "0..1" Incident
+RerouteProposal "0..*" -- "0..1" User : decidida por
+NotificationLog "0..*" -- "0..1" Order
+NotificationLog "0..*" -- "0..1" Route
+NotificationLog "0..*" -- "0..1" User
+
+MultiStopPlan "1" *-- "1..*" Leg
+Leg "1" -- "1" SearchResult
+MUL ..> MultiStopPlan : <<crea>>
+MUL ..> DIJ : <<usa>>
+MUL ..> AST : <<usa>>
+MUL ..> TRA : <<usa>>
+MUL ..> GEN : ordena con
+MUL ..> TimeDependentCost : aptitud
+TimeDependentCost ..> DIJ : matriz por franja
+GEN ..> GeneticParams
+GEN ..> GeneticResult : devuelve
+PLN ..> OptimizerSettings : lee parámetros
+OptimizerSettings ..> GeneticParams : se convierte en
+ORT ..> GeneticResult : se compara con
+DIJ ..> RoadGraph
+DIJ ..> ShortestPathTree : devuelve
+DIJ ..> SearchResult : devuelve
+AST ..> RoadGraph
+AST ..> SearchResult : devuelve
+PLN ..> MUL
+PLN ..> Route : guarda
+INC ..> AST
+INC ..> RerouteProposal : crea
+RoadGraph ..> Node : se arma desde
+RoadGraph ..> Edge : se arma desde
+RoadGraph ..> TrafficProfile : se arma desde
+RoutesClient ..> RouteSample : consulta por lotes
+
+note bottom of RoutesClient
+  Se usa en la construcción y calibración del
+  grafo, en la recalibración semanal y en el
+  tráfico en vivo (al planificar y al verificar).
+end note
+@enduml

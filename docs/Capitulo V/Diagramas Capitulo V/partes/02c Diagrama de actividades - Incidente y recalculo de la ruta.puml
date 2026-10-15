@@ -1,0 +1,51 @@
+@startuml
+!include ../estilo.iuml
+title Diagrama de actividades: incidente y recálculo
+
+|Personal|
+start
+:Reportar incidente:
+tipo, tramos y efecto;
+
+|Servidor enruta|
+:Registrar el incidente
+y avisar al personal;
+if (¿Alguna ruta usa esos
+tramos en lo pendiente?) then (no)
+  stop
+else (sí)
+endif
+
+|Motor de rutas|
+:Recalcular con A*
+los tramos pendientes
+(cierre = infinito);
+
+|Servidor enruta|
+if (¿Cerrado o ahorro
+≥ 1 minuto?) then (no)
+  :Mantener la ruta;
+  stop
+else (sí)
+  :Crear propuesta y
+  avisar al coordinador;
+endif
+
+|Personal|
+if (¿Aprobar?) then (sí)
+  |Servidor enruta|
+  :Reemplazar tramos,
+  actualizar llegadas y
+  avisar al conductor;
+else (no)
+  |Servidor enruta|
+  :Marcar «mantuvo
+  la ruta»;
+endif
+stop
+
+legend bottom
+  Personal: reporta el mensajero o el coordinador;
+  decide el conductor de la ruta o el despacho.
+endlegend
+@enduml

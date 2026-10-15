@@ -1,0 +1,39 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+left to right direction
+title Diagrama de casos de uso: seguimiento y avisos
+
+actor "Cliente final" as CLI
+actor "Personal\n(coordinador,\nmensajero,\nadministrador)" as PER
+actor "Servicio de\ncorreo Resend" as RES
+
+rectangle "Sistema enruta" {
+  usecase "Seguir pedido con el\nenlace público" as U_SEG
+  usecase "Enviar avisos\npor correo" as U_MAIL
+  usecase "Gestionar usuarios\n(detallado en 01a)" as X_USR EXTERNO
+  usecase "Registrar pedido y\nplanificar ruta\n(detallado en 01b)" as X_PLAN EXTERNO
+  usecase "Reportar incidente\n(detallado en 01c)" as X_INC EXTERNO
+  usecase "Iniciar ruta y\nmarcar entrega\n(detallado en 01d)" as X_ENT EXTERNO
+}
+
+CLI --> U_SEG
+U_MAIL --> CLI
+U_MAIL --> PER
+U_MAIL --> RES
+X_USR ..> U_MAIL : <<incluir>>
+X_PLAN ..> U_MAIL : <<incluir>>
+X_INC ..> U_MAIL : <<incluir>>
+X_ENT ..> U_MAIL : <<incluir>>
+
+note bottom of U_SEG
+  Sin cuenta: token de 128 bits.
+  Muestra datos mínimos (sin
+  teléfono ni coordenadas).
+end note
+note bottom of U_MAIL
+  Se envía después de confirmar
+  la transacción; un fallo del
+  correo nunca deshace la entrega.
+end note
+@enduml

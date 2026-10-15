@@ -1,0 +1,53 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+hide circle
+hide empty members
+title Diagrama de clases: usuarios y flota
+
+class User <<cuenta de Django>> {
+  +username: str
+  +email: str
+  +is_active: bool
+}
+class UserProfile {
+  +role: admin | dispatcher | driver
+  +must_change_password: bool
+  +temp_password_expires_at: datetime
+}
+class Driver {
+  +name: str
+  +phone: str
+  +license_number: str
+  +last_position_at: datetime
+  +is_active: bool
+}
+class Vehicle {
+  +plate: str
+  +model: str
+  +capacity_kg: decimal
+  +is_active: bool
+}
+class Depot {
+  +name: str
+  +address: str
+  +latitude: float
+  +longitude: float
+  +is_active: bool
+}
+class Node <<detallado en 04c>> EXTERNO
+class Route <<detallado en 04b>> EXTERNO
+
+User "1" -- "1" UserProfile : perfil y rol
+User "1" -- "0..1" Driver : cuenta del conductor
+Driver "0..1" -- "0..*" Vehicle : asignado
+Depot "0..*" --> "0..1" Node : nodo más cercano
+Route "0..*" --> "1" Depot : sale de
+Route "0..*" --> "0..1" Driver : conductor
+Route "0..*" --> "0..1" Vehicle : vehículo
+
+note bottom of UserProfile
+  El rol se verifica en el servidor
+  en cada solicitud.
+end note
+@enduml

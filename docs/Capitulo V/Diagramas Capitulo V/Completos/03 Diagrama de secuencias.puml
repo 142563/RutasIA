@@ -1,0 +1,95 @@
+@startuml
+skinparam dpi 300
+skinparam backgroundColor white
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ArrowColor #333333
+skinparam SequenceLifeLineBorderColor #7A7A7A
+skinparam ParticipantBorderColor #1F3A5F
+skinparam ParticipantBackgroundColor #F5F5F5
+skinparam ActorBorderColor #333333
+skinparam ActorBackgroundColor #FFFFFF
+skinparam DatabaseBorderColor #1F3A5F
+skinparam DatabaseBackgroundColor #F5F5F5
+skinparam SequenceGroupBorderColor #7A7A7A
+skinparam SequenceGroupBackgroundColor #FFFFFF
+skinparam SequenceBoxBorderColor #7A7A7A
+skinparam NoteBorderColor #7A7A7A
+skinparam NoteBackgroundColor #F5F5F5
+skinparam NoteFontSize 10
+skinparam ArrowFontSize 10
+skinparam ParticipantPadding 12
+skinparam BoxPadding 6
+skinparam maxMessageSize 150
+autonumber "<b>0"
+
+hide footbox
+title Diagrama de secuencias: generar una ruta optimizada
+
+actor "Coordinador\nde rutas" as COO
+participant "Interfaz React\n(Planificar)" as UI
+participant "Servidor Django\n(planificación)" as BE
+participant "Motor de rutas\n(Dijkstra, A*)" as MO
+participant "Algoritmo\ngenético" as GA
+database "Base de datos\nPostgreSQL" as DB
+participant "Google\nRoutes API" as GGL
+participant "Servicio de\ncorreo Resend" as RES
+
+== Proponer la ruta (sin guardar) ==
+COO -> UI : Elegir bodega, pedidos pendientes\ny hora de salida
+UI -> BE : Pedir propuesta
+activate BE
+BE -> BE : Verificar rol (administrador o despachador)
+BE -> DB : Consultar bodega y pedidos
+DB --> BE : Bodega y pedidos pendientes
+BE -> MO : Grafo en memoria (en caché)
+group repetir [más corta, más rápida y cada franja de salida]
+  BE -> MO : Matriz de tiempos con Dijkstra (uno a todos)
+  MO --> BE : Minutos entre bodega y paradas
+  BE -> GA : Ordenar paradas (parámetros del administrador)
+  activate GA
+  GA -> GA : Torneo, cruce OX, mutación,\nelitismo y 2-opt
+  GA --> BE : Mejor orden
+  deactivate GA
+  BE -> MO : A* por cada tramo (franja en que inicia)
+  MO --> BE : Tramos, minutos y llegadas
+end
+BE -> GGL : Medir en vivo los tramos elegidos\n(en paralelo, caché de 5 minutos)
+GGL --> BE : Minutos con el tráfico del momento\n(si falla: perfil calibrado)
+BE --> UI : Variantes, ahorro, fuente del tráfico\ny tiempo de respuesta
+deactivate BE
+UI --> COO : Comparación y llegadas en el mapa
+
+== Confirmar y guardar la ruta ==
+COO -> UI : Elegir criterio, conductor y vehículo,\ny confirmar
+UI -> BE : Confirmar ruta
+activate BE
+group transacción [todo o nada]
+  BE -> DB : Bloquear los pedidos
+  BE -> DB : Consultar conductor y vehículo
+  BE -> BE : Validar capacidad
+  note over BE
+    Recalcular la variante elegida y su tráfico
+    en vivo (sale de la caché de 5 minutos)
+  end note
+  BE -> DB : Rutas que se traslapan en horario
+  group alternativa [capacidad u horario no disponible]
+    BE --> UI : Rechazo con el motivo
+  else disponible
+    BE -> DB : Guardar ruta, paradas y fuente del tráfico;\npedidos pasan a «asignado»
+  end
+end
+BE -> RES : Avisos al cliente y al conductor
+RES --> BE : Identificadores de los correos
+BE -> DB : Bitácora de avisos (enviado o falló)
+BE --> UI : Ruta creada
+deactivate BE
+UI --> COO : Confirmación
+
+note over RES, DB
+  El correo sale después de confirmar la transacción;
+  un fallo del correo nunca deshace la ruta.
+end note
+@enduml

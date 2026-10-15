@@ -1,0 +1,42 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+top to bottom direction
+title Diagrama de casos de uso: planificación de rutas
+
+actor "Coordinador\nde rutas" as COO
+actor "API de\nGoogle Maps" as GGL
+
+rectangle "Sistema enruta" {
+  usecase "Registrar\npedido" as U_PED
+  usecase "Ubicar\ndirección\nen el mapa" as U_GEO
+  usecase "Planificar\nruta\noptimizada" as U_PLAN
+  usecase "Ordenar\nparadas con el\nalgoritmo\ngenético" as U_GA
+  usecase "Calcular matriz\ny tramos con\nDijkstra y A*" as U_TRAMOS
+  usecase "Asignar\nconductor\ny vehículo" as U_ASIG
+  usecase "Mostrar ruta\nen el mapa" as U_MAPA
+  usecase "Consultar\nanálisis Dijkstra\ncontra A*" as U_ANA
+  usecase "Enviar avisos\npor correo\n(detallado en 01e)" as U_MAIL EXTERNO
+}
+
+COO --> U_PED
+COO --> U_PLAN
+COO --> U_ANA
+U_PED ..> U_GEO : <<incluir>>
+U_PED ..> U_MAIL : <<incluir>>
+U_PLAN ..> U_GA : <<incluir>>
+U_GA ..> U_TRAMOS : <<incluir>>
+U_PLAN ..> U_MAPA : <<incluir>>
+U_PLAN ..> U_MAIL : <<incluir>>
+U_ASIG ..> U_PLAN : <<extender>>
+U_GEO --> GGL
+U_MAPA --> GGL
+U_TRAMOS --> GGL
+
+note bottom of U_TRAMOS
+  Google mide en vivo los
+  tramos elegidos; si falla,
+  se usan los perfiles
+  calibrados por franja.
+end note
+@enduml

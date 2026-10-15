@@ -1,0 +1,72 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+hide circle
+hide empty members
+title Diagrama entidad-relación: usuarios, flota y bodegas
+
+entity "auth_user" as user {
+  * id : integer <<PK>>
+  --
+  username : varchar(150) <<UK>>
+  email : varchar(254)
+  is_active : boolean
+}
+entity "logistics_userprofile" as profile {
+  * id : integer <<PK>>
+  --
+  * user_id : integer <<FK, UK>>
+  role : varchar(20)
+  must_change_password : boolean
+  temp_password_expires_at : timestamp
+}
+entity "logistics_driver" as driver {
+  * id : integer <<PK>>
+  --
+  user_id : integer <<FK, UK>>
+  name : varchar(120)
+  license_number : varchar(30) <<UK>>
+  is_active : boolean
+}
+entity "logistics_vehicle" as vehicle {
+  * id : integer <<PK>>
+  --
+  driver_id : integer <<FK>>
+  plate : varchar(16) <<UK>>
+  capacity_kg : numeric(8,2)
+  is_active : boolean
+}
+entity "logistics_depot" as depot {
+  * id : integer <<PK>>
+  --
+  node_id : integer <<FK>>
+  name : varchar(120) <<UK>>
+  latitude : double
+  longitude : double
+}
+entity "logistics_optimizersettings" as optset {
+  * id : integer <<PK>> (= 1)
+  --
+  population, generations,
+  tournament, crossover_rate,
+  mutation_rate, elitism,
+  stall_generations, seed, ...
+}
+entity "logistics_route\n(detallada en 07b)" as route EXTERNO
+entity "logistics_node\n(detallada en 07c)" as node EXTERNO
+
+user ||-down-|| profile
+user |o-right-o| driver
+driver |o-down-o{ vehicle
+route }o-left-o| driver
+route }o-down-o| vehicle
+route }o-down-|| depot
+depot }o-down-o| node
+route }o-up-o| user
+profile -[hidden]down- optset
+
+note bottom of optset
+  Fila única sin relaciones:
+  parámetros del genético.
+end note
+@enduml

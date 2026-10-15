@@ -1,0 +1,78 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+hide circle
+hide empty members
+title Diagrama de clases: motor de optimización
+
+class RoadGraph {
+  +codes: list[str]
+  +t0: list[float]
+  +km: list[float]
+  +weights(criterio, franja, día)
+  +search_weights(...)
+}
+class "Dijkstra" as DIJ <<módulo>> {
+  +dijkstra(grafo, pesos, s, t)
+  +dijkstra_all(grafo, pesos, s)
+}
+class "A*" as AST <<módulo>> {
+  +astar(grafo, pesos, s, t)
+  +compute_v_max(grafo, pesos)
+}
+class SearchResult {
+  +cost: float
+  +edges: list[int]
+  +expanded: int
+  +elapsed_ms: float
+}
+class "Varias paradas" as MUL <<módulo>> {
+  +plan_multistop(...): MultiStopPlan
+  +time_matrix(grafo, pesos, nodos)
+}
+class TimeDependentCost {
+  +__call__(orden): float
+}
+class "Algoritmo genético" as GEN <<módulo>> {
+  +solve(matriz, params, ...)
+  +ordered_crossover(a, b)
+  +mutate(orden)
+  +fast_two_opt(orden, matriz)
+}
+class GeneticParams {
+  +population: int = 80
+  +generations: int = 400
+  +tournament: int = 3
+  +crossover_rate: float = 0.9
+  +mutation_rate: float = 0.2
+  +elitism: int = 2
+  +seed: int = 2026
+}
+class OptimizerSettings <<ajustes del administrador>> {
+  +population, generations, ...
+}
+class MultiStopPlan {
+  +order: list[int]
+  +legs: list[Leg]
+  +etas: list[datetime]
+  +optimizer: str
+}
+
+MUL .left.> MultiStopPlan : <<crea>>
+MUL .down.> DIJ : matriz <<usa>>
+MUL .down.> GEN : orden <<usa>>
+MUL .down.> AST : tramos <<usa>>
+DIJ .down.> RoadGraph
+AST .down.> SearchResult : <<devuelve>>
+AST .left.> RoadGraph
+GEN .down.> TimeDependentCost : aptitud
+TimeDependentCost -[hidden]down- GeneticParams
+GEN ..> GeneticParams
+OptimizerSettings .up.> GeneticParams : <<se convierte en>>
+
+note bottom of OptimizerSettings
+  Biblioteca estándar de Python.
+  OR-Tools solo como línea base
+  en el experimento de la tesis.
+end note
+@enduml

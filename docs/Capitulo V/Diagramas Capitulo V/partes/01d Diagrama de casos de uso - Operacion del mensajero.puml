@@ -1,0 +1,39 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+left to right direction
+title Diagrama de casos de uso: operación del mensajero
+
+actor "Mensajero" as MEN
+
+rectangle "Sistema enruta" {
+  usecase "Ver ruta del día" as U_DIA
+  usecase "Iniciar ruta" as U_INI
+  usecase "Navegar dentro\nde la aplicación" as U_NAV
+  usecase "Marcar entrega\no no entrega" as U_ENT
+  usecase "Compartir\nubicación GPS" as U_GPS
+  usecase "Mostrar ruta en el mapa\n(detallado en 01b)" as U_MAPA EXTERNO
+  usecase "Reportar incidente\n(detallado en 01c)" as U_INC EXTERNO
+  usecase "Enviar avisos por correo\n(detallado en 01e)" as U_MAIL EXTERNO
+}
+
+MEN --> U_DIA
+MEN --> U_INI
+MEN --> U_NAV
+MEN --> U_ENT
+MEN --> U_GPS
+MEN --> U_INC
+U_NAV ..> U_MAPA : <<incluir>>
+U_INI ..> U_MAIL : <<incluir>>
+U_ENT ..> U_MAIL : <<incluir>>
+
+note bottom of U_ENT
+  Si no se entregó, el
+  motivo es obligatorio.
+end note
+note bottom of U_GPS
+  Solo con la ruta en curso,
+  una lectura cada 5 s
+  como mínimo.
+end note
+@enduml

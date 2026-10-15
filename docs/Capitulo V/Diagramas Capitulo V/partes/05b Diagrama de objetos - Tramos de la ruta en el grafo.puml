@@ -1,0 +1,91 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+title Diagrama de objetos: tramos de la ruta en el grafo
+
+hide circle
+hide empty members
+class "<u>ruta : Route</u>" as rt <<detallada en 05a>> EXTERNO
+object "n1 : Node" as n1 {
+  code = "ciudad-guatemala"
+  kind = "cabecera"
+}
+object "n2 : Node" as n2 {
+  code = "el-trebol"
+  kind = "cruce"
+}
+object "n3 : Node" as n3 {
+  code = "mixco"
+  kind = "municipio"
+}
+object "n4 : Node" as n4 {
+  code = "san-lucas-sacatepequez"
+  kind = "cruce"
+}
+object "n5 : Node" as n5 {
+  code = "antigua-guatemala"
+  kind = "cabecera"
+}
+object "e1 : Edge" as e1 {
+  road = "Urbano"
+  distance_km = 4.1
+  duration_free_min = 9.0
+}
+object "e2 : Edge" as e2 {
+  road = "CA-1"
+  distance_km = 8.2
+  duration_free_min = 11.0
+}
+object "e3 : Edge" as e3 {
+  road = "CA-1"
+  distance_km = 14.8
+  duration_free_min = 16.0
+}
+object "e4 : Edge" as e4 {
+  road = "RN-10"
+  distance_km = 12.5
+  duration_free_min = 17.0
+}
+object "perfil : TrafficProfile" as tp {
+  band = "peak_am"
+  day_type = "weekday"
+  multiplier = 1.60
+}
+object "incidente : Incident" as inc {
+  kind = "accident"
+  multiplier = 2.0
+}
+object "propuesta :\nRerouteProposal" as rp {
+  current_minutes = 46.0
+  proposed_minutes = 39.5
+  status = "pending"
+}
+
+rt .down. n1 : sale de
+n1 -[hidden]down- n2
+n2 -[hidden]down- n3
+n3 -[hidden]down- n4
+n4 -[hidden]down- n5
+e1 -[hidden]down- e2
+e2 -[hidden]down- e3
+e3 -[hidden]down- e4
+e1 -left-> n1 : origen
+e1 -left-> n2 : destino
+e2 -left-> n2 : origen
+e2 -left-> n3 : destino
+e3 -left-> n3 : origen
+e3 -left-> n4 : destino
+e4 -left-> n4 : origen
+e4 -left-> n5 : destino
+e2 -right- tp : tráfico
+inc -left-> e2 : tramo afectado
+tp -[hidden]down- inc
+inc -[hidden]down- rp
+rp -up-> inc
+rp .up. rt
+
+legend bottom
+  Tramo 1: e1 y e2; tramo 2: e3 y e4 (A* elige estas aristas).
+  Valores ilustrativos, no mediciones.
+endlegend
+@enduml

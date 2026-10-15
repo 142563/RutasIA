@@ -1,0 +1,41 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+title Diagrama de componentes: detalle del servidor Django
+
+component "Aplicación React\n(detallado en 06a)" as SPA EXTERNO
+component "Gunicorn\n(3 procesos)" as GUN
+component "WhiteNoise\n(archivos\nestáticos)" as WN
+package "Django" {
+  component "Presentación\n(vistas, sesión\ny roles)" as PRES
+  component "Aplicación\n(planificación,\nincidentes,\nasignación,\nconductor,\npedidos,\nseguimiento)" as APP
+  component "Dominio\n(reglas y\nregiones)" as DOM
+  component "Motor de rutas\n(grafo, Dijkstra,\nA*, algoritmo\ngenético)" as ENG
+  component "Tráfico\nen vivo\n(caché 5 min)" as LIVE
+  component "Notificaciones\n(correo)" as NOT
+  component "Cliente de\nGoogle" as RCL
+}
+database "PostgreSQL\n(detallado\nen 06a)" as PG EXTERNO
+cloud "Google\nRoutes API\n(06a)" as GR EXTERNO
+cloud "Resend\n(06a)" as RES EXTERNO
+
+SPA -right-> GUN : API REST
+GUN -right-> WN
+GUN -down-> PRES : interfaz del\nservidor web
+PRES -down-> APP
+APP -left-> DOM
+APP -up-> PG : ORM
+PRES -[hidden]right- PG
+APP -down-> ENG
+APP -down-> LIVE
+APP -right-> NOT
+LIVE -right-> RCL
+RCL -right-> GR
+NOT -right-> RES
+
+legend bottom
+  El motor nunca llama a Google ni a la base de datos
+  dentro de Dijkstra o A*. Los avisos salen tras
+  confirmar la transacción.
+endlegend
+@enduml

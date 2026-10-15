@@ -1,0 +1,39 @@
+@startuml
+!pragma layout smetana
+!include ../estilo.iuml
+top to bottom direction
+title Diagrama de casos de uso: monitoreo y recálculo
+
+actor "Coordinador\nde rutas" as COO
+actor "Mensajero" as MEN
+actor "API de\nGoogle Maps" as GGL
+
+rectangle "Sistema enruta" {
+  usecase "Monitorear\nrutas en vivo" as U_MON
+  usecase "Verificar\ntráfico en vivo" as U_LIVE
+  usecase "Reportar\nincidente" as U_INC
+  usecase "Recalcular\nrutas afectadas\ncon A*" as U_REC
+  usecase "Aprobar\nrecálculo" as U_APR
+  usecase "Mostrar ruta\nen el mapa\n(detallado en 01b)" as U_MAPA EXTERNO
+  usecase "Enviar avisos\npor correo\n(detallado en 01e)" as U_MAIL EXTERNO
+}
+
+COO --> U_MON
+COO --> U_INC
+MEN --> U_INC
+COO --> U_APR
+MEN --> U_APR
+U_MON ..> U_MAPA : <<incluir>>
+U_LIVE ..> U_MON : <<extender>>
+U_INC ..> U_REC : <<incluir>>
+U_INC ..> U_MAIL : <<incluir>>
+U_APR ..> U_REC : <<extender>>
+U_LIVE --> GGL
+
+note bottom of U_REC
+  Solo se propone una ruta
+  nueva si el tramo quedó
+  cerrado o si ahorra al
+  menos 1 minuto.
+end note
+@enduml

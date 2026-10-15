@@ -1,0 +1,42 @@
+@startuml
+!include ../estilo.iuml
+skinparam maxMessageSize 130
+autonumber "<b>0"
+hide footbox
+title Diagrama de secuencias: incidente, recálculo y decisión
+
+actor "Mensajero o\ncoordinador" as PER
+participant "Servidor\n(incidentes)" as BE
+participant "Motor de\nrutas (A*)" as MO
+database "Base de\ndatos" as DB
+participant "Servicio de\ncorreo Resend" as RES
+
+PER -> BE : reportar incidente
+activate BE
+group transacción [todo o nada]
+  BE -> DB : guardar incidente\ny tramos
+  BE -> DB : rutas planificadas\no en curso
+  group repetir [cada ruta afectada]
+    BE -> MO : A* con costo\npenalizado
+    MO --> BE : tramos nuevos
+    group opcional [cerrado o ahorro ≥ 1 min]
+      BE -> DB : propuesta pendiente
+    end
+  end
+end
+BE -> RES : avisos al personal\ny al coordinador
+BE --> PER : propuestas creadas
+deactivate BE
+
+== decisión ==
+PER -> BE : aprobar o mantener
+activate BE
+group alternativa [aprobar]
+  BE -> DB : reemplazar tramos\ny llegadas
+  BE -> RES : avisar al conductor
+else mantener
+  BE -> DB : «mantuvo la ruta»
+end
+BE --> PER : decisión registrada
+deactivate BE
+@enduml
