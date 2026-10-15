@@ -14,8 +14,9 @@ import { concatenateGeometry, type EdgeGeometry } from "@/lib/polyline";
 import { CONGESTION_STEPS, congestionColor } from "@/lib/congestion";
 import { useTrafficProfile } from "@/lib/queries";
 import { bandFor, bandLabel, dayTypeFor } from "@/lib/traffic";
-import { GEOMETRY_PENDING_NOTE, mergeTrafficPairs, NETWORK_GEOMETRY_KEY, pairsWithGeometry, pairTitle, toggleLayer, trafficMapEdges } from "@/lib/trafficMap";
+import { GEOMETRY_PENDING_NOTE, mergeTrafficPairs, NETWORK_GEOMETRY_KEY, pairsWithGeometry, pairTitle, toggleLayer, trafficMapEdges, type DrawnPair } from "@/lib/trafficMap";
 import { useAnimatedPosition } from "@/components/ui/motion";
+import { frameScheduler, intersectsViewport, preparePixelPath, type Pixel } from "@/lib/mapRendering";
 
 /**
  Mapa de la red vial nacional.
@@ -93,7 +94,13 @@ export interface NetworkMapProps {
   children?: (toXY: (p: LatLng) => [number, number]) => React.ReactNode;
 }
 
-type ToXY = (p: LatLng) => [number, number];
+interface TrafficCamera {
+  project: (p: LatLng) => Pixel;
+  scale: number;
+  offset: Pixel;
+  viewport: Pixel;
+}
+type ToXY = ((p: LatLng) => Pixel) & { camera?: TrafficCamera };
 
 export function NetworkMap(props: NetworkMapProps) {
   const google = useGoogleMaps();
@@ -160,12 +167,7 @@ export function NetworkMap(props: NetworkMapProps) {
   if (showOurs && onGoogle && drawn.length) {
     layers = {
       ...props,
-      renderEdges: (toXY: ToXY) => <g strokeLinecap="round" strokeLinejoin="round" fill="none">{drawn.map(({ pair, points }) => {
-        const d = points.map((p, i) => { const [x, y] = toXY(p); return `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`; }).join("");
-        return <path key={pair.key} d={d} stroke={congestionColor(pair.multiplier)} strokeWidth={3} opacity={0.85}>
-          <title>{pairTitle(pair, nameOf)}</title>
-        </path>;
-      })}</g>,
+      renderEdges: (toXY: ToXY) => <TrafficRoads drawn={drawn} toXY={toXY} nodes={props.nodes} />,
     };
   } else if (showOurs && !onGoogle) {
     // Mapa esquemático: la recta de nodo a nodo sí tiene sentido.
@@ -230,6 +232,25 @@ export function NetworkMap(props: NetworkMapProps) {
 
 /* ───────────────────────── Capas comunes (SVG) ───────────────────────── */
 
+export const TrafficRoads = React.memo(function TrafficRoads({ drawn, toXY, nodes }: { drawn: DrawnPair[]; toXY: ToXY; nodes: GraphNode[] }) {
+  const camera = toXY.camera;
+  const project = camera?.project ?? toXY;
+  const scale = camera?.scale ?? 1;
+  // La proyección mundial no cambia al arrastrar: solo se mueve el grupo SVG.
+  const world = React.useMemo(() => drawn.map(({ pair, points }) => ({ pair, points: points.map(project) })), [drawn, project]);
+  const prepared = React.useMemo(() => world.map(({ pair, points }) => ({ pair, ...preparePixelPath(points, scale) })), [world, scale]);
+  const names = React.useMemo(() => new Map(nodes.map((node) => [node.code, node.name])), [nodes]);
+  const offset = camera?.offset ?? [0, 0];
+  return <g transform={`translate(${offset[0]} ${offset[1]})`} strokeLinecap="round" strokeLinejoin="round" fill="none">
+    {prepared.map(({ pair, d, bounds }) => {
+      if (camera && !intersectsViewport(bounds, camera.offset, camera.viewport)) return null;
+      return <path key={pair.key} d={d} stroke={congestionColor(pair.multiplier)} strokeWidth={3} opacity={0.85}>
+        <title>{pairTitle(pair, (code) => names.get(code) ?? code)}</title>
+      </path>;
+    })}
+  </g>;
+});
+
 interface LayerOptions {
   onGoogle: boolean;
   roadGeometry?: Map<string, LatLng[]>;
@@ -273,15 +294,24 @@ function MapLayers({ props, toXY, opts }: { props: NetworkMapProps; toXY: ToXY; 
     ? { stroke: "var(--color-ink-3)", width: 1.2, opacity: 0.35 }
     : { stroke: "var(--color-line-strong)", width: 1.4, opacity: 1 };
   const markCount = Math.min(nodeMarks.length, MAX_CASCADE);
+  const customEdges = React.useMemo(() => renderEdges?.(toXY), [renderEdges, toXY]);
+  const routePoints = React.useMemo(() => paths.map((path) => {
+    const road = path.followRoads ? opts.roadGeometry?.get(pathKey(path.codes)) : undefined;
+    const points = road ? road.map(toXY) : path.codes.map((code) => {
+      const node = byCode.get(code);
+      return node ? toXY(node) : null;
+    }).filter((p): p is Pixel => p !== null);
+    return points.length < 2 ? null : points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  }), [paths, opts.roadGeometry, toXY, byCode]);
 
   return (
     <>
       <style>{MAP_CSS}</style>
 
       {/* Tramos de la red (base) */}
-      {renderEdges ? renderEdges(toXY) : null}
-      <g strokeLinecap="round" display={renderEdges ? "none" : undefined}>
-        {edges.map((edge) => {
+      {customEdges}
+      <g strokeLinecap="round">
+        {!renderEdges && edges.map((edge) => {
           const a = xy(edge.from);
           const b = xy(edge.to);
           if (!a || !b) return null;
@@ -318,10 +348,8 @@ function MapLayers({ props, toXY, opts }: { props: NetworkMapProps; toXY: ToXY; 
       {/* Rutas: se dibujan de origen a destino al aparecer */}
       <g fill="none" strokeLinecap="round" strokeLinejoin="round">
         {paths.map((path, i) => {
-          const road = path.followRoads ? opts.roadGeometry?.get(pathKey(path.codes)) : undefined;
-          const points = road ? road.map(toXY) : path.codes.map(xy).filter((p): p is [number, number] => p !== null);
-          if (points.length < 2) return null;
-          const d = points.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+          const d = routePoints[i];
+          if (!d) return null;
           const w = path.width ?? 4;
           const opacity = path.opacity ?? 1;
           // pathLength 0→1 no combina con trazos discontinuos: esas rutas aparecen con un fundido
@@ -509,7 +537,7 @@ function GoogleNetworkMap(props: NetworkMapProps & { storedGeometry: Map<string,
   const { resolved: theme } = useTheme();
   const [map, setMap] = React.useState<google.maps.Map | null>(null);
   const [overlay, setOverlay] = React.useState<google.maps.OverlayView | null>(null);
-  const [, redraw] = React.useReducer((x: number) => x + 1, 0);
+  const [cameraVersion, redraw] = React.useReducer((x: number) => x + 1, 0);
 
   // Crear el mapa una sola vez
   React.useEffect(() => {
@@ -528,13 +556,18 @@ function GoogleNetworkMap(props: NetworkMapProps & { storedGeometry: Map<string,
     const ov = new google.maps.OverlayView();
     ov.onAdd = () => {};
     ov.onRemove = () => {};
-    ov.draw = () => redraw();
+    const frames = frameScheduler(redraw, requestAnimationFrame, cancelAnimationFrame);
+    ov.draw = frames.schedule;
     ov.setMap(m);
-    const listener = m.addListener("bounds_changed", () => redraw());
+    const listener = m.addListener("bounds_changed", frames.schedule);
+    const resize = new ResizeObserver(frames.schedule);
+    resize.observe(divRef.current);
     setMap(m);
     setOverlay(ov);
     return () => {
       listener.remove();
+      resize.disconnect();
+      frames.dispose();
       ov.setMap(null);
     };
   }, []);
@@ -585,15 +618,34 @@ function GoogleNetworkMap(props: NetworkMapProps & { storedGeometry: Map<string,
   const fallbackPaths = props.geometryReady ? props.paths?.filter((path) => !props.storedGeometry.has(pathKey(path.codes))) : undefined;
   const fallbackGeometry = useRoadGeometry(map ? fallbackPaths : undefined, nodes);
   const connectorGeometry = useConnectorGeometry(map ? props.connectors : undefined);
-  const roadGeometry = new Map([...fallbackGeometry, ...props.storedGeometry, ...connectorGeometry]);
+  const roadGeometry = React.useMemo(() => new Map([...fallbackGeometry, ...props.storedGeometry, ...connectorGeometry]),
+    [fallbackGeometry, props.storedGeometry, connectorGeometry]);
 
   const projection = overlay?.getProjection();
-  const toXY: ToXY | null = projection
-    ? (p) => {
-        const pt = projection.fromLatLngToContainerPixel(new google.maps.LatLng(p.lat, p.lng));
-        return pt ? [pt.x, pt.y] : [-9999, -9999];
-      }
-    : null;
+  const worldProjection = map?.getProjection();
+  const projectWorld = React.useMemo(() => {
+    if (!worldProjection) return null;
+    const origin = worldProjection.fromLatLngToPoint(GUATEMALA_CENTER)!;
+    return (point: LatLng): Pixel => {
+      const p = worldProjection.fromLatLngToPoint(point)!;
+      return [p.x - origin.x, p.y - origin.y];
+    };
+  }, [worldProjection]);
+  const toXY = React.useMemo(() => {
+    if (!projection) return null;
+    const convert: ToXY = (p) => {
+      const pt = projection.fromLatLngToContainerPixel(new google.maps.LatLng(p.lat, p.lng));
+      return pt ? [pt.x, pt.y] : [-9999, -9999];
+    };
+    const scale = projection.getWorldWidth() / 256;
+    if (map && projectWorld && Number.isFinite(scale) && scale > 0 && !(map.getTilt() ?? 0) && !(map.getHeading() ?? 0)) {
+      convert.camera = {
+        project: projectWorld, scale, offset: convert(GUATEMALA_CENTER),
+        viewport: [map.getDiv().clientWidth, map.getDiv().clientHeight],
+      };
+    }
+    return convert;
+  }, [projection, map, projectWorld, cameraVersion]);
 
   return (
     <div
